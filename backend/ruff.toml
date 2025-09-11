@@ -1,0 +1,10 @@
+target-version = "py39"
+line-length = 144
+
+[lint]
+select = ["ALL"]
+fixable = ["UP034", "I001"]
+ignore = ["T201", "D", "ANN101", "TD002", "TD003"]
+
+[lint.extend-per-file-ignores]
+"test*.py" = ["S101"]
