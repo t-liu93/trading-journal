@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from sqlalchemy import text
-from sqlalchemy.engine import Connection, Engine
 from sqlmodel import SQLModel
 
-# 最新 schema 版本号
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Connection, Engine
+
 LATEST_VERSION = 1
 
 
@@ -17,6 +18,8 @@ def _mig_0_1(engine: Engine) -> None:
     """
     # Ensure all models are imported before this is called (import side-effect registers tables)
     # e.g. trading_journal.models is imported in the caller / app startup.
+    from trading_journal import models_v1  # noqa: PLC0415, F401
+
     SQLModel.metadata.create_all(bind=engine)
 
 
@@ -31,7 +34,7 @@ def _get_sqlite_user_version(conn: Connection) -> int:
     return int(row[0]) if row and row[0] is not None else 0
 
 
-def _set_sqlite_user_version(conn, v: int) -> None:
+def _set_sqlite_user_version(conn: Connection, v: int) -> None:
     conn.execute(text(f"PRAGMA user_version = {int(v)}"))
 
 
@@ -54,23 +57,4 @@ def run_migrations(engine: Engine, target_version: int | None = None) -> int:
                 _set_sqlite_user_version(conn, cur_version + 1)
                 cur_version += 1
             return cur_version
-        else:
-            # generic migrations table for non-sqlite
-            conn.execute(
-                text("""
-                CREATE TABLE IF NOT EXISTS migrations (
-                    version INTEGER PRIMARY KEY,
-                    applied_at TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            )
-            row = conn.execute(text("SELECT MAX(version) FROM migrations")).fetchone()
-            cur_version = int(row[0]) if row and row[0] is not None else 0
-            while cur_version < target:
-                fn = MIGRATIONS.get(cur_version)
-                if fn is None:
-                    raise RuntimeError(f"No migration from {cur_version} -> {cur_version + 1}")
-                fn(engine)
-                conn.execute(text("INSERT INTO migrations(version) VALUES (:v)"), {"v": cur_version + 1})
-                cur_version += 1
-            return cur_version
+        return -1  # unknown / unsupported driver; no-op

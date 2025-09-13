@@ -7,7 +7,7 @@ from sqlalchemy import event
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, create_engine
 
-import trading_journal.db_migration
+from trading_journal import db_migration
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -33,6 +33,8 @@ class Database:
             def _enable_sqlite_pragmas(dbapi_conn: DBAPIConnection, _connection_record: object) -> None:
                 try:
                     cur = dbapi_conn.cursor()
+                    cur.execute("PRAGMA journal_mode=WAL;")
+                    cur.execute("PRAGMA synchronous=NORMAL;")
                     cur.execute("PRAGMA foreign_keys=ON;")
                     cur.execute("PRAGMA busy_timeout=30000;")
                     cur.close()
@@ -43,7 +45,7 @@ class Database:
             event.listen(self._engine, "connect", _enable_sqlite_pragmas)
 
     def init_db(self) -> None:
-        pass
+        db_migration.run_migrations(self._engine)
 
     def get_session(self) -> Generator[Session, None, None]:
         session = Session(self._engine)
