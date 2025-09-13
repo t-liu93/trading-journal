@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Callable
 
 from sqlalchemy import text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 from sqlmodel import SQLModel
 
 # 最新 schema 版本号
@@ -26,7 +26,7 @@ MIGRATIONS: dict[int, Callable[[Engine], None]] = {
 }
 
 
-def _get_sqlite_user_version(conn) -> int:
+def _get_sqlite_user_version(conn: Connection) -> int:
     row = conn.execute(text("PRAGMA user_version")).fetchone()
     return int(row[0]) if row and row[0] is not None else 0
 

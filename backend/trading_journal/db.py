@@ -5,12 +5,13 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import event
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, create_engine
+
+import trading_journal.db_migration
 
 if TYPE_CHECKING:
     from collections.abc import Generator
-
-    from sqlalchemy.engine import Connection
+    from sqlite3 import Connection as DBAPIConnection
 
 
 class Database:
@@ -29,11 +30,9 @@ class Database:
 
         if self._database_url.startswith("sqlite"):
 
-            def _enable_sqlite_pragmas(dbapi_conn: Connection, _connection_record: object) -> None:
+            def _enable_sqlite_pragmas(dbapi_conn: DBAPIConnection, _connection_record: object) -> None:
                 try:
                     cur = dbapi_conn.cursor()
-                    cur.execute("PRAGMA journal_mode=WAL;")
-                    cur.execute("PRAGMA synchronous=NORMAL;")
                     cur.execute("PRAGMA foreign_keys=ON;")
                     cur.execute("PRAGMA busy_timeout=30000;")
                     cur.close()

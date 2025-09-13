@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime  # noqa: TC003
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
 from sqlmodel import Enum as SQLEnum
