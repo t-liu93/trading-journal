@@ -7,7 +7,7 @@ on:
 
 jobs:
   unit-test:
-    runs-on: ubuntu-latest-slim
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
