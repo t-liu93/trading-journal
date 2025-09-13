@@ -64,7 +64,7 @@ def test_rollback_on_exception() -> None:
             s.exec(text("CREATE TABLE IF NOT EXISTS t_rb (id INTEGER PRIMARY KEY, val TEXT);"))
             s.exec(text("INSERT INTO t_rb (val) VALUES (:v)").bindparams(v="will_rollback"))
             # simulate handler error -> should trigger rollback in get_session
-            raise RuntimeError("simulated failure")  # noqa: TRY003, EM101
+            raise RuntimeError("simulated failure")
 
     # New session should not see the inserted row
     with session_ctx(db) as s2:

@@ -4,7 +4,17 @@ line-length = 144
 [lint]
 select = ["ALL"]
 fixable = ["UP034", "I001"]
-ignore = ["T201", "D", "ANN101", "TD002", "TD003", "TRY003", "EM102"]
+ignore = [
+    "T201",
+    "D",
+    "ANN101",
+    "TD002",
+    "TD003",
+    "TRY003",
+    "EM101",
+    "EM102",
+    "PLC0405",
+]
 
 [lint.extend-per-file-ignores]
 "test*.py" = ["S101"]
