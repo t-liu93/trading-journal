@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import date, datetime  # noqa: TC003
 from enum import Enum
 
@@ -75,7 +73,7 @@ class Trades(SQLModel, table=True):
     cycle_id: int | None = Field(
         default=None, foreign_key="cycles.id", nullable=True, index=True
     )
-    cycle: Cycles | None = Relationship(back_populates="trades")
+    cycle: "Cycles" = Relationship(back_populates="trades")
 
 
 class Cycles(SQLModel, table=True):
@@ -94,13 +92,13 @@ class Cycles(SQLModel, table=True):
     symbol: str = Field(sa_column=Column(Text, nullable=False))
     underlying_currency: str = Field(sa_column=Column(Text, nullable=False))
     status: CycleStatus = Field(sa_column=Column(Text, nullable=False))
-    funding_source: FundingSource = Field(sa_column=Column(Text, nullable=False))
-    capital_exposure_cents: int
+    funding_source: FundingSource = Field(sa_column=Column(Text, nullable=True))
+    capital_exposure_cents: int | None = Field(default=None, nullable=True)
     loan_amount_cents: int | None = Field(default=None, nullable=True)
     loan_interest_rate_bps: int | None = Field(default=None, nullable=True)
     start_date: date = Field(sa_column=Column(Date, nullable=False))
     end_date: date | None = Field(default=None, sa_column=Column(Date, nullable=True))
-    trades: list[Trades] = Relationship(back_populates="cycle")
+    trades: list["Trades"] = Relationship(back_populates="cycle")
 
 
 class Users(SQLModel, table=True):
