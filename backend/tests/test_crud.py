@@ -11,14 +11,19 @@ from trading_journal import crud, models
 
 
 @pytest.fixture
-def engine() -> Engine:
+def engine() -> Generator[Engine, None, None]:
     e = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     SQLModel.metadata.create_all(e)
-    return e
+    try:
+        yield e
+    finally:
+        SQLModel.metadata.drop_all(e)
+        SQLModel.metadata.clear()
+        e.dispose()
 
 
 @pytest.fixture
@@ -41,7 +46,7 @@ def make_cycle(session, user_id: int, friendly_name: str = "Test Cycle") -> int:
         friendly_name=friendly_name,
         symbol="AAPL",
         underlying_currency="USD",
-        status="open",
+        status=models.CycleStatus.OPEN,
         start_date=datetime.now().date(),
     )
     session.add(cycle)
