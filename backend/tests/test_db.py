@@ -42,7 +42,6 @@ def database_ctx(db: Database) -> Generator[Database, None, None]:
         yield db
     finally:
         db.dispose()
-        SQLModel.metadata.clear()
 
 
 def test_select_one_executes() -> None:
@@ -77,6 +76,7 @@ def test_sqlite_pragmas_applied() -> None:
 
 def test_rollback_on_exception() -> None:
     db = create_database(None)
+    SQLModel.metadata.clear()
     db.init_db()
     with database_ctx(db):
         # Create table then insert and raise inside the same session to force rollback

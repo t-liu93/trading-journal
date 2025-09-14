@@ -24,7 +24,6 @@ def engine() -> Generator[Engine, None, None]:
         yield e
     finally:
         SQLModel.metadata.drop_all(e)
-        SQLModel.metadata.clear()
         e.dispose()
 
 

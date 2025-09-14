@@ -13,6 +13,7 @@ def _base_type_of(compiled: str) -> str:
 
 def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
     # in-memory engine that preserves the same connection (StaticPool)
+    SQLModel.metadata.clear()
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
