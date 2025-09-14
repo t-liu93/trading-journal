@@ -1,8 +1,17 @@
 from datetime import date, datetime  # noqa: TC003
 from enum import Enum
 
-from sqlalchemy import Date, Text, UniqueConstraint
-from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
+from sqlmodel import (
+    Column,
+    Date,
+    DateTime,
+    Field,
+    Integer,
+    Relationship,
+    SQLModel,
+    Text,
+    UniqueConstraint,
+)
 
 
 class TradeType(str, Enum):
@@ -36,6 +45,18 @@ class CycleStatus(str, Enum):
     CLOSED = "CLOSED"
 
 
+class UnderlyingCurrency(str, Enum):
+    EUR = "EUR"
+    USD = "USD"
+    GBP = "GBP"
+    JPY = "JPY"
+    AUD = "AUD"
+    CAD = "CAD"
+    CHF = "CHF"
+    NZD = "NZD"
+    CNY = "CNY"
+
+
 class FundingSource(str, Enum):
     CASH = "CASH"
     MARGIN = "MARGIN"
@@ -57,19 +78,22 @@ class Trades(SQLModel, table=True):
         default=None, sa_column=Column(Text, nullable=True)
     )
     symbol: str = Field(sa_column=Column(Text, nullable=False))
-    underlying_currency: str = Field(sa_column=Column(Text, nullable=False))
+    underlying_currency: UnderlyingCurrency = Field(
+        sa_column=Column(Text, nullable=False)
+    )
     trade_type: TradeType = Field(sa_column=Column(Text, nullable=False))
     trade_strategy: TradeStrategy = Field(sa_column=Column(Text, nullable=False))
+    trade_date: date = Field(sa_column=Column(Date, nullable=False))
     trade_time_utc: datetime = Field(
         sa_column=Column(DateTime(timezone=True), nullable=False)
     )
     expiry_date: date | None = Field(default=None, nullable=True)
     strike_price_cents: int | None = Field(default=None, nullable=True)
-    quantity: int
-    price_cents: int
-    gross_cash_flow_cents: int
-    commission_cents: int
-    net_cash_flow_cents: int
+    quantity: int = Field(sa_column=Column(Integer, nullable=False))
+    price_cents: int = Field(sa_column=Column(Integer, nullable=False))
+    gross_cash_flow_cents: int = Field(sa_column=Column(Integer, nullable=False))
+    commission_cents: int = Field(sa_column=Column(Integer, nullable=False))
+    net_cash_flow_cents: int = Field(sa_column=Column(Integer, nullable=False))
     cycle_id: int | None = Field(
         default=None, foreign_key="cycles.id", nullable=True, index=True
     )
@@ -90,7 +114,9 @@ class Cycles(SQLModel, table=True):
         default=None, sa_column=Column(Text, nullable=True)
     )
     symbol: str = Field(sa_column=Column(Text, nullable=False))
-    underlying_currency: str = Field(sa_column=Column(Text, nullable=False))
+    underlying_currency: UnderlyingCurrency = Field(
+        sa_column=Column(Text, nullable=False)
+    )
     status: CycleStatus = Field(sa_column=Column(Text, nullable=False))
     funding_source: FundingSource = Field(sa_column=Column(Text, nullable=True))
     capital_exposure_cents: int | None = Field(default=None, nullable=True)

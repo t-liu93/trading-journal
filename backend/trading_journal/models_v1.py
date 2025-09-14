@@ -36,6 +36,18 @@ class CycleStatus(str, Enum):
     CLOSED = "CLOSED"
 
 
+class UnderlyingCurrency(str, Enum):
+    EUR = "EUR"
+    USD = "USD"
+    GBP = "GBP"
+    JPY = "JPY"
+    AUD = "AUD"
+    CAD = "CAD"
+    CHF = "CHF"
+    NZD = "NZD"
+    CNY = "CNY"
+
+
 class FundingSource(str, Enum):
     CASH = "CASH"
     MARGIN = "MARGIN"
@@ -57,9 +69,12 @@ class Trades(SQLModel, table=True):
         default=None, sa_column=Column(Text, nullable=True)
     )
     symbol: str = Field(sa_column=Column(Text, nullable=False))
-    underlying_currency: str = Field(sa_column=Column(Text, nullable=False))
+    underlying_currency: UnderlyingCurrency = Field(
+        sa_column=Column(Text, nullable=False)
+    )
     trade_type: TradeType = Field(sa_column=Column(Text, nullable=False))
     trade_strategy: TradeStrategy = Field(sa_column=Column(Text, nullable=False))
+    trade_date: date = Field(sa_column=Column(Date, nullable=False))
     trade_time_utc: datetime = Field(
         sa_column=Column(DateTime(timezone=True), nullable=False)
     )
@@ -90,7 +105,9 @@ class Cycles(SQLModel, table=True):
         default=None, sa_column=Column(Text, nullable=True)
     )
     symbol: str = Field(sa_column=Column(Text, nullable=False))
-    underlying_currency: str = Field(sa_column=Column(Text, nullable=False))
+    underlying_currency: UnderlyingCurrency = Field(
+        sa_column=Column(Text, nullable=False)
+    )
     status: CycleStatus = Field(sa_column=Column(Text, nullable=False))
     funding_source: FundingSource = Field(sa_column=Column(Text, nullable=True))
     capital_exposure_cents: int | None = Field(default=None, nullable=True)
