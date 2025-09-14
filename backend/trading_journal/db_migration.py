@@ -18,9 +18,16 @@ def _mig_0_1(engine: Engine) -> None:
     """
     # Ensure all models are imported before this is called (import side-effect registers tables)
     # e.g. trading_journal.models is imported in the caller / app startup.
-    from trading_journal import models_v1  # noqa: PLC0415, F401
+    from trading_journal import models_v1
 
-    SQLModel.metadata.create_all(bind=engine)
+    SQLModel.metadata.create_all(
+        bind=engine,
+        tables=[
+            models_v1.Trades.__table__,
+            models_v1.Cycles.__table__,
+            models_v1.Users.__table__,
+        ],
+    )
 
 
 # map current_version -> function that migrates from current_version -> current_version+1
@@ -51,7 +58,9 @@ def run_migrations(engine: Engine, target_version: int | None = None) -> int:
             while cur_version < target:
                 fn = MIGRATIONS.get(cur_version)
                 if fn is None:
-                    raise RuntimeError(f"No migration from {cur_version} -> {cur_version + 1}")
+                    raise RuntimeError(
+                        f"No migration from {cur_version} -> {cur_version + 1}"
+                    )
                 # call migration with Engine (fn should use transactions)
                 fn(engine)
                 _set_sqlite_user_version(conn, cur_version + 1)
