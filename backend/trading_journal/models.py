@@ -34,7 +34,7 @@ class TradeType(str, Enum):
 
 
 class TradeStrategy(str, Enum):
-    WHEELS = "WHEEL"
+    WHEEL = "WHEEL"
     FX = "FX"
     SPOT = "SPOT"
     OTHER = "OTHER"

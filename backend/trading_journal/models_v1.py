@@ -1,8 +1,17 @@
 from datetime import date, datetime  # noqa: TC003
 from enum import Enum
 
-from sqlalchemy import Date, Text, UniqueConstraint
-from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
+from sqlmodel import (
+    Column,
+    Date,
+    DateTime,
+    Field,
+    Integer,
+    Relationship,
+    SQLModel,
+    Text,
+    UniqueConstraint,
+)
 
 
 class TradeType(str, Enum):
@@ -25,7 +34,7 @@ class TradeType(str, Enum):
 
 
 class TradeStrategy(str, Enum):
-    WHEELS = "WHEEL"
+    WHEEL = "WHEEL"
     FX = "FX"
     SPOT = "SPOT"
     OTHER = "OTHER"
@@ -80,11 +89,11 @@ class Trades(SQLModel, table=True):
     )
     expiry_date: date | None = Field(default=None, nullable=True)
     strike_price_cents: int | None = Field(default=None, nullable=True)
-    quantity: int
-    price_cents: int
-    gross_cash_flow_cents: int
-    commission_cents: int
-    net_cash_flow_cents: int
+    quantity: int = Field(sa_column=Column(Integer, nullable=False))
+    price_cents: int = Field(sa_column=Column(Integer, nullable=False))
+    gross_cash_flow_cents: int = Field(sa_column=Column(Integer, nullable=False))
+    commission_cents: int = Field(sa_column=Column(Integer, nullable=False))
+    net_cash_flow_cents: int = Field(sa_column=Column(Integer, nullable=False))
     cycle_id: int | None = Field(
         default=None, foreign_key="cycles.id", nullable=True, index=True
     )
