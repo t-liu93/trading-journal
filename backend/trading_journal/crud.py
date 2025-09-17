@@ -115,6 +115,13 @@ def get_trade_by_user_id_and_friendly_name(
     return session.exec(statement).first()
 
 
+def get_trades_by_user_id(session: Session, user_id: int) -> list[models.Trades]:
+    statement = select(models.Trades).where(
+        models.Trades.user_id == user_id,
+    )
+    return session.exec(statement).all()
+
+
 # Cycles
 def create_cycle(session: Session, cycle_data: Mapping) -> models.Cycles:
     if hasattr(cycle_data, "dict"):

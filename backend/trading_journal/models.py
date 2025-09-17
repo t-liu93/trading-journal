@@ -94,6 +94,14 @@ class Trades(SQLModel, table=True):
     gross_cash_flow_cents: int = Field(sa_column=Column(Integer, nullable=False))
     commission_cents: int = Field(sa_column=Column(Integer, nullable=False))
     net_cash_flow_cents: int = Field(sa_column=Column(Integer, nullable=False))
+    is_invalidated: bool = Field(default=False, nullable=False)
+    invalidated_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    replaced_by_trade_id: int | None = Field(
+        default=None, foreign_key="trades.id", nullable=True
+    )
+    notes: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     cycle_id: int | None = Field(
         default=None, foreign_key="cycles.id", nullable=True, index=True
     )
