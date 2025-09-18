@@ -74,6 +74,7 @@ def make_trade(
         commission_cents=500,
         net_cash_flow_cents=-150500,
         cycle_id=cycle_id,
+        notes="Initial test trade",
     )
     session.add(trade)
     session.commit()
@@ -97,9 +98,9 @@ def test_create_trade_success_with_cycle(session: Session):
         "user_id": user_id,
         "friendly_name": "Test Trade",
         "symbol": "AAPL",
-        "underlying_currency": "USD",
-        "trade_type": "LONG_SPOT",
-        "trade_strategy": "SPOT",
+        "underlying_currency": models.UnderlyingCurrency.USD,
+        "trade_type": models.TradeType.LONG_SPOT,
+        "trade_strategy": models.TradeStrategy.SPOT,
         "trade_time_utc": datetime.now(),
         "quantity": 10,
         "price_cents": 15000,
@@ -137,9 +138,9 @@ def test_create_trade_with_auto_created_cycle(session: Session):
         "user_id": user_id,
         "friendly_name": "Test Trade with Auto Cycle",
         "symbol": "AAPL",
-        "underlying_currency": "USD",
-        "trade_type": "LONG_SPOT",
-        "trade_strategy": "SPOT",
+        "underlying_currency": models.UnderlyingCurrency.USD,
+        "trade_type": models.TradeType.LONG_SPOT,
+        "trade_strategy": models.TradeStrategy.SPOT,
         "trade_time_utc": datetime.now(),
         "quantity": 5,
         "price_cents": 15500,
@@ -179,9 +180,9 @@ def test_create_trade_missing_required_fields(session: Session):
         "user_id": user_id,
         "friendly_name": "Incomplete Trade",
         "symbol": "AAPL",
-        "underlying_currency": "USD",
-        "trade_type": "LONG_SPOT",
-        "trade_strategy": "SPOT",
+        "underlying_currency": models.UnderlyingCurrency.USD,
+        "trade_type": models.TradeType.LONG_SPOT,
+        "trade_strategy": models.TradeStrategy.SPOT,
         "trade_time_utc": datetime.now(),
         "quantity": 10,
         "price_cents": 15000,
@@ -338,13 +339,89 @@ def test_get_trades_by_user_id(session: Session):
     assert friendly_names == {"Trade One", "Trade Two"}
 
 
+def test_update_trade_note(session: Session):
+    user_id = make_user(session)
+    cycle_id = make_cycle(session, user_id)
+    trade_id = make_trade(session, user_id, cycle_id)
+
+    new_note = "This is an updated note."
+    updated_trade = crud.update_trade_note(session, trade_id, new_note)
+    assert updated_trade is not None
+    assert updated_trade.id == trade_id
+    assert updated_trade.notes == new_note
+
+    session.refresh(updated_trade)
+    actual_trade = session.get(models.Trades, trade_id)
+    assert actual_trade is not None
+    assert actual_trade.notes == new_note
+
+
+def test_invalidate_trade(session: Session):
+    user_id = make_user(session)
+    cycle_id = make_cycle(session, user_id)
+    trade_id = make_trade(session, user_id, cycle_id)
+
+    invalidated_trade = crud.invalidate_trade(session, trade_id)
+    assert invalidated_trade is not None
+    assert invalidated_trade.id == trade_id
+    assert invalidated_trade.is_invalidated is True
+
+    session.refresh(invalidated_trade)
+    actual_trade = session.get(models.Trades, trade_id)
+    assert actual_trade is not None
+    assert actual_trade.is_invalidated is True
+
+
+def test_replace_trade(session: Session):
+    user_id = make_user(session)
+    cycle_id = make_cycle(session, user_id)
+    old_trade_id = make_trade(session, user_id, cycle_id)
+
+    new_trade_data = {
+        "user_id": user_id,
+        "friendly_name": "Replaced Trade",
+        "symbol": "MSFT",
+        "underlying_currency": models.UnderlyingCurrency.USD,
+        "trade_type": models.TradeType.LONG_SPOT,
+        "trade_strategy": models.TradeStrategy.SPOT,
+        "trade_time_utc": datetime.now(),
+        "quantity": 20,
+        "price_cents": 25000,
+    }
+
+    new_trade = crud.replace_trade(session, old_trade_id, new_trade_data)
+    assert new_trade.id is not None
+    assert new_trade.id != old_trade_id
+    assert new_trade.user_id == user_id
+    assert new_trade.symbol == new_trade_data["symbol"]
+    assert new_trade.quantity == new_trade_data["quantity"]
+
+    # Verify the old trade is invalidated
+    old_trade = session.get(models.Trades, old_trade_id)
+    assert old_trade is not None
+    assert old_trade.is_invalidated is True
+
+    # Verify the new trade exists
+    session.refresh(new_trade)
+    actual_new_trade = session.get(models.Trades, new_trade.id)
+    assert actual_new_trade is not None
+    assert actual_new_trade.friendly_name == new_trade_data["friendly_name"]
+    assert actual_new_trade.symbol == new_trade_data["symbol"]
+    assert actual_new_trade.underlying_currency == new_trade_data["underlying_currency"]
+    assert actual_new_trade.trade_type == new_trade_data["trade_type"]
+    assert actual_new_trade.trade_strategy == new_trade_data["trade_strategy"]
+    assert actual_new_trade.quantity == new_trade_data["quantity"]
+    assert actual_new_trade.price_cents == new_trade_data["price_cents"]
+    assert actual_new_trade.replaced_by_trade_id == old_trade_id
+
+
 def test_create_cycle(session: Session):
     user_id = make_user(session)
     cycle_data = {
         "user_id": user_id,
         "friendly_name": "My First Cycle",
         "symbol": "GOOGL",
-        "underlying_currency": "USD",
+        "underlying_currency": models.UnderlyingCurrency.USD,
         "status": models.CycleStatus.OPEN,
         "start_date": datetime.now().date(),
     }
@@ -367,6 +444,50 @@ def test_create_cycle(session: Session):
     assert actual_cycle.start_date == cycle_data["start_date"]
 
 
+def test_update_cycle(session: Session):
+    user_id = make_user(session)
+    cycle_id = make_cycle(session, user_id, friendly_name="Initial Cycle Name")
+
+    update_data = {
+        "friendly_name": "Updated Cycle Name",
+        "status": models.CycleStatus.CLOSED,
+    }
+    updated_cycle = crud.update_cycle(session, cycle_id, update_data)
+    assert updated_cycle is not None
+    assert updated_cycle.id == cycle_id
+    assert updated_cycle.friendly_name == update_data["friendly_name"]
+    assert updated_cycle.status == update_data["status"]
+
+    session.refresh(updated_cycle)
+    actual_cycle = session.get(models.Cycles, cycle_id)
+    assert actual_cycle is not None
+    assert actual_cycle.friendly_name == update_data["friendly_name"]
+    assert actual_cycle.status == update_data["status"]
+
+
+def test_update_cycle_immutable_fields(session: Session):
+    user_id = make_user(session)
+    cycle_id = make_cycle(session, user_id, friendly_name="Initial Cycle Name")
+
+    # Attempt to update immutable fields
+    update_data = {
+        "id": cycle_id + 1,  # Trying to change the ID
+        "user_id": user_id + 1,  # Trying to change the user_id
+        "start_date": datetime(2020, 1, 1).date(),  # Trying to change start_date
+        "created_at": datetime(2020, 1, 1),  # Trying to change created_at
+        "friendly_name": "Valid Update",  # Valid field to update
+    }
+
+    with pytest.raises(ValueError) as excinfo:
+        crud.update_cycle(session, cycle_id, update_data)
+    assert (
+        "field 'id' is immutable" in str(excinfo.value)
+        or "field 'user_id' is immutable" in str(excinfo.value)
+        or "field 'start_date' is immutable" in str(excinfo.value)
+        or "field 'created_at' is immutable" in str(excinfo.value)
+    )
+
+
 def test_create_user(session: Session):
     user_data = {
         "username": "newuser",
@@ -382,3 +503,40 @@ def test_create_user(session: Session):
     assert actual_user is not None
     assert actual_user.username == user_data["username"]
     assert actual_user.password_hash == user_data["password_hash"]
+
+
+def test_update_user(session: Session):
+    user_id = make_user(session, username="updatableuser")
+
+    update_data = {
+        "password_hash": "updatedhashedpassword",
+    }
+    updated_user = crud.update_user(session, user_id, update_data)
+    assert updated_user is not None
+    assert updated_user.id == user_id
+    assert updated_user.password_hash == update_data["password_hash"]
+
+    session.refresh(updated_user)
+    actual_user = session.get(models.Users, user_id)
+    assert actual_user is not None
+    assert actual_user.password_hash == update_data["password_hash"]
+
+
+def test_update_user_immutable_fields(session: Session):
+    user_id = make_user(session, username="immutableuser")
+
+    # Attempt to update immutable fields
+    update_data = {
+        "id": user_id + 1,  # Trying to change the ID
+        "username": "newusername",  # Trying to change the username
+        "created_at": datetime(2020, 1, 1),  # Trying to change created_at
+        "password_hash": "validupdate",  # Valid field to update
+    }
+
+    with pytest.raises(ValueError) as excinfo:
+        crud.update_user(session, user_id, update_data)
+    assert (
+        "field 'id' is immutable" in str(excinfo.value)
+        or "field 'username' is immutable" in str(excinfo.value)
+        or "field 'created_at' is immutable" in str(excinfo.value)
+    )
