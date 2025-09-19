@@ -63,6 +63,17 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
                 "net_cash_flow_cents": ("INTEGER", 1, 0),
                 "cycle_id": ("INTEGER", 0, 0),
             },
+            "sessions": {
+                "id": ("INTEGER", 1, 1),
+                "user_id": ("INTEGER", 1, 0),
+                "session_token_hash": ("TEXT", 1, 0),
+                "created_at": ("DATETIME", 1, 0),
+                "expires_at": ("DATETIME", 1, 0),
+                "last_seen_at": ("DATETIME", 0, 0),
+                "last_used_ip": ("TEXT", 0, 0),
+                "user_agent": ("TEXT", 0, 0),
+                "device_name": ("TEXT", 0, 0),
+            },
         }
 
         expected_fks = {
