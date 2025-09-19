@@ -25,7 +25,7 @@ jobs:
         run: pip install -r dev-requirements.txt
 
       - name: Run models vs snapshot check
-        working-directory: ..
+        working-directory: ${{ github.workspace }}
         run: |
           python .github/scripts/compare_models.py backend/trading_journal/models.py
 
