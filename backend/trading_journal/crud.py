@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
-from typing import Mapping
+from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from trading_journal import models
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
-def _check_enum(enum_cls, value, field_name: str):
+
+def _check_enum(enum_cls: any, value: any, field_name: str) -> any:
     if value is None:
         raise ValueError(f"{field_name} is required")
     # already an enum member
@@ -34,19 +39,13 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
         raise ValueError("symbol is required")
     if "underlying_currency" not in payload:
         raise ValueError("underlying_currency is required")
-    payload["underlying_currency"] = _check_enum(
-        models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency"
-    )
+    payload["underlying_currency"] = _check_enum(models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency")
     if "trade_type" not in payload:
         raise ValueError("trade_type is required")
-    payload["trade_type"] = _check_enum(
-        models.TradeType, payload["trade_type"], "trade_type"
-    )
+    payload["trade_type"] = _check_enum(models.TradeType, payload["trade_type"], "trade_type")
     if "trade_strategy" not in payload:
         raise ValueError("trade_strategy is required")
-    payload["trade_strategy"] = _check_enum(
-        models.TradeStrategy, payload["trade_strategy"], "trade_strategy"
-    )
+    payload["trade_strategy"] = _check_enum(models.TradeStrategy, payload["trade_strategy"], "trade_strategy")
     # trade_time_utc is the creation moment: always set to now (caller shouldn't provide)
     now = datetime.now(timezone.utc)
     payload.pop("trade_time_utc", None)
@@ -67,9 +66,7 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
     if "gross_cash_flow_cents" not in payload:
         payload["gross_cash_flow_cents"] = -quantity * price_cents
     if "net_cash_flow_cents" not in payload:
-        payload["net_cash_flow_cents"] = (
-            payload["gross_cash_flow_cents"] - commission_cents
-        )
+        payload["net_cash_flow_cents"] = payload["gross_cash_flow_cents"] - commission_cents
 
     # If no cycle_id provided, create Cycle instance but don't call create_cycle()
     created_cycle = None
@@ -78,8 +75,7 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
             "user_id": user_id,
             "symbol": payload["symbol"],
             "underlying_currency": payload["underlying_currency"],
-            "friendly_name": "Auto-created Cycle by trade "
-            + payload.get("friendly_name", ""),
+            "friendly_name": "Auto-created Cycle by trade " + payload.get("friendly_name", ""),
             "status": models.CycleStatus.OPEN,
             "start_date": payload["trade_date"],
         }
@@ -92,9 +88,8 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
         cycle = session.get(models.Cycles, cycle_id)
         if cycle is None:
             raise ValueError("cycle_id does not exist")
-        else:
-            if cycle.user_id != user_id:
-                raise ValueError("cycle.user_id does not match trade.user_id")
+        if cycle.user_id != user_id:
+            raise ValueError("cycle.user_id does not match trade.user_id")
 
     # Build trade instance; if we created a Cycle instance, link via relationship so a single flush will persist both and populate ids
     t_payload = dict(payload)
@@ -119,9 +114,7 @@ def get_trade_by_id(session: Session, trade_id: int) -> models.Trades | None:
     return session.get(models.Trades, trade_id)
 
 
-def get_trade_by_user_id_and_friendly_name(
-    session: Session, user_id: int, friendly_name: str
-) -> models.Trades | None:
+def get_trade_by_user_id_and_friendly_name(session: Session, user_id: int, friendly_name: str) -> models.Trades | None:
     statement = select(models.Trades).where(
         models.Trades.user_id == user_id,
         models.Trades.friendly_name == friendly_name,
@@ -169,17 +162,14 @@ def invalidate_trade(session: Session, trade_id: int) -> models.Trades:
     return trade
 
 
-def replace_trade(
-    session: Session, old_trade_id: int, new_trade_data: Mapping
-) -> models.Trades:
+def replace_trade(session: Session, old_trade_id: int, new_trade_data: Mapping) -> models.Trades:
     invalidate_trade(session, old_trade_id)
     if hasattr(new_trade_data, "dict"):
         data = new_trade_data.dict(exclude_unset=True)
     else:
         data = dict(new_trade_data)
     data["replaced_by_trade_id"] = old_trade_id
-    new_trade = create_trade(session, data)
-    return new_trade
+    return create_trade(session, data)
 
 
 # Cycles
@@ -196,9 +186,7 @@ def create_cycle(session: Session, cycle_data: Mapping) -> models.Cycles:
         raise ValueError("symbol is required")
     if "underlying_currency" not in payload:
         raise ValueError("underlying_currency is required")
-    payload["underlying_currency"] = _check_enum(
-        models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency"
-    )
+    payload["underlying_currency"] = _check_enum(models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency")
     if "status" not in payload:
         raise ValueError("status is required")
     payload["status"] = _check_enum(models.CycleStatus, payload["status"], "status")
@@ -219,9 +207,7 @@ def create_cycle(session: Session, cycle_data: Mapping) -> models.Cycles:
 IMMUTABLE_CYCLE_FIELDS = {"id", "user_id", "start_date", "created_at"}
 
 
-def update_cycle(
-    session: Session, cycle_id: int, update_data: Mapping
-) -> models.Cycles:
+def update_cycle(session: Session, cycle_id: int, update_data: Mapping) -> models.Cycles:
     cycle: models.Cycles | None = session.get(models.Cycles, cycle_id)
     if cycle is None:
         raise ValueError("cycle_id does not exist")
@@ -237,9 +223,9 @@ def update_cycle(
         if k not in allowed:
             continue
         if k == "underlying_currency":
-            v = _check_enum(models.UnderlyingCurrency, v, "underlying_currency")
+            v = _check_enum(models.UnderlyingCurrency, v, "underlying_currency")  # noqa: PLW2901
         if k == "status":
-            v = _check_enum(models.CycleStatus, v, "status")
+            v = _check_enum(models.CycleStatus, v, "status")  # noqa: PLW2901
         setattr(cycle, k, v)
     session.add(cycle)
     try:
@@ -337,9 +323,7 @@ def create_login_session(
     return s
 
 
-def get_login_session_by_token_hash_and_user_id(
-    session: Session, session_token_hash: str, user_id: int
-) -> models.Sessions | None:
+def get_login_session_by_token_hash_and_user_id(session: Session, session_token_hash: str, user_id: int) -> models.Sessions | None:
     statement = select(models.Sessions).where(
         models.Sessions.session_token_hash == session_token_hash,
         models.Sessions.user_id == user_id,
@@ -352,14 +336,12 @@ def get_login_session_by_token_hash_and_user_id(
 IMMUTABLE_SESSION_FIELDS = {"id", "user_id", "session_token_hash", "created_at"}
 
 
-def update_login_session(
-    session: Session, session_token_hashed: str, update_session: Mapping
-) -> models.Sessions | None:
+def update_login_session(session: Session, session_token_hashed: str, update_session: Mapping) -> models.Sessions | None:
     login_session: models.Sessions | None = session.exec(
         select(models.Sessions).where(
             models.Sessions.session_token_hash == session_token_hashed,
             models.Sessions.expires_at > datetime.now(timezone.utc),
-        )
+        ),
     ).first()
     if login_session is None:
         return None
@@ -385,7 +367,7 @@ def delete_login_session(session: Session, session_token_hash: str) -> None:
     login_session: models.Sessions | None = session.exec(
         select(models.Sessions).where(
             models.Sessions.session_token_hash == session_token_hash,
-        )
+        ),
     ).first()
     if login_session is None:
         return

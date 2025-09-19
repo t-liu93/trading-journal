@@ -1,15 +1,19 @@
-from collections.abc import Generator
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel
 
 from trading_journal import crud, models
 
-# TODO: If needed, add failing flow tests, but now only add happy flow.
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from sqlalchemy.engine import Engine
 
 
 @pytest.fixture
@@ -41,16 +45,14 @@ def make_user(session: Session, username: str = "testuser") -> int:
     return user.id
 
 
-def make_cycle(
-    session: Session, user_id: int, friendly_name: str = "Test Cycle"
-) -> int:
+def make_cycle(session: Session, user_id: int, friendly_name: str = "Test Cycle") -> int:
     cycle = models.Cycles(
         user_id=user_id,
         friendly_name=friendly_name,
         symbol="AAPL",
         underlying_currency=models.UnderlyingCurrency.USD,
         status=models.CycleStatus.OPEN,
-        start_date=datetime.now().date(),
+        start_date=datetime.now(timezone.utc).date(),
     )
     session.add(cycle)
     session.commit()
@@ -58,9 +60,7 @@ def make_cycle(
     return cycle.id
 
 
-def make_trade(
-    session: Session, user_id: int, cycle_id: int, friendly_name: str = "Test Trade"
-) -> int:
+def make_trade(session: Session, user_id: int, cycle_id: int, friendly_name: str = "Test Trade") -> int:
     trade = models.Trades(
         user_id=user_id,
         friendly_name=friendly_name,
@@ -68,8 +68,8 @@ def make_trade(
         underlying_currency=models.UnderlyingCurrency.USD,
         trade_type=models.TradeType.LONG_SPOT,
         trade_strategy=models.TradeStrategy.SPOT,
-        trade_date=datetime.now().date(),
-        trade_time_utc=datetime.now(),
+        trade_date=datetime.now(timezone.utc).date(),
+        trade_time_utc=datetime.now(timezone.utc),
         quantity=10,
         price_cents=15000,
         gross_cash_flow_cents=-150000,
@@ -113,7 +113,15 @@ def make_login_session(session: Session, created_at: datetime) -> models.Session
     return login_session
 
 
-def test_create_trade_success_with_cycle(session: Session):
+def _ensure_utc_aware(dt: datetime) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def test_create_trade_success_with_cycle(session: Session) -> None:
     user_id = make_user(session)
     cycle_id = make_cycle(session, user_id)
 
@@ -124,7 +132,7 @@ def test_create_trade_success_with_cycle(session: Session):
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
-        "trade_time_utc": datetime.now(),
+        "trade_time_utc": datetime.now(timezone.utc),
         "quantity": 10,
         "price_cents": 15000,
         "gross_cash_flow_cents": -150000,
@@ -154,7 +162,7 @@ def test_create_trade_success_with_cycle(session: Session):
     assert actual_trade.cycle_id == trade_data["cycle_id"]
 
 
-def test_create_trade_with_auto_created_cycle(session: Session):
+def test_create_trade_with_auto_created_cycle(session: Session) -> None:
     user_id = make_user(session)
 
     trade_data = {
@@ -164,7 +172,7 @@ def test_create_trade_with_auto_created_cycle(session: Session):
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
-        "trade_time_utc": datetime.now(),
+        "trade_time_utc": datetime.now(timezone.utc),
         "quantity": 5,
         "price_cents": 15500,
     }
@@ -196,7 +204,7 @@ def test_create_trade_with_auto_created_cycle(session: Session):
     assert auto_cycle.friendly_name.startswith("Auto-created Cycle by trade")
 
 
-def test_create_trade_missing_required_fields(session: Session):
+def test_create_trade_missing_required_fields(session: Session) -> None:
     user_id = make_user(session)
 
     base_trade_data = {
@@ -206,7 +214,7 @@ def test_create_trade_missing_required_fields(session: Session):
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
-        "trade_time_utc": datetime.now(),
+        "trade_time_utc": datetime.now(timezone.utc),
         "quantity": 10,
         "price_cents": 15000,
     }
@@ -254,7 +262,7 @@ def test_create_trade_missing_required_fields(session: Session):
     assert "price_cents is required" in str(excinfo.value)
 
 
-def test_get_trade_by_id(session: Session):
+def test_get_trade_by_id(session: Session) -> None:
     user_id = make_user(session)
     cycle_id = make_cycle(session, user_id)
     trade_data = {
@@ -264,8 +272,8 @@ def test_get_trade_by_id(session: Session):
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
-        "trade_date": datetime.now().date(),
-        "trade_time_utc": datetime.now(),
+        "trade_date": datetime.now(timezone.utc).date(),
+        "trade_time_utc": datetime.now(timezone.utc),
         "quantity": 10,
         "price_cents": 15000,
         "gross_cash_flow_cents": -150000,
@@ -291,7 +299,7 @@ def test_get_trade_by_id(session: Session):
     assert trade.trade_date == trade_data["trade_date"]
 
 
-def test_get_trade_by_user_id_and_friendly_name(session: Session):
+def test_get_trade_by_user_id_and_friendly_name(session: Session) -> None:
     user_id = make_user(session)
     cycle_id = make_cycle(session, user_id)
     friendly_name = "Unique Trade Name"
@@ -302,8 +310,8 @@ def test_get_trade_by_user_id_and_friendly_name(session: Session):
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
-        "trade_date": datetime.now().date(),
-        "trade_time_utc": datetime.now(),
+        "trade_date": datetime.now(timezone.utc).date(),
+        "trade_time_utc": datetime.now(timezone.utc),
         "quantity": 10,
         "price_cents": 15000,
         "gross_cash_flow_cents": -150000,
@@ -318,7 +326,7 @@ def test_get_trade_by_user_id_and_friendly_name(session: Session):
     assert trade.user_id == user_id
 
 
-def test_get_trades_by_user_id(session: Session):
+def test_get_trades_by_user_id(session: Session) -> None:
     user_id = make_user(session)
     cycle_id = make_cycle(session, user_id)
     trade_data_1 = {
@@ -328,8 +336,8 @@ def test_get_trades_by_user_id(session: Session):
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
-        "trade_date": datetime.now().date(),
-        "trade_time_utc": datetime.now(),
+        "trade_date": datetime.now(timezone.utc).date(),
+        "trade_time_utc": datetime.now(timezone.utc),
         "quantity": 10,
         "price_cents": 15000,
         "gross_cash_flow_cents": -150000,
@@ -344,8 +352,8 @@ def test_get_trades_by_user_id(session: Session):
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.SHORT_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
-        "trade_date": datetime.now().date(),
-        "trade_time_utc": datetime.now(),
+        "trade_date": datetime.now(timezone.utc).date(),
+        "trade_time_utc": datetime.now(timezone.utc),
         "quantity": 5,
         "price_cents": 280000,
         "gross_cash_flow_cents": 1400000,
@@ -362,7 +370,7 @@ def test_get_trades_by_user_id(session: Session):
     assert friendly_names == {"Trade One", "Trade Two"}
 
 
-def test_update_trade_note(session: Session):
+def test_update_trade_note(session: Session) -> None:
     user_id = make_user(session)
     cycle_id = make_cycle(session, user_id)
     trade_id = make_trade(session, user_id, cycle_id)
@@ -379,7 +387,7 @@ def test_update_trade_note(session: Session):
     assert actual_trade.notes == new_note
 
 
-def test_invalidate_trade(session: Session):
+def test_invalidate_trade(session: Session) -> None:
     user_id = make_user(session)
     cycle_id = make_cycle(session, user_id)
     trade_id = make_trade(session, user_id, cycle_id)
@@ -395,7 +403,7 @@ def test_invalidate_trade(session: Session):
     assert actual_trade.is_invalidated is True
 
 
-def test_replace_trade(session: Session):
+def test_replace_trade(session: Session) -> None:
     user_id = make_user(session)
     cycle_id = make_cycle(session, user_id)
     old_trade_id = make_trade(session, user_id, cycle_id)
@@ -407,7 +415,7 @@ def test_replace_trade(session: Session):
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
-        "trade_time_utc": datetime.now(),
+        "trade_time_utc": datetime.now(timezone.utc),
         "quantity": 20,
         "price_cents": 25000,
     }
@@ -438,7 +446,7 @@ def test_replace_trade(session: Session):
     assert actual_new_trade.replaced_by_trade_id == old_trade_id
 
 
-def test_create_cycle(session: Session):
+def test_create_cycle(session: Session) -> None:
     user_id = make_user(session)
     cycle_data = {
         "user_id": user_id,
@@ -446,7 +454,7 @@ def test_create_cycle(session: Session):
         "symbol": "GOOGL",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "status": models.CycleStatus.OPEN,
-        "start_date": datetime.now().date(),
+        "start_date": datetime.now(timezone.utc).date(),
     }
     cycle = crud.create_cycle(session, cycle_data)
     assert cycle.id is not None
@@ -467,7 +475,7 @@ def test_create_cycle(session: Session):
     assert actual_cycle.start_date == cycle_data["start_date"]
 
 
-def test_update_cycle(session: Session):
+def test_update_cycle(session: Session) -> None:
     user_id = make_user(session)
     cycle_id = make_cycle(session, user_id, friendly_name="Initial Cycle Name")
 
@@ -488,7 +496,7 @@ def test_update_cycle(session: Session):
     assert actual_cycle.status == update_data["status"]
 
 
-def test_update_cycle_immutable_fields(session: Session):
+def test_update_cycle_immutable_fields(session: Session) -> None:
     user_id = make_user(session)
     cycle_id = make_cycle(session, user_id, friendly_name="Initial Cycle Name")
 
@@ -496,8 +504,8 @@ def test_update_cycle_immutable_fields(session: Session):
     update_data = {
         "id": cycle_id + 1,  # Trying to change the ID
         "user_id": user_id + 1,  # Trying to change the user_id
-        "start_date": datetime(2020, 1, 1).date(),  # Trying to change start_date
-        "created_at": datetime(2020, 1, 1),  # Trying to change created_at
+        "start_date": datetime(2020, 1, 1, tzinfo=timezone.utc).date(),  # Trying to change start_date
+        "created_at": datetime(2020, 1, 1, tzinfo=timezone.utc),  # Trying to change created_at
         "friendly_name": "Valid Update",  # Valid field to update
     }
 
@@ -511,7 +519,7 @@ def test_update_cycle_immutable_fields(session: Session):
     )
 
 
-def test_create_user(session: Session):
+def test_create_user(session: Session) -> None:
     user_data = {
         "username": "newuser",
         "password_hash": "newhashedpassword",
@@ -528,7 +536,7 @@ def test_create_user(session: Session):
     assert actual_user.password_hash == user_data["password_hash"]
 
 
-def test_update_user(session: Session):
+def test_update_user(session: Session) -> None:
     user_id = make_user(session, username="updatableuser")
 
     update_data = {
@@ -545,14 +553,14 @@ def test_update_user(session: Session):
     assert actual_user.password_hash == update_data["password_hash"]
 
 
-def test_update_user_immutable_fields(session: Session):
+def test_update_user_immutable_fields(session: Session) -> None:
     user_id = make_user(session, username="immutableuser")
 
     # Attempt to update immutable fields
     update_data = {
         "id": user_id + 1,  # Trying to change the ID
         "username": "newusername",  # Trying to change the username
-        "created_at": datetime(2020, 1, 1),  # Trying to change created_at
+        "created_at": datetime(2020, 1, 1, tzinfo=timezone.utc),  # Trying to change created_at
         "password_hash": "validupdate",  # Valid field to update
     }
 
@@ -566,7 +574,7 @@ def test_update_user_immutable_fields(session: Session):
 
 
 # login sessions
-def test_create_login_session(session: Session):
+def test_create_login_session(session: Session) -> None:
     user_id = make_user(session, username="testuser")
     session_token_hash = "sessiontokenhashed"
     login_session = crud.create_login_session(session, user_id, session_token_hash)
@@ -575,7 +583,7 @@ def test_create_login_session(session: Session):
     assert login_session.session_token_hash == session_token_hash
 
 
-def test_create_login_session_with_invalid_user(session: Session):
+def test_create_login_session_with_invalid_user(session: Session) -> None:
     invalid_user_id = 9999  # Assuming this user ID does not exist
     session_token_hash = "sessiontokenhashed"
     with pytest.raises(ValueError) as excinfo:
@@ -583,40 +591,34 @@ def test_create_login_session_with_invalid_user(session: Session):
     assert "user_id does not exist" in str(excinfo.value)
 
 
-def test_get_login_session_by_token_and_user_id(session: Session):
-    now = datetime.now()
+def test_get_login_session_by_token_and_user_id(session: Session) -> None:
+    now = datetime.now(timezone.utc)
     created_session = make_login_session(session, now)
-    fetched_session = crud.get_login_session_by_token_hash_and_user_id(
-        session, created_session.session_token_hash, created_session.user_id
-    )
+    fetched_session = crud.get_login_session_by_token_hash_and_user_id(session, created_session.session_token_hash, created_session.user_id)
     assert fetched_session is not None
     assert fetched_session.id == created_session.id
     assert fetched_session.user_id == created_session.user_id
     assert fetched_session.session_token_hash == created_session.session_token_hash
 
 
-def test_update_login_session(session: Session):
-    now = datetime.now()
+def test_update_login_session(session: Session) -> None:
+    now = datetime.now(timezone.utc)
     created_session = make_login_session(session, now)
 
     update_data = {
         "last_seen_at": now + timedelta(hours=1),
         "last_used_ip": "192.168.1.1",
     }
-    updated_session = crud.update_login_session(
-        session, created_session.session_token_hash, update_data
-    )
+    updated_session = crud.update_login_session(session, created_session.session_token_hash, update_data)
     assert updated_session is not None
-    assert updated_session.last_seen_at == update_data["last_seen_at"]
+    assert _ensure_utc_aware(updated_session.last_seen_at) == update_data["last_seen_at"]
     assert updated_session.last_used_ip == update_data["last_used_ip"]
 
 
-def test_delete_login_session(session: Session):
-    now = datetime.now()
+def test_delete_login_session(session: Session) -> None:
+    now = datetime.now(timezone.utc)
     created_session = make_login_session(session, now)
 
     crud.delete_login_session(session, created_session.session_token_hash)
-    deleted_session = crud.get_login_session_by_token_hash_and_user_id(
-        session, created_session.session_token_hash, created_session.user_id
-    )
+    deleted_session = crud.get_login_session_by_token_hash_and_user_id(session, created_session.session_token_hash, created_session.user_id)
     assert deleted_session is None

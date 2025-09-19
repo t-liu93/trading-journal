@@ -60,7 +60,7 @@ def run_migrations(engine: Engine, target_version: int | None = None) -> int:
                 fn = MIGRATIONS.get(cur_version)
                 if fn is None:
                     raise RuntimeError(
-                        f"No migration from {cur_version} -> {cur_version + 1}"
+                        f"No migration from {cur_version} -> {cur_version + 1}",
                     )
                 # call migration with Engine (fn should use transactions)
                 fn(engine)

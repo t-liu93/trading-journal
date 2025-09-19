@@ -13,8 +13,14 @@ ignore = [
     "TRY003",
     "EM101",
     "EM102",
-    "PLC0405",
+    "SIM108",
+    "C901",
+    "PLR0912",
+    "PLR0915",
+    "PLR0913",
+    "PLC0415",
 ]
 
 [lint.extend-per-file-ignores]
-"test*.py" = ["S101"]
+"test*.py" = ["S101", "S105", "S106", "PT011", "PLR2004"]
+"models*.py" = ["FA102"]

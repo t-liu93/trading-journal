@@ -24,17 +24,13 @@ class Database:
     ) -> None:
         self._database_url = database_url or "sqlite:///:memory:"
 
-        default_connect = (
-            {"check_same_thread": False, "timeout": 30}
-            if self._database_url.startswith("sqlite")
-            else {}
-        )
+        default_connect = {"check_same_thread": False, "timeout": 30} if self._database_url.startswith("sqlite") else {}
         merged_connect = {**default_connect, **(connect_args or {})}
 
         if self._database_url == "sqlite:///:memory:":
             logger = logging.getLogger(__name__)
             logger.warning(
-                "Using in-memory SQLite database; all data will be lost when the application stops."
+                "Using in-memory SQLite database; all data will be lost when the application stops.",
             )
             self._engine = create_engine(
                 self._database_url,
@@ -43,15 +39,11 @@ class Database:
                 poolclass=StaticPool,
             )
         else:
-            self._engine = create_engine(
-                self._database_url, echo=echo, connect_args=merged_connect
-            )
+            self._engine = create_engine(self._database_url, echo=echo, connect_args=merged_connect)
 
         if self._database_url.startswith("sqlite"):
 
-            def _enable_sqlite_pragmas(
-                dbapi_conn: DBAPIConnection, _connection_record: object
-            ) -> None:
+            def _enable_sqlite_pragmas(dbapi_conn: DBAPIConnection, _connection_record: object) -> None:
                 try:
                     cur = dbapi_conn.cursor()
                     cur.execute("PRAGMA journal_mode=WAL;")
