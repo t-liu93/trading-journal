@@ -27,7 +27,7 @@ jobs:
       - name: Run models vs snapshot check
         working-directory: ${{ github.workspace }}
         run: |
-          python .github/scripts/compare_models.py backend/trading_journal/models.py
+          python .github/script/compare_models.py backend/trading_journal/models.py
 
       - name: Run tests
         run: |
