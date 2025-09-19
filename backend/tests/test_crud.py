@@ -50,6 +50,7 @@ def make_cycle(session: Session, user_id: int, friendly_name: str = "Test Cycle"
         user_id=user_id,
         friendly_name=friendly_name,
         symbol="AAPL",
+        exchange="NASDAQ",
         underlying_currency=models.UnderlyingCurrency.USD,
         status=models.CycleStatus.OPEN,
         start_date=datetime.now(timezone.utc).date(),
@@ -65,6 +66,7 @@ def make_trade(session: Session, user_id: int, cycle_id: int, friendly_name: str
         user_id=user_id,
         friendly_name=friendly_name,
         symbol="AAPL",
+        exchange="NASDAQ",
         underlying_currency=models.UnderlyingCurrency.USD,
         trade_type=models.TradeType.LONG_SPOT,
         trade_strategy=models.TradeStrategy.SPOT,
@@ -129,6 +131,7 @@ def test_create_trade_success_with_cycle(session: Session) -> None:
         "user_id": user_id,
         "friendly_name": "Test Trade",
         "symbol": "AAPL",
+        "exchange": "NASDAQ",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -169,6 +172,7 @@ def test_create_trade_with_auto_created_cycle(session: Session) -> None:
         "user_id": user_id,
         "friendly_name": "Test Trade with Auto Cycle",
         "symbol": "AAPL",
+        "exchange": "NASDAQ",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -211,6 +215,7 @@ def test_create_trade_missing_required_fields(session: Session) -> None:
         "user_id": user_id,
         "friendly_name": "Incomplete Trade",
         "symbol": "AAPL",
+        "exchange": "NASDAQ",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -225,6 +230,13 @@ def test_create_trade_missing_required_fields(session: Session) -> None:
     with pytest.raises(ValueError) as excinfo:
         crud.create_trade(session, trade_data)
     assert "symbol is required" in str(excinfo.value)
+
+    # Missing exchange
+    trade_data = base_trade_data.copy()
+    trade_data.pop("exchange", None)
+    with pytest.raises(ValueError) as excinfo:
+        crud.create_trade(session, trade_data)
+    assert "exchange is required" in str(excinfo.value)
 
     # Missing underlying_currency
     trade_data = base_trade_data.copy()
@@ -269,6 +281,7 @@ def test_get_trade_by_id(session: Session) -> None:
         "user_id": user_id,
         "friendly_name": "Test Trade for Get",
         "symbol": "AAPL",
+        "exchange": "NASDAQ",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -307,6 +320,7 @@ def test_get_trade_by_user_id_and_friendly_name(session: Session) -> None:
         "user_id": user_id,
         "friendly_name": friendly_name,
         "symbol": "AAPL",
+        "exchange": "NASDAQ",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -333,6 +347,7 @@ def test_get_trades_by_user_id(session: Session) -> None:
         "user_id": user_id,
         "friendly_name": "Trade One",
         "symbol": "AAPL",
+        "exchange": "NASDAQ",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -349,6 +364,7 @@ def test_get_trades_by_user_id(session: Session) -> None:
         "user_id": user_id,
         "friendly_name": "Trade Two",
         "symbol": "GOOGL",
+        "exchange": "NASDAQ",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.SHORT_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -412,6 +428,7 @@ def test_replace_trade(session: Session) -> None:
         "user_id": user_id,
         "friendly_name": "Replaced Trade",
         "symbol": "MSFT",
+        "exchange": "NASDAQ",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -452,6 +469,7 @@ def test_create_cycle(session: Session) -> None:
         "user_id": user_id,
         "friendly_name": "My First Cycle",
         "symbol": "GOOGL",
+        "exchange": "NASDAQ",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "status": models.CycleStatus.OPEN,
         "start_date": datetime.now(timezone.utc).date(),

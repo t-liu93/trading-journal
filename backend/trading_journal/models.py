@@ -72,6 +72,7 @@ class Trades(SQLModel, table=True):
     # allow null while user may omit friendly_name; uniqueness enforced per-user by constraint
     friendly_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     symbol: str = Field(sa_column=Column(Text, nullable=False))
+    exchange: str = Field(sa_column=Column(Text, nullable=False))
     underlying_currency: UnderlyingCurrency = Field(sa_column=Column(Text, nullable=False))
     trade_type: TradeType = Field(sa_column=Column(Text, nullable=False))
     trade_strategy: TradeStrategy = Field(sa_column=Column(Text, nullable=False))
@@ -100,6 +101,7 @@ class Cycles(SQLModel, table=True):
     user_id: int = Field(foreign_key="users.id", nullable=False, index=True)
     friendly_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     symbol: str = Field(sa_column=Column(Text, nullable=False))
+    exchange: str = Field(sa_column=Column(Text, nullable=False))
     underlying_currency: UnderlyingCurrency = Field(sa_column=Column(Text, nullable=False))
     status: CycleStatus = Field(sa_column=Column(Text, nullable=False))
     funding_source: FundingSource = Field(sa_column=Column(Text, nullable=True))

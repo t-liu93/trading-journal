@@ -37,6 +37,8 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
     payload = {k: v for k, v in data.items() if k in allowed}
     if "symbol" not in payload:
         raise ValueError("symbol is required")
+    if "exchange" not in payload:
+        raise ValueError("exchange is required")
     if "underlying_currency" not in payload:
         raise ValueError("underlying_currency is required")
     payload["underlying_currency"] = _check_enum(models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency")
@@ -74,6 +76,7 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
         c_payload = {
             "user_id": user_id,
             "symbol": payload["symbol"],
+            "exchange": payload["exchange"],
             "underlying_currency": payload["underlying_currency"],
             "friendly_name": "Auto-created Cycle by trade " + payload.get("friendly_name", ""),
             "status": models.CycleStatus.OPEN,
@@ -184,6 +187,8 @@ def create_cycle(session: Session, cycle_data: Mapping) -> models.Cycles:
         raise ValueError("user_id is required")
     if "symbol" not in payload:
         raise ValueError("symbol is required")
+    if "exchange" not in payload:
+        raise ValueError("exchange is required")
     if "underlying_currency" not in payload:
         raise ValueError("underlying_currency is required")
     payload["underlying_currency"] = _check_enum(models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency")
