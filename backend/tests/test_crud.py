@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -41,7 +41,9 @@ def make_user(session: Session, username: str = "testuser") -> int:
     return user.id
 
 
-def make_cycle(session, user_id: int, friendly_name: str = "Test Cycle") -> int:
+def make_cycle(
+    session: Session, user_id: int, friendly_name: str = "Test Cycle"
+) -> int:
     cycle = models.Cycles(
         user_id=user_id,
         friendly_name=friendly_name,
@@ -57,7 +59,7 @@ def make_cycle(session, user_id: int, friendly_name: str = "Test Cycle") -> int:
 
 
 def make_trade(
-    session, user_id: int, cycle_id: int, friendly_name: str = "Test Trade"
+    session: Session, user_id: int, cycle_id: int, friendly_name: str = "Test Trade"
 ) -> int:
     trade = models.Trades(
         user_id=user_id,
@@ -82,12 +84,33 @@ def make_trade(
     return trade.id
 
 
-def make_trade_by_trade_data(session, trade_data: dict) -> int:
+def make_trade_by_trade_data(session: Session, trade_data: dict) -> int:
     trade = models.Trades(**trade_data)
     session.add(trade)
     session.commit()
     session.refresh(trade)
     return trade.id
+
+
+def make_login_session(session: Session, created_at: datetime) -> models.Sessions:
+    user_id = make_user(session, username="sessionuser")
+    session_token_hash = "uniquesessiontokenhash"
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    login_session = models.Sessions(
+        user_id=user_id,
+        session_token_hash=session_token_hash,
+        created_at=created_at,
+        expires_at=created_at + timedelta(seconds=86400),
+        last_seen_at=None,
+        last_used_ip=None,
+        user_agent=None,
+        device_name=None,
+    )
+    session.add(login_session)
+    session.commit()
+    session.refresh(login_session)
+    return login_session
 
 
 def test_create_trade_success_with_cycle(session: Session):
@@ -540,3 +563,60 @@ def test_update_user_immutable_fields(session: Session):
         or "field 'username' is immutable" in str(excinfo.value)
         or "field 'created_at' is immutable" in str(excinfo.value)
     )
+
+
+# login sessions
+def test_create_login_session(session: Session):
+    user_id = make_user(session, username="testuser")
+    session_token_hash = "sessiontokenhashed"
+    login_session = crud.create_login_session(session, user_id, session_token_hash)
+    assert login_session.id is not None
+    assert login_session.user_id == user_id
+    assert login_session.session_token_hash == session_token_hash
+
+
+def test_create_login_session_with_invalid_user(session: Session):
+    invalid_user_id = 9999  # Assuming this user ID does not exist
+    session_token_hash = "sessiontokenhashed"
+    with pytest.raises(ValueError) as excinfo:
+        crud.create_login_session(session, invalid_user_id, session_token_hash)
+    assert "user_id does not exist" in str(excinfo.value)
+
+
+def test_get_login_session_by_token_and_user_id(session: Session):
+    now = datetime.now()
+    created_session = make_login_session(session, now)
+    fetched_session = crud.get_login_session_by_token_hash_and_user_id(
+        session, created_session.session_token_hash, created_session.user_id
+    )
+    assert fetched_session is not None
+    assert fetched_session.id == created_session.id
+    assert fetched_session.user_id == created_session.user_id
+    assert fetched_session.session_token_hash == created_session.session_token_hash
+
+
+def test_update_login_session(session: Session):
+    now = datetime.now()
+    created_session = make_login_session(session, now)
+
+    update_data = {
+        "last_seen_at": now + timedelta(hours=1),
+        "last_used_ip": "192.168.1.1",
+    }
+    updated_session = crud.update_login_session(
+        session, created_session.session_token_hash, update_data
+    )
+    assert updated_session is not None
+    assert updated_session.last_seen_at == update_data["last_seen_at"]
+    assert updated_session.last_used_ip == update_data["last_used_ip"]
+
+
+def test_delete_login_session(session: Session):
+    now = datetime.now()
+    created_session = make_login_session(session, now)
+
+    crud.delete_login_session(session, created_session.session_token_hash)
+    deleted_session = crud.get_login_session_by_token_hash_and_user_id(
+        session, created_session.session_token_hash, created_session.user_id
+    )
+    assert deleted_session is None

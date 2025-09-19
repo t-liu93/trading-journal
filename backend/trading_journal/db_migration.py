@@ -26,6 +26,7 @@ def _mig_0_1(engine: Engine) -> None:
             models_v1.Trades.__table__,
             models_v1.Cycles.__table__,
             models_v1.Users.__table__,
+            models_v1.Sessions.__table__,
         ],
     )
 

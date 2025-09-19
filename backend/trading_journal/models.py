@@ -142,3 +142,24 @@ class Users(SQLModel, table=True):
     username: str = Field(sa_column=Column(Text, nullable=False, unique=True))
     password_hash: str = Field(sa_column=Column(Text, nullable=False))
     is_active: bool = Field(default=True, nullable=False)
+
+
+class Sessions(SQLModel, table=True):
+    __tablename__ = "sessions"
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", nullable=False, index=True)
+    session_token_hash: str = Field(sa_column=Column(Text, nullable=False, unique=True))
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=False)
+    )
+    expires_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=False, index=True)
+    )
+    last_seen_at: datetime | None = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    last_used_ip: str | None = Field(
+        default=None, sa_column=Column(Text, nullable=True)
+    )
+    user_agent: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    device_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
