@@ -561,6 +561,79 @@ def test_update_cycle_immutable_fields(session: Session) -> None:
     )
 
 
+# Exchanges
+def test_create_exchange(session: Session) -> None:
+    exchange_data = {
+        "name": "NYSE",
+        "notes": "New York Stock Exchange",
+    }
+    exchange = crud.create_exchange(session, exchange_data)
+    assert exchange.id is not None
+    assert exchange.name == exchange_data["name"]
+    assert exchange.notes == exchange_data["notes"]
+
+    session.refresh(exchange)
+    actual_exchange = session.get(models.Exchanges, exchange.id)
+    assert actual_exchange is not None
+    assert actual_exchange.name == exchange_data["name"]
+    assert actual_exchange.notes == exchange_data["notes"]
+
+
+def test_get_exchange_by_id(session: Session) -> None:
+    exchange_id = make_exchange(session, name="LSE")
+    exchange = crud.get_exchange_by_id(session, exchange_id)
+    assert exchange is not None
+    assert exchange.id == exchange_id
+    assert exchange.name == "LSE"
+
+
+def test_get_exchange_by_name(session: Session) -> None:
+    exchange_name = "TSX"
+    make_exchange(session, name=exchange_name)
+    exchange = crud.get_exchange_by_name(session, exchange_name)
+    assert exchange is not None
+    assert exchange.name == exchange_name
+
+
+def test_get_all_exchanges(session: Session) -> None:
+    exchange_names = ["NYSE", "NASDAQ", "LSE"]
+    for name in exchange_names:
+        make_exchange(session, name=name)
+
+    exchanges = crud.get_all_exchanges(session)
+    assert len(exchanges) >= 3
+    fetched_names = {ex.name for ex in exchanges}
+    for name in exchange_names:
+        assert name in fetched_names
+
+
+def test_update_exchange(session: Session) -> None:
+    exchange_id = make_exchange(session, name="Initial Exchange")
+    update_data = {
+        "name": "Updated Exchange",
+        "notes": "Updated notes for the exchange",
+    }
+    updated_exchange = crud.update_exchange(session, exchange_id, update_data)
+    assert updated_exchange is not None
+    assert updated_exchange.id == exchange_id
+    assert updated_exchange.name == update_data["name"]
+    assert updated_exchange.notes == update_data["notes"]
+
+    session.refresh(updated_exchange)
+    actual_exchange = session.get(models.Exchanges, exchange_id)
+    assert actual_exchange is not None
+    assert actual_exchange.name == update_data["name"]
+    assert actual_exchange.notes == update_data["notes"]
+
+
+def test_delete_exchange(session: Session) -> None:
+    exchange_id = make_exchange(session, name="Deletable Exchange")
+    crud.delete_exchange(session, exchange_id)
+    deleted_exchange = session.get(models.Exchanges, exchange_id)
+    assert deleted_exchange is None
+
+
+# Users
 def test_create_user(session: Session) -> None:
     user_data = {
         "username": "newuser",
