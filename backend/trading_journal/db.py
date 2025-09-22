@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from sqlalchemy import event
@@ -62,6 +63,18 @@ class Database:
         pass
 
     def get_session(self) -> Generator[Session, None, None]:
+        session = Session(self._engine)
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    @contextmanager
+    def get_session_ctx_manager(self) -> Session:
         session = Session(self._engine)
         try:
             yield session

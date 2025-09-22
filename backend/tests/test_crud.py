@@ -651,6 +651,22 @@ def test_create_user(session: Session) -> None:
     assert actual_user.password_hash == user_data["password_hash"]
 
 
+def test_get_user_by_id(session: Session) -> None:
+    user_id = make_user(session, username="fetchuser")
+    user = crud.get_user_by_id(session, user_id)
+    assert user is not None
+    assert user.id == user_id
+    assert user.username == "fetchuser"
+
+
+def test_get_user_by_username(session: Session) -> None:
+    username = "uniqueuser"
+    make_user(session, username=username)
+    user = crud.get_user_by_username(session, username)
+    assert user is not None
+    assert user.username == username
+
+
 def test_update_user(session: Session) -> None:
     user_id = make_user(session, username="updatableuser")
 
@@ -710,6 +726,16 @@ def test_get_login_session_by_token_and_user_id(session: Session) -> None:
     now = datetime.now(timezone.utc)
     created_session = make_login_session(session, now)
     fetched_session = crud.get_login_session_by_token_hash_and_user_id(session, created_session.session_token_hash, created_session.user_id)
+    assert fetched_session is not None
+    assert fetched_session.id == created_session.id
+    assert fetched_session.user_id == created_session.user_id
+    assert fetched_session.session_token_hash == created_session.session_token_hash
+
+
+def test_get_login_session_by_token(session: Session) -> None:
+    now = datetime.now(timezone.utc)
+    created_session = make_login_session(session, now)
+    fetched_session = crud.get_login_session_by_token_hash(session, created_session.session_token_hash)
     assert fetched_session is not None
     assert fetched_session.id == created_session.id
     assert fetched_session.user_id == created_session.user_id

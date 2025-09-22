@@ -349,6 +349,17 @@ def create_user(session: Session, user_data: Mapping) -> models.Users:
     return u
 
 
+def get_user_by_id(session: Session, user_id: int) -> models.Users | None:
+    return session.get(models.Users, user_id)
+
+
+def get_user_by_username(session: Session, username: str) -> models.Users | None:
+    statement = select(models.Users).where(
+        models.Users.username == username,
+    )
+    return session.exec(statement).first()
+
+
 def update_user(session: Session, user_id: int, update_data: Mapping) -> models.Users:
     user: models.Users | None = session.get(models.Users, user_id)
     if user is None:
@@ -412,6 +423,15 @@ def get_login_session_by_token_hash_and_user_id(session: Session, session_token_
     statement = select(models.Sessions).where(
         models.Sessions.session_token_hash == session_token_hash,
         models.Sessions.user_id == user_id,
+        models.Sessions.expires_at > datetime.now(timezone.utc),
+    )
+
+    return session.exec(statement).first()
+
+
+def get_login_session_by_token_hash(session: Session, session_token_hash: str) -> models.Sessions | None:
+    statement = select(models.Sessions).where(
+        models.Sessions.session_token_hash == session_token_hash,
         models.Sessions.expires_at > datetime.now(timezone.utc),
     )
 
