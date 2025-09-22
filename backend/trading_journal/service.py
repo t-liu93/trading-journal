@@ -12,7 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import settings
 from trading_journal import crud, security
 from trading_journal.db import Database
-from trading_journal.dto import SessionsCreate, SessionsUpdate, UserCreate, UserLogin, UserRead
+from trading_journal.dto import ExchangesBase, ExchangesCreate, SessionsCreate, SessionsUpdate, UserCreate, UserLogin, UserRead
 from trading_journal.models import Sessions
 
 SessionsCreate.model_rebuild()
@@ -88,6 +88,10 @@ class UserAlreadyExistsError(ServiceError):
     pass
 
 
+class ExchangeAlreadyExistsError(ServiceError):
+    pass
+
+
 def register_user_service(db_session: Session, user_in: UserCreate) -> UserRead:
     if crud.get_user_by_username(db_session, user_in.username):
         raise UserAlreadyExistsError("username already exists")
@@ -131,6 +135,34 @@ def authenticate_user_service(db_session: Session, user_in: UserLogin) -> tuple[
         logger.exception("Failed to create login session: \n")
         raise ServiceError("Failed to create login session") from e
     return SessionsCreate.model_validate(session), token
+
+
+# Exchanges service
+def create_exchange_service(db_session: Session, user_id: int, name: str, notes: str | None) -> ExchangesCreate:
+    existing_exchange = crud.get_exchange_by_name_and_user_id(db_session, name, user_id)
+    if existing_exchange:
+        raise ExchangeAlreadyExistsError("Exchange with the same name already exists for this user")
+    exchange_data = ExchangesCreate(
+        user_id=user_id,
+        name=name,
+        notes=notes,
+    )
+    try:
+        exchange = crud.create_exchange(db_session, exchange_data=exchange_data)
+        try:
+            exchange_dto = ExchangesCreate.model_validate(exchange)
+        except Exception as e:
+            logger.exception("Failed to convert exchange to ExchangesCreate: ")
+            raise ServiceError("Failed to convert exchange to ExchangesCreate") from e
+    except Exception as e:
+        logger.exception("Failed to create exchange:")
+        raise ServiceError("Failed to create exchange") from e
+    return exchange_dto
+
+
+def get_exchanges_by_user_service(db_session: Session, user_id: int) -> list[ExchangesBase]:
+    exchanges = crud.get_all_exchanges_by_user_id(db_session, user_id)
+    return [ExchangesBase.model_validate(exchange) for exchange in exchanges]
 
 
 def get_trades_service(db_session: Session, user_id: int) -> list:

@@ -10,6 +10,15 @@ if TYPE_CHECKING:
     from trading_journal.models import TradeStrategy, TradeType, UnderlyingCurrency
 
 
+class ExchangesBase(SQLModel):
+    name: str
+    notes: str | None = None
+
+
+class ExchangesCreate(ExchangesBase):
+    user_id: int
+
+
 class TradeBase(SQLModel):
     user_id: int
     friendly_name: str | None
