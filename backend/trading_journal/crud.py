@@ -35,10 +35,11 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
         data = dict(trade_data)
     allowed = {c.name for c in models.Trades.__table__.columns}
     payload = {k: v for k, v in data.items() if k in allowed}
+    cycle_id = payload.get("cycle_id")
     if "symbol" not in payload:
         raise ValueError("symbol is required")
-    if "exchange" not in payload:
-        raise ValueError("exchange is required")
+    if "exchange_id" not in payload and cycle_id is None:
+        raise ValueError("exchange_id is required when no cycle is attached")
     if "underlying_currency" not in payload:
         raise ValueError("underlying_currency is required")
     payload["underlying_currency"] = _check_enum(models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency")
@@ -54,7 +55,6 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
     payload["trade_time_utc"] = now
     if "trade_date" not in payload or payload.get("trade_date") is None:
         payload["trade_date"] = payload["trade_time_utc"].date()
-    cycle_id = payload.get("cycle_id")
     user_id = payload.get("user_id")
     if "quantity" not in payload:
         raise ValueError("quantity is required")
@@ -76,7 +76,7 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
         c_payload = {
             "user_id": user_id,
             "symbol": payload["symbol"],
-            "exchange": payload["exchange"],
+            "exchange_id": payload["exchange_id"],
             "underlying_currency": payload["underlying_currency"],
             "friendly_name": "Auto-created Cycle by trade " + payload.get("friendly_name", ""),
             "status": models.CycleStatus.OPEN,
@@ -89,8 +89,11 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
     # If cycle_id provided, validate existence and ownership
     if cycle_id is not None:
         cycle = session.get(models.Cycles, cycle_id)
+
         if cycle is None:
             raise ValueError("cycle_id does not exist")
+        payload.pop("exchange_id", None)  # ignore exchange_id if provided; use cycle's exchange_id
+        payload["exchange_id"] = cycle.exchange_id
         if cycle.user_id != user_id:
             raise ValueError("cycle.user_id does not match trade.user_id")
 
@@ -187,8 +190,8 @@ def create_cycle(session: Session, cycle_data: Mapping) -> models.Cycles:
         raise ValueError("user_id is required")
     if "symbol" not in payload:
         raise ValueError("symbol is required")
-    if "exchange" not in payload:
-        raise ValueError("exchange is required")
+    if "exchange_id" not in payload:
+        raise ValueError("exchange_id is required")
     if "underlying_currency" not in payload:
         raise ValueError("underlying_currency is required")
     payload["underlying_currency"] = _check_enum(models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency")

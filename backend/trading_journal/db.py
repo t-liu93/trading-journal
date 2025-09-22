@@ -58,7 +58,8 @@ class Database:
             event.listen(self._engine, "connect", _enable_sqlite_pragmas)
 
     def init_db(self) -> None:
-        db_migration.run_migrations(self._engine)
+        # db_migration.run_migrations(self._engine)
+        pass
 
     def get_session(self) -> Generator[Session, None, None]:
         session = Session(self._engine)

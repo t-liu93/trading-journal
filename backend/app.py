@@ -1,33 +1,30 @@
-from fastapi import FastAPI
+import asyncio
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
-from models import MsgPayload
+from fastapi import FastAPI, status
 
-app = FastAPI()
-messages_list: dict[int, MsgPayload] = {}
+import settings
+from trading_journal import db
+from trading_journal.dto import TradeCreate, TradeRead
 
+API_BASE = "/api/v1"
 
-@app.get("/")
-def root() -> dict[str, str]:
-    return {"message": "Hello"}
-
-
-# About page route
-@app.get("/about")
-def about() -> dict[str, str]:
-    return {"message": "This is the about page."}
+_db = db.create_database(settings.settings.database_url)
 
 
-# Route to add a message
-@app.post("/messages/{msg_name}/")
-def add_msg(msg_name: str) -> dict[str, MsgPayload]:
-    # Generate an ID for the item based on the highest ID in the messages_list
-    msg_id = max(messages_list.keys()) + 1 if messages_list else 0
-    messages_list[msg_id] = MsgPayload(msg_id=msg_id, msg_name=msg_name)
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
+    await asyncio.to_thread(_db.init_db)
+    try:
+        yield
+    finally:
+        await asyncio.to_thread(_db.dispose)
 
-    return {"message": messages_list[msg_id]}
+
+app = FastAPI(lifespan=lifespan)
 
 
-# Route to list all messages
-@app.get("/messages")
-def message_items() -> dict[str, dict[int, MsgPayload]]:
-    return {"messages:": messages_list}
+@app.get(f"{API_BASE}/status")
+async def get_status() -> dict[str, str]:
+    return {"status": "ok"}

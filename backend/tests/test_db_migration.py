@@ -36,6 +36,7 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
                 "user_id": ("INTEGER", 1, 0),
                 "friendly_name": ("TEXT", 0, 0),
                 "symbol": ("TEXT", 1, 0),
+                "exchange_id": ("INTEGER", 1, 0),
                 "underlying_currency": ("TEXT", 1, 0),
                 "status": ("TEXT", 1, 0),
                 "funding_source": ("TEXT", 0, 0),
@@ -50,9 +51,11 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
                 "user_id": ("INTEGER", 1, 0),
                 "friendly_name": ("TEXT", 0, 0),
                 "symbol": ("TEXT", 1, 0),
+                "exchange_id": ("INTEGER", 1, 0),
                 "underlying_currency": ("TEXT", 1, 0),
                 "trade_type": ("TEXT", 1, 0),
                 "trade_strategy": ("TEXT", 1, 0),
+                "trade_date": ("DATE", 1, 0),
                 "trade_time_utc": ("DATETIME", 1, 0),
                 "expiry_date": ("DATE", 0, 0),
                 "strike_price_cents": ("INTEGER", 0, 0),
@@ -61,6 +64,10 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
                 "gross_cash_flow_cents": ("INTEGER", 1, 0),
                 "commission_cents": ("INTEGER", 1, 0),
                 "net_cash_flow_cents": ("INTEGER", 1, 0),
+                "is_invalidated": ("BOOLEAN", 1, 0),
+                "invalidated_at": ("DATETIME", 0, 0),
+                "replaced_by_trade_id": ("INTEGER", 0, 0),
+                "notes": ("TEXT", 0, 0),
                 "cycle_id": ("INTEGER", 0, 0),
             },
             "sessions": {
@@ -80,10 +87,17 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
             "trades": [
                 {"table": "cycles", "from": "cycle_id", "to": "id"},
                 {"table": "users", "from": "user_id", "to": "id"},
+                {"table": "exchanges", "from": "exchange_id", "to": "id"},
             ],
             "cycles": [
                 {"table": "users", "from": "user_id", "to": "id"},
+                {"table": "exchanges", "from": "exchange_id", "to": "id"},
             ],
+            "sessions": [
+                {"table": "users", "from": "user_id", "to": "id"},
+            ],
+            "users": [],
+            "exchanges": [],
         }
 
         with engine.connect() as conn:

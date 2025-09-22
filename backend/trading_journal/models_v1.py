@@ -72,7 +72,8 @@ class Trades(SQLModel, table=True):
     # allow null while user may omit friendly_name; uniqueness enforced per-user by constraint
     friendly_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     symbol: str = Field(sa_column=Column(Text, nullable=False))
-    exchange: str = Field(sa_column=Column(Text, nullable=False))
+    exchange_id: int = Field(foreign_key="exchanges.id", nullable=False, index=True)
+    exchange: "Exchanges" = Relationship(back_populates="trades")
     underlying_currency: UnderlyingCurrency = Field(sa_column=Column(Text, nullable=False))
     trade_type: TradeType = Field(sa_column=Column(Text, nullable=False))
     trade_strategy: TradeStrategy = Field(sa_column=Column(Text, nullable=False))
@@ -101,7 +102,8 @@ class Cycles(SQLModel, table=True):
     user_id: int = Field(foreign_key="users.id", nullable=False, index=True)
     friendly_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     symbol: str = Field(sa_column=Column(Text, nullable=False))
-    exchange: str = Field(sa_column=Column(Text, nullable=False))
+    exchange_id: int = Field(foreign_key="exchanges.id", nullable=False, index=True)
+    exchange: "Exchanges" = Relationship(back_populates="cycles")
     underlying_currency: UnderlyingCurrency = Field(sa_column=Column(Text, nullable=False))
     status: CycleStatus = Field(sa_column=Column(Text, nullable=False))
     funding_source: FundingSource = Field(sa_column=Column(Text, nullable=True))
@@ -111,6 +113,15 @@ class Cycles(SQLModel, table=True):
     start_date: date = Field(sa_column=Column(Date, nullable=False))
     end_date: date | None = Field(default=None, sa_column=Column(Date, nullable=True))
     trades: list["Trades"] = Relationship(back_populates="cycle")
+
+
+class Exchanges(SQLModel, table=True):
+    __tablename__ = "exchanges"
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(sa_column=Column(Text, nullable=False, unique=True))
+    notes: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    trades: list["Trades"] = Relationship(back_populates="exchange")
+    cycles: list["Cycles"] = Relationship(back_populates="exchange")
 
 
 class Users(SQLModel, table=True):

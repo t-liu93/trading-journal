@@ -33,8 +33,11 @@ def engine() -> Generator[Engine, None, None]:
 
 @pytest.fixture
 def session(engine: Engine) -> Generator[Session, None, None]:
-    with Session(engine) as s:
-        yield s
+    session = Session(engine)
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 def make_user(session: Session, username: str = "testuser") -> int:
@@ -45,12 +48,20 @@ def make_user(session: Session, username: str = "testuser") -> int:
     return user.id
 
 
-def make_cycle(session: Session, user_id: int, friendly_name: str = "Test Cycle") -> int:
+def make_exchange(session: Session, name: str = "NASDAQ") -> int:
+    exchange = models.Exchanges(name=name, notes="Test exchange")
+    session.add(exchange)
+    session.commit()
+    session.refresh(exchange)
+    return exchange.id
+
+
+def make_cycle(session: Session, user_id: int, exchange_id: int, friendly_name: str = "Test Cycle") -> int:
     cycle = models.Cycles(
         user_id=user_id,
         friendly_name=friendly_name,
         symbol="AAPL",
-        exchange="NASDAQ",
+        exchange_id=exchange_id,
         underlying_currency=models.UnderlyingCurrency.USD,
         status=models.CycleStatus.OPEN,
         start_date=datetime.now(timezone.utc).date(),
@@ -62,11 +73,13 @@ def make_cycle(session: Session, user_id: int, friendly_name: str = "Test Cycle"
 
 
 def make_trade(session: Session, user_id: int, cycle_id: int, friendly_name: str = "Test Trade") -> int:
+    cycle: models.Cycles = session.get(models.Cycles, cycle_id)
+    exchange_id = cycle.exchange_id
     trade = models.Trades(
         user_id=user_id,
         friendly_name=friendly_name,
         symbol="AAPL",
-        exchange="NASDAQ",
+        exchange_id=exchange_id,
         underlying_currency=models.UnderlyingCurrency.USD,
         trade_type=models.TradeType.LONG_SPOT,
         trade_strategy=models.TradeStrategy.SPOT,
@@ -125,13 +138,13 @@ def _ensure_utc_aware(dt: datetime) -> datetime | None:
 
 def test_create_trade_success_with_cycle(session: Session) -> None:
     user_id = make_user(session)
-    cycle_id = make_cycle(session, user_id)
+    exchange_id = make_exchange(session)
+    cycle_id = make_cycle(session, user_id, exchange_id)
 
     trade_data = {
         "user_id": user_id,
         "friendly_name": "Test Trade",
         "symbol": "AAPL",
-        "exchange": "NASDAQ",
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -167,12 +180,13 @@ def test_create_trade_success_with_cycle(session: Session) -> None:
 
 def test_create_trade_with_auto_created_cycle(session: Session) -> None:
     user_id = make_user(session)
+    exchange_id = make_exchange(session)
 
     trade_data = {
         "user_id": user_id,
         "friendly_name": "Test Trade with Auto Cycle",
         "symbol": "AAPL",
-        "exchange": "NASDAQ",
+        "exchange_id": exchange_id,
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -210,12 +224,13 @@ def test_create_trade_with_auto_created_cycle(session: Session) -> None:
 
 def test_create_trade_missing_required_fields(session: Session) -> None:
     user_id = make_user(session)
+    exchange_id = make_exchange(session)
 
     base_trade_data = {
         "user_id": user_id,
         "friendly_name": "Incomplete Trade",
         "symbol": "AAPL",
-        "exchange": "NASDAQ",
+        "exchange_id": exchange_id,
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -231,12 +246,12 @@ def test_create_trade_missing_required_fields(session: Session) -> None:
         crud.create_trade(session, trade_data)
     assert "symbol is required" in str(excinfo.value)
 
-    # Missing exchange
+    # Missing exchange and cycle together
     trade_data = base_trade_data.copy()
-    trade_data.pop("exchange", None)
+    trade_data.pop("exchange_id", None)
     with pytest.raises(ValueError) as excinfo:
         crud.create_trade(session, trade_data)
-    assert "exchange is required" in str(excinfo.value)
+    assert "exchange_id is required when no cycle is attached" in str(excinfo.value)
 
     # Missing underlying_currency
     trade_data = base_trade_data.copy()
@@ -276,12 +291,13 @@ def test_create_trade_missing_required_fields(session: Session) -> None:
 
 def test_get_trade_by_id(session: Session) -> None:
     user_id = make_user(session)
-    cycle_id = make_cycle(session, user_id)
+    exchange_id = make_exchange(session)
+    cycle_id = make_cycle(session, user_id, exchange_id)
     trade_data = {
         "user_id": user_id,
         "friendly_name": "Test Trade for Get",
         "symbol": "AAPL",
-        "exchange": "NASDAQ",
+        "exchange_id": exchange_id,
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -314,13 +330,14 @@ def test_get_trade_by_id(session: Session) -> None:
 
 def test_get_trade_by_user_id_and_friendly_name(session: Session) -> None:
     user_id = make_user(session)
-    cycle_id = make_cycle(session, user_id)
+    exchange_id = make_exchange(session)
+    cycle_id = make_cycle(session, user_id, exchange_id)
     friendly_name = "Unique Trade Name"
     trade_data = {
         "user_id": user_id,
         "friendly_name": friendly_name,
         "symbol": "AAPL",
-        "exchange": "NASDAQ",
+        "exchange_id": exchange_id,
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -342,12 +359,13 @@ def test_get_trade_by_user_id_and_friendly_name(session: Session) -> None:
 
 def test_get_trades_by_user_id(session: Session) -> None:
     user_id = make_user(session)
-    cycle_id = make_cycle(session, user_id)
+    exchange_id = make_exchange(session)
+    cycle_id = make_cycle(session, user_id, exchange_id)
     trade_data_1 = {
         "user_id": user_id,
         "friendly_name": "Trade One",
         "symbol": "AAPL",
-        "exchange": "NASDAQ",
+        "exchange_id": exchange_id,
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -364,7 +382,7 @@ def test_get_trades_by_user_id(session: Session) -> None:
         "user_id": user_id,
         "friendly_name": "Trade Two",
         "symbol": "GOOGL",
-        "exchange": "NASDAQ",
+        "exchange_id": exchange_id,
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.SHORT_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -388,7 +406,8 @@ def test_get_trades_by_user_id(session: Session) -> None:
 
 def test_update_trade_note(session: Session) -> None:
     user_id = make_user(session)
-    cycle_id = make_cycle(session, user_id)
+    exchange_id = make_exchange(session)
+    cycle_id = make_cycle(session, user_id, exchange_id)
     trade_id = make_trade(session, user_id, cycle_id)
 
     new_note = "This is an updated note."
@@ -405,7 +424,8 @@ def test_update_trade_note(session: Session) -> None:
 
 def test_invalidate_trade(session: Session) -> None:
     user_id = make_user(session)
-    cycle_id = make_cycle(session, user_id)
+    exchange_id = make_exchange(session)
+    cycle_id = make_cycle(session, user_id, exchange_id)
     trade_id = make_trade(session, user_id, cycle_id)
 
     invalidated_trade = crud.invalidate_trade(session, trade_id)
@@ -421,14 +441,15 @@ def test_invalidate_trade(session: Session) -> None:
 
 def test_replace_trade(session: Session) -> None:
     user_id = make_user(session)
-    cycle_id = make_cycle(session, user_id)
+    exchange_id = make_exchange(session)
+    cycle_id = make_cycle(session, user_id, exchange_id)
     old_trade_id = make_trade(session, user_id, cycle_id)
 
     new_trade_data = {
         "user_id": user_id,
         "friendly_name": "Replaced Trade",
         "symbol": "MSFT",
-        "exchange": "NASDAQ",
+        "exchange_id": exchange_id,
         "underlying_currency": models.UnderlyingCurrency.USD,
         "trade_type": models.TradeType.LONG_SPOT,
         "trade_strategy": models.TradeStrategy.SPOT,
@@ -465,11 +486,12 @@ def test_replace_trade(session: Session) -> None:
 
 def test_create_cycle(session: Session) -> None:
     user_id = make_user(session)
+    exchange_id = make_exchange(session)
     cycle_data = {
         "user_id": user_id,
         "friendly_name": "My First Cycle",
         "symbol": "GOOGL",
-        "exchange": "NASDAQ",
+        "exchange_id": exchange_id,
         "underlying_currency": models.UnderlyingCurrency.USD,
         "status": models.CycleStatus.OPEN,
         "start_date": datetime.now(timezone.utc).date(),
@@ -495,7 +517,8 @@ def test_create_cycle(session: Session) -> None:
 
 def test_update_cycle(session: Session) -> None:
     user_id = make_user(session)
-    cycle_id = make_cycle(session, user_id, friendly_name="Initial Cycle Name")
+    exchange_id = make_exchange(session)
+    cycle_id = make_cycle(session, user_id, exchange_id, friendly_name="Initial Cycle Name")
 
     update_data = {
         "friendly_name": "Updated Cycle Name",
@@ -516,7 +539,8 @@ def test_update_cycle(session: Session) -> None:
 
 def test_update_cycle_immutable_fields(session: Session) -> None:
     user_id = make_user(session)
-    cycle_id = make_cycle(session, user_id, friendly_name="Initial Cycle Name")
+    exchange_id = make_exchange(session)
+    cycle_id = make_cycle(session, user_id, exchange_id, friendly_name="Initial Cycle Name")
 
     # Attempt to update immutable fields
     update_data = {

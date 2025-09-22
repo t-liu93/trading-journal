@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     port: int = 8000
     workers: int = 1
     log_level: str = "info"
+    database_url: str = "sqlite:///:memory:"
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
