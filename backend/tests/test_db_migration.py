@@ -70,6 +70,12 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
                 "notes": ("TEXT", 0, 0),
                 "cycle_id": ("INTEGER", 0, 0),
             },
+            "exchanges": {
+                "id": ("INTEGER", 1, 1),
+                "user_id": ("INTEGER", 1, 0),
+                "name": ("TEXT", 1, 0),
+                "notes": ("TEXT", 0, 0),
+            },
             "sessions": {
                 "id": ("INTEGER", 1, 1),
                 "user_id": ("INTEGER", 1, 0),
@@ -97,7 +103,9 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
                 {"table": "users", "from": "user_id", "to": "id"},
             ],
             "users": [],
-            "exchanges": [],
+            "exchanges": [
+                {"table": "users", "from": "user_id", "to": "id"},
+            ],
         }
 
         with engine.connect() as conn:

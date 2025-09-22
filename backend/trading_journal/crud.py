@@ -274,15 +274,23 @@ def get_exchange_by_id(session: Session, exchange_id: int) -> models.Exchanges |
     return session.get(models.Exchanges, exchange_id)
 
 
-def get_exchange_by_name(session: Session, name: str) -> models.Exchanges | None:
+def get_exchange_by_name_and_user_id(session: Session, name: str, user_id: int) -> models.Exchanges | None:
     statement = select(models.Exchanges).where(
         models.Exchanges.name == name,
+        models.Exchanges.user_id == user_id,
     )
     return session.exec(statement).first()
 
 
 def get_all_exchanges(session: Session) -> list[models.Exchanges]:
     statement = select(models.Exchanges)
+    return session.exec(statement).all()
+
+
+def get_all_exchanges_by_user_id(session: Session, user_id: int) -> list[models.Exchanges]:
+    statement = select(models.Exchanges).where(
+        models.Exchanges.user_id == user_id,
+    )
     return session.exec(statement).all()
 
 

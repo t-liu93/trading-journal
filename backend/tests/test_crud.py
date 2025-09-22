@@ -48,8 +48,8 @@ def make_user(session: Session, username: str = "testuser") -> int:
     return user.id
 
 
-def make_exchange(session: Session, name: str = "NASDAQ") -> int:
-    exchange = models.Exchanges(name=name, notes="Test exchange")
+def make_exchange(session: Session, user_id: int, name: str = "NASDAQ") -> int:
+    exchange = models.Exchanges(user_id=user_id, name=name, notes="Test exchange")
     session.add(exchange)
     session.commit()
     session.refresh(exchange)
@@ -138,7 +138,7 @@ def _ensure_utc_aware(dt: datetime) -> datetime | None:
 
 def test_create_trade_success_with_cycle(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
     cycle_id = make_cycle(session, user_id, exchange_id)
 
     trade_data = {
@@ -180,7 +180,7 @@ def test_create_trade_success_with_cycle(session: Session) -> None:
 
 def test_create_trade_with_auto_created_cycle(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
 
     trade_data = {
         "user_id": user_id,
@@ -224,7 +224,7 @@ def test_create_trade_with_auto_created_cycle(session: Session) -> None:
 
 def test_create_trade_missing_required_fields(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
 
     base_trade_data = {
         "user_id": user_id,
@@ -291,7 +291,7 @@ def test_create_trade_missing_required_fields(session: Session) -> None:
 
 def test_get_trade_by_id(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
     cycle_id = make_cycle(session, user_id, exchange_id)
     trade_data = {
         "user_id": user_id,
@@ -330,7 +330,7 @@ def test_get_trade_by_id(session: Session) -> None:
 
 def test_get_trade_by_user_id_and_friendly_name(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
     cycle_id = make_cycle(session, user_id, exchange_id)
     friendly_name = "Unique Trade Name"
     trade_data = {
@@ -359,7 +359,7 @@ def test_get_trade_by_user_id_and_friendly_name(session: Session) -> None:
 
 def test_get_trades_by_user_id(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
     cycle_id = make_cycle(session, user_id, exchange_id)
     trade_data_1 = {
         "user_id": user_id,
@@ -406,7 +406,7 @@ def test_get_trades_by_user_id(session: Session) -> None:
 
 def test_update_trade_note(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
     cycle_id = make_cycle(session, user_id, exchange_id)
     trade_id = make_trade(session, user_id, cycle_id)
 
@@ -424,7 +424,7 @@ def test_update_trade_note(session: Session) -> None:
 
 def test_invalidate_trade(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
     cycle_id = make_cycle(session, user_id, exchange_id)
     trade_id = make_trade(session, user_id, cycle_id)
 
@@ -441,7 +441,7 @@ def test_invalidate_trade(session: Session) -> None:
 
 def test_replace_trade(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
     cycle_id = make_cycle(session, user_id, exchange_id)
     old_trade_id = make_trade(session, user_id, cycle_id)
 
@@ -486,7 +486,7 @@ def test_replace_trade(session: Session) -> None:
 
 def test_create_cycle(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
     cycle_data = {
         "user_id": user_id,
         "friendly_name": "My First Cycle",
@@ -517,7 +517,7 @@ def test_create_cycle(session: Session) -> None:
 
 def test_update_cycle(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
     cycle_id = make_cycle(session, user_id, exchange_id, friendly_name="Initial Cycle Name")
 
     update_data = {
@@ -539,7 +539,7 @@ def test_update_cycle(session: Session) -> None:
 
 def test_update_cycle_immutable_fields(session: Session) -> None:
     user_id = make_user(session)
-    exchange_id = make_exchange(session)
+    exchange_id = make_exchange(session, user_id)
     cycle_id = make_cycle(session, user_id, exchange_id, friendly_name="Initial Cycle Name")
 
     # Attempt to update immutable fields
@@ -563,42 +563,51 @@ def test_update_cycle_immutable_fields(session: Session) -> None:
 
 # Exchanges
 def test_create_exchange(session: Session) -> None:
+    user_id = make_user(session)
     exchange_data = {
         "name": "NYSE",
         "notes": "New York Stock Exchange",
+        "user_id": user_id,
     }
     exchange = crud.create_exchange(session, exchange_data)
     assert exchange.id is not None
     assert exchange.name == exchange_data["name"]
     assert exchange.notes == exchange_data["notes"]
+    assert exchange.user_id == user_id
 
     session.refresh(exchange)
     actual_exchange = session.get(models.Exchanges, exchange.id)
     assert actual_exchange is not None
     assert actual_exchange.name == exchange_data["name"]
     assert actual_exchange.notes == exchange_data["notes"]
+    assert actual_exchange.user_id == user_id
 
 
 def test_get_exchange_by_id(session: Session) -> None:
-    exchange_id = make_exchange(session, name="LSE")
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id=user_id, name="LSE")
     exchange = crud.get_exchange_by_id(session, exchange_id)
     assert exchange is not None
     assert exchange.id == exchange_id
     assert exchange.name == "LSE"
+    assert exchange.user_id == user_id
 
 
-def test_get_exchange_by_name(session: Session) -> None:
+def test_get_exchange_by_name_and_user_id(session: Session) -> None:
     exchange_name = "TSX"
-    make_exchange(session, name=exchange_name)
-    exchange = crud.get_exchange_by_name(session, exchange_name)
+    user_id = make_user(session)
+    make_exchange(session, user_id=user_id, name=exchange_name)
+    exchange = crud.get_exchange_by_name_and_user_id(session, exchange_name, user_id)
     assert exchange is not None
     assert exchange.name == exchange_name
+    assert exchange.user_id == user_id
 
 
 def test_get_all_exchanges(session: Session) -> None:
     exchange_names = ["NYSE", "NASDAQ", "LSE"]
+    user_id = make_user(session)
     for name in exchange_names:
-        make_exchange(session, name=name)
+        make_exchange(session, user_id=user_id, name=name)
 
     exchanges = crud.get_all_exchanges(session)
     assert len(exchanges) >= 3
@@ -607,8 +616,22 @@ def test_get_all_exchanges(session: Session) -> None:
         assert name in fetched_names
 
 
+def test_get_all_exchanges_by_user_id(session: Session) -> None:
+    exchange_names = ["NYSE", "NASDAQ"]
+    user_id = make_user(session)
+    for name in exchange_names:
+        make_exchange(session, user_id=user_id, name=name)
+
+    exchanges = crud.get_all_exchanges_by_user_id(session, user_id)
+    assert len(exchanges) == len(exchange_names)
+    fetched_names = {ex.name for ex in exchanges}
+    for name in exchange_names:
+        assert name in fetched_names
+
+
 def test_update_exchange(session: Session) -> None:
-    exchange_id = make_exchange(session, name="Initial Exchange")
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id=user_id, name="Initial Exchange")
     update_data = {
         "name": "Updated Exchange",
         "notes": "Updated notes for the exchange",
@@ -627,7 +650,8 @@ def test_update_exchange(session: Session) -> None:
 
 
 def test_delete_exchange(session: Session) -> None:
-    exchange_id = make_exchange(session, name="Deletable Exchange")
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id=user_id, name="Deletable Exchange")
     crud.delete_exchange(session, exchange_id)
     deleted_exchange = session.get(models.Exchanges, exchange_id)
     assert deleted_exchange is None

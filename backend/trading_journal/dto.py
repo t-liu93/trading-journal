@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from datetime import date, datetime  # noqa: TC003
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
 from sqlmodel import SQLModel
 
 if TYPE_CHECKING:
-    from datetime import date, datetime
-
     from trading_journal.models import TradeStrategy, TradeType, UnderlyingCurrency
 
 
@@ -52,5 +52,33 @@ class UserCreate(UserBase):
     password: str
 
 
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
 class UserRead(UserBase):
     id: int
+
+
+class SessionsBase(SQLModel):
+    user_id: int
+
+
+class SessionRead(SessionsBase):
+    id: int
+    expires_at: datetime
+    last_seen_at: datetime | None
+    last_used_ip: str | None
+    user_agent: str | None
+
+
+class SessionsCreate(SessionsBase):
+    expires_at: datetime
+
+
+class SessionsUpdate(SQLModel):
+    expires_at: datetime | None = None
+    last_seen_at: datetime | None = None
+    last_used_ip: str | None = None
+    user_agent: str | None = None

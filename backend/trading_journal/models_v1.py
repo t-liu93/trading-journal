@@ -117,11 +117,14 @@ class Cycles(SQLModel, table=True):
 
 class Exchanges(SQLModel, table=True):
     __tablename__ = "exchanges"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_exchanges_user_name"),)
     id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(sa_column=Column(Text, nullable=False, unique=True))
+    user_id: int = Field(foreign_key="users.id", nullable=False, index=True)
+    name: str = Field(sa_column=Column(Text, nullable=False))
     notes: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     trades: list["Trades"] = Relationship(back_populates="exchange")
     cycles: list["Cycles"] = Relationship(back_populates="exchange")
+    user: "Users" = Relationship(back_populates="exchanges")
 
 
 class Users(SQLModel, table=True):
@@ -131,6 +134,8 @@ class Users(SQLModel, table=True):
     username: str = Field(sa_column=Column(Text, nullable=False, unique=True))
     password_hash: str = Field(sa_column=Column(Text, nullable=False))
     is_active: bool = Field(default=True, nullable=False)
+    sessions: list["Sessions"] = Relationship(back_populates="user")
+    exchanges: list["Exchanges"] = Relationship(back_populates="user")
 
 
 class Sessions(SQLModel, table=True):
@@ -144,3 +149,4 @@ class Sessions(SQLModel, table=True):
     last_used_ip: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     user_agent: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     device_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    user: "Users" = Relationship(back_populates="sessions")

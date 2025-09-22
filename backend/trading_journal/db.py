@@ -8,8 +8,6 @@ from sqlalchemy import event
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, create_engine
 
-from trading_journal import db_migration
-
 if TYPE_CHECKING:
     from collections.abc import Generator
     from sqlite3 import Connection as DBAPIConnection
@@ -59,7 +57,6 @@ class Database:
             event.listen(self._engine, "connect", _enable_sqlite_pragmas)
 
     def init_db(self) -> None:
-        # db_migration.run_migrations(self._engine)
         pass
 
     def get_session(self) -> Generator[Session, None, None]:
@@ -74,7 +71,7 @@ class Database:
             session.close()
 
     @contextmanager
-    def get_session_ctx_manager(self) -> Session:
+    def get_session_ctx_manager(self) -> Generator[Session, None, None]:
         session = Session(self._engine)
         try:
             yield session
