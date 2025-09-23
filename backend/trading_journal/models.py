@@ -64,7 +64,7 @@ class FundingSource(str, Enum):
 
 
 class Trades(SQLModel, table=True):
-    __tablename__ = "trades"
+    __tablename__ = "trades"  # type: ignore[attr-defined]
     __table_args__ = (UniqueConstraint("user_id", "friendly_name", name="uq_trades_user_friendly_name"),)
 
     id: int | None = Field(default=None, primary_key=True)
@@ -95,7 +95,7 @@ class Trades(SQLModel, table=True):
 
 
 class Cycles(SQLModel, table=True):
-    __tablename__ = "cycles"
+    __tablename__ = "cycles"  # type: ignore[attr-defined]
     __table_args__ = (UniqueConstraint("user_id", "friendly_name", name="uq_cycles_user_friendly_name"),)
 
     id: int | None = Field(default=None, primary_key=True)
@@ -116,7 +116,7 @@ class Cycles(SQLModel, table=True):
 
 
 class Exchanges(SQLModel, table=True):
-    __tablename__ = "exchanges"
+    __tablename__ = "exchanges"  # type: ignore[attr-defined]
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_exchanges_user_name"),)
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", nullable=False, index=True)
@@ -128,7 +128,7 @@ class Exchanges(SQLModel, table=True):
 
 
 class Users(SQLModel, table=True):
-    __tablename__ = "users"
+    __tablename__ = "users"  # type: ignore[attr-defined]
     id: int | None = Field(default=None, primary_key=True)
     # unique=True already creates an index; no need to also set index=True
     username: str = Field(sa_column=Column(Text, nullable=False, unique=True))
@@ -139,7 +139,7 @@ class Users(SQLModel, table=True):
 
 
 class Sessions(SQLModel, table=True):
-    __tablename__ = "sessions"
+    __tablename__ = "sessions"  # type: ignore[attr-defined]
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", nullable=False, index=True)
     session_token_hash: str = Field(sa_column=Column(Text, nullable=False, unique=True))

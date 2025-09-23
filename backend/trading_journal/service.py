@@ -2,20 +2,23 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Callable
+from typing import TYPE_CHECKING, cast
 
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
-from sqlmodel import Session
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 import settings
 from trading_journal import crud, security
-from trading_journal.db import Database
 from trading_journal.dto import ExchangesBase, ExchangesCreate, SessionsCreate, SessionsUpdate, UserCreate, UserLogin, UserRead
-from trading_journal.models import Sessions
 
 SessionsCreate.model_rebuild()
+
+if TYPE_CHECKING:
+    from sqlmodel import Session
+
+    from trading_journal.db import Database
+    from trading_journal.models import Sessions
 
 
 EXCEPT_PATHS = [
@@ -28,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class AuthMiddleWare(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Response]) -> Response:  # noqa: PLR0911
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:  # noqa: PLR0911
         if request.url.path in EXCEPT_PATHS:
             return await call_next(request)
 
@@ -51,12 +54,12 @@ class AuthMiddleWare(BaseHTTPMiddleware):
             with db_factory.get_session_ctx_manager() as request_session:
                 hashed_token = security.hash_session_token_sha256(token)
                 request.state.db_session = request_session
-                login_session: Sessions | None = crud.get_login_session_by_token_hash(request.state.db_session, hashed_token)
+                login_session: Sessions | None = crud.get_login_session_by_token_hash(request_session, hashed_token)
                 if not login_session:
                     return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Unauthorized"})
                 session_expires_utc = login_session.expires_at.replace(tzinfo=timezone.utc)
                 if session_expires_utc < datetime.now(timezone.utc):
-                    crud.delete_login_session(request.state.db_session, login_session)
+                    crud.delete_login_session(request_session, login_session.session_token_hash)
                     return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Unauthorized"})
                 if login_session.user.is_active is False:
                     return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Unauthorized"})
@@ -72,7 +75,7 @@ class AuthMiddleWare(BaseHTTPMiddleware):
                 )
                 user_id = login_session.user_id
                 request.state.user_id = user_id
-                crud.update_login_session(request.state.db_session, hashed_token, update_session=updated_session)
+                crud.update_login_session(request_session, hashed_token, update_session=updated_session)
         except Exception:
             logger.exception("Failed to authenticate user: \n")
             return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"detail": "Internal server error"})
@@ -106,7 +109,7 @@ def register_user_service(db_session: Session, user_in: UserCreate) -> UserRead:
             # prefer pydantic's from_orm if DTO supports orm_mode
             user = UserRead.model_validate(user)
         except Exception as e:
-            logger.exception("Failed to convert user to UserRead: %s", e)
+            logger.exception("Failed to convert user to UserRead: ")
             raise ServiceError("Failed to convert user to UserRead") from e
     except Exception as e:
         logger.exception("Failed to create user:")
@@ -118,6 +121,7 @@ def authenticate_user_service(db_session: Session, user_in: UserLogin) -> tuple[
     user = crud.get_user_by_username(db_session, user_in.username)
     if not user:
         return None
+    user_id_val = cast("int", user.id)
 
     if not security.verify_password(user_in.password, user.password_hash):
         return None
@@ -127,7 +131,7 @@ def authenticate_user_service(db_session: Session, user_in: UserLogin) -> tuple[
     try:
         session = crud.create_login_session(
             session=db_session,
-            user_id=user.id,
+            user_id=user_id_val,
             session_token_hash=token_hashed,
             session_length_seconds=settings.settings.session_expiry_seconds,
         )

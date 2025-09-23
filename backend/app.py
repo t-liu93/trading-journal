@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 import settings
 from trading_journal import db, service
-from trading_journal.db import Database
 from trading_journal.dto import ExchangesBase, SessionsBase, SessionsCreate, UserCreate, UserLogin, UserRead
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from trading_journal.db import Database
 
 _db = db.create_database(settings.settings.database_url)
 
@@ -43,7 +47,7 @@ async def get_status() -> dict[str, str]:
 
 
 @app.post(f"{settings.settings.api_base}/register")
-async def register_user(request: Request, user_in: UserCreate) -> UserRead:
+async def register_user(request: Request, user_in: UserCreate) -> Response:
     db_factory: Database = request.app.state.db_factory
 
     def sync_work() -> UserRead:
@@ -61,7 +65,7 @@ async def register_user(request: Request, user_in: UserCreate) -> UserRead:
 
 
 @app.post(f"{settings.settings.api_base}/login")
-async def login(request: Request, user_in: UserLogin) -> SessionsBase:
+async def login(request: Request, user_in: UserLogin) -> Response:
     db_factory: Database = request.app.state.db_factory
 
     def sync_work() -> tuple[SessionsCreate, str] | None:
@@ -97,7 +101,7 @@ async def login(request: Request, user_in: UserLogin) -> SessionsBase:
 
 # Exchange
 @app.post(f"{settings.settings.api_base}/exchanges")
-async def create_exchange(request: Request, exchange_data: ExchangesBase) -> dict:
+async def create_exchange(request: Request, exchange_data: ExchangesBase) -> Response:
     db_factory: Database = request.app.state.db_factory
 
     def sync_work() -> ExchangesBase:

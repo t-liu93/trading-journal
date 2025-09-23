@@ -23,11 +23,11 @@ def _mig_0_1(engine: Engine) -> None:
     SQLModel.metadata.create_all(
         bind=engine,
         tables=[
-            models_v1.Trades.__table__,
-            models_v1.Cycles.__table__,
-            models_v1.Users.__table__,
-            models_v1.Sessions.__table__,
-            models_v1.Exchanges.__table__,
+            models_v1.Trades.__table__,  # type: ignore[attr-defined]
+            models_v1.Cycles.__table__,  # type: ignore[attr-defined]
+            models_v1.Users.__table__,  # type: ignore[attr-defined]
+            models_v1.Sessions.__table__,  # type: ignore[attr-defined]
+            models_v1.Exchanges.__table__,  # type: ignore[attr-defined]
         ],
     )
 
