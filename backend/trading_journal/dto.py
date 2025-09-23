@@ -1,55 +1,11 @@
 from __future__ import annotations
 
 from datetime import date, datetime  # noqa: TC003
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 from sqlmodel import SQLModel
 
-if TYPE_CHECKING:
-    from trading_journal.models import TradeStrategy, TradeType, UnderlyingCurrency
-
-
-class ExchangesBase(SQLModel):
-    name: str
-    notes: str | None = None
-
-
-class ExchangesCreate(ExchangesBase):
-    user_id: int
-
-
-class TradeBase(SQLModel):
-    user_id: int
-    friendly_name: str | None
-    symbol: str
-    exchange: str
-    underlying_currency: UnderlyingCurrency
-    trade_type: TradeType
-    trade_strategy: TradeStrategy
-    trade_date: date
-    trade_time_utc: datetime
-    quantity: int
-    price_cents: int
-    gross_cash_flow_cents: int
-    commission_cents: int
-    net_cash_flow_cents: int
-    notes: str | None
-    cycle_id: int | None = None
-
-
-class TradeCreate(TradeBase):
-    expiry_date: date | None = None
-    strike_price_cents: int | None = None
-    is_invalidated: bool = False
-    invalidated_at: datetime | None = None
-    replaced_by_trade_id: int | None = None
-
-
-class TradeRead(TradeBase):
-    id: int
-    is_invalidated: bool
-    invalidated_at: datetime | None
+from trading_journal.models import TradeStrategy, TradeType, UnderlyingCurrency  # noqa: TC001
 
 
 class UserBase(SQLModel):
@@ -91,3 +47,68 @@ class SessionsUpdate(SQLModel):
     last_seen_at: datetime | None = None
     last_used_ip: str | None = None
     user_agent: str | None = None
+
+
+class ExchangesBase(SQLModel):
+    name: str
+    notes: str | None = None
+
+
+class ExchangesCreate(ExchangesBase):
+    user_id: int
+
+
+class ExchangesRead(ExchangesBase):
+    id: int
+
+
+class CycleBase(SQLModel):
+    friendly_name: str | None = None
+    symbol: str
+    exchange_id: int
+    underlying_currency: UnderlyingCurrency
+    status: str
+    start_date: date
+    end_date: date | None = None
+    funding_source: str | None = None
+    capital_exposure_cents: int | None = None
+    loan_amount_cents: int | None = None
+    loan_interest_rate_bps: int | None = None
+    trades: list[TradeRead] | None = None
+
+
+class CycleCreate(CycleBase):
+    user_id: int
+
+
+class TradeBase(SQLModel):
+    user_id: int
+    friendly_name: str | None
+    symbol: str
+    exchange: str
+    underlying_currency: UnderlyingCurrency
+    trade_type: TradeType
+    trade_strategy: TradeStrategy
+    trade_date: date
+    trade_time_utc: datetime
+    quantity: int
+    price_cents: int
+    gross_cash_flow_cents: int
+    commission_cents: int
+    net_cash_flow_cents: int
+    notes: str | None
+    cycle_id: int | None = None
+
+
+class TradeCreate(TradeBase):
+    expiry_date: date | None = None
+    strike_price_cents: int | None = None
+    is_invalidated: bool = False
+    invalidated_at: datetime | None = None
+    replaced_by_trade_id: int | None = None
+
+
+class TradeRead(TradeBase):
+    id: int
+    is_invalidated: bool
+    invalidated_at: datetime | None

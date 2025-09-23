@@ -7,11 +7,12 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, Response
 
 import settings
 from trading_journal import db, service
-from trading_journal.dto import ExchangesBase, SessionsBase, SessionsCreate, UserCreate, UserLogin, UserRead
+from trading_journal.dto import CycleBase, ExchangesBase, ExchangesRead, SessionsBase, SessionsCreate, UserCreate, UserLogin, UserRead
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -119,10 +120,10 @@ async def create_exchange(request: Request, exchange_data: ExchangesBase) -> Res
 
 
 @app.get(f"{settings.settings.api_base}/exchanges")
-async def get_exchanges(request: Request) -> list[ExchangesBase]:
+async def get_exchanges(request: Request) -> list[ExchangesRead]:
     db_factory: Database = request.app.state.db_factory
 
-    def sync_work() -> list[ExchangesBase]:
+    def sync_work() -> list[ExchangesRead]:
         with db_factory.get_session_ctx_manager() as db:
             return service.get_exchanges_by_user_service(db, request.state.user_id)
 
@@ -133,4 +134,39 @@ async def get_exchanges(request: Request) -> list[ExchangesBase]:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
 
 
-# Trade
+@app.patch(f"{settings.settings.api_base}/exchanges/{{exchange_id}}")
+async def update_exchange(request: Request, exchange_id: int, exchange_data: ExchangesBase) -> Response:
+    db_factory: Database = request.app.state.db_factory
+
+    def sync_work() -> ExchangesBase:
+        with db_factory.get_session_ctx_manager() as db:
+            return service.update_exchanges_service(db, request.state.user_id, exchange_id, exchange_data.name, exchange_data.notes)
+
+    try:
+        exchange = await asyncio.to_thread(sync_work)
+        return JSONResponse(status_code=status.HTTP_200_OK, content=exchange.model_dump())
+    except service.ExchangeNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except service.ExchangeAlreadyExistsError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Failed to update exchange: \n")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+# Cycle
+@app.post(f"{settings.settings.api_base}/cycles")
+async def create_cycle(request: Request, cycle_data: CycleBase) -> Response:
+    return JSONResponse(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, content="Not supported.")
+    db_factory: Database = request.app.state.db_factory
+
+    def sync_work() -> CycleBase:
+        with db_factory.get_session_ctx_manager() as db:
+            return service.create_cycle_service(db, request.state.user_id, cycle_data)
+
+    try:
+        cycle = await asyncio.to_thread(sync_work)
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=jsonable_encoder(cycle))
+    except Exception as e:
+        logger.exception("Failed to create cycle: \n")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e

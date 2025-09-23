@@ -10,9 +10,21 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 
 import settings
 from trading_journal import crud, security
-from trading_journal.dto import ExchangesBase, ExchangesCreate, SessionsCreate, SessionsUpdate, UserCreate, UserLogin, UserRead
+from trading_journal.dto import (
+    CycleBase,
+    CycleCreate,
+    ExchangesBase,
+    ExchangesCreate,
+    ExchangesRead,
+    SessionsCreate,
+    SessionsUpdate,
+    UserCreate,
+    UserLogin,
+    UserRead,
+)
 
 SessionsCreate.model_rebuild()
+CycleBase.model_rebuild()
 
 if TYPE_CHECKING:
     from sqlmodel import Session
@@ -95,6 +107,11 @@ class ExchangeAlreadyExistsError(ServiceError):
     pass
 
 
+class ExchangeNotFoundError(ServiceError):
+    pass
+
+
+# User service
 def register_user_service(db_session: Session, user_in: UserCreate) -> UserRead:
     if crud.get_user_by_username(db_session, user_in.username):
         raise UserAlreadyExistsError("username already exists")
@@ -156,7 +173,7 @@ def create_exchange_service(db_session: Session, user_id: int, name: str, notes:
         try:
             exchange_dto = ExchangesCreate.model_validate(exchange)
         except Exception as e:
-            logger.exception("Failed to convert exchange to ExchangesCreate: ")
+            logger.exception("Failed to convert exchange to ExchangesCreate:")
             raise ServiceError("Failed to convert exchange to ExchangesCreate") from e
     except Exception as e:
         logger.exception("Failed to create exchange:")
@@ -164,9 +181,42 @@ def create_exchange_service(db_session: Session, user_id: int, name: str, notes:
     return exchange_dto
 
 
-def get_exchanges_by_user_service(db_session: Session, user_id: int) -> list[ExchangesBase]:
+def get_exchanges_by_user_service(db_session: Session, user_id: int) -> list[ExchangesRead]:
     exchanges = crud.get_all_exchanges_by_user_id(db_session, user_id)
-    return [ExchangesBase.model_validate(exchange) for exchange in exchanges]
+    return [ExchangesRead.model_validate(exchange) for exchange in exchanges]
+
+
+def update_exchanges_service(db_session: Session, user_id: int, exchange_id: int, name: str | None, notes: str | None) -> ExchangesBase:
+    existing_exchange = crud.get_exchange_by_id(db_session, exchange_id)
+    if not existing_exchange:
+        raise ExchangeNotFoundError("Exchange not found")
+    if existing_exchange.user_id != user_id:
+        raise ExchangeNotFoundError("Exchange not found")
+
+    if name:
+        other_exchange = crud.get_exchange_by_name_and_user_id(db_session, name, user_id)
+        if other_exchange and other_exchange.id != existing_exchange.id:
+            raise ExchangeAlreadyExistsError("Another exchange with the same name already exists for this user")
+
+    exchange_data = ExchangesBase(
+        name=name or existing_exchange.name,
+        notes=notes or existing_exchange.notes,
+    )
+    try:
+        exchange = crud.update_exchange(db_session, cast("int", existing_exchange.id), update_data=exchange_data)
+    except Exception as e:
+        logger.exception("Failed to update exchange: \n")
+        raise ServiceError("Failed to update exchange") from e
+    return ExchangesBase.model_validate(exchange)
+
+
+# Cycle Service
+def create_cycle_service(db_session: Session, user_id: int, cycle_data: CycleBase) -> CycleBase:
+    cycle_data_dict = cycle_data.model_dump()
+    cycle_data_dict["user_id"] = user_id
+    cycle_data_with_user_id: CycleCreate = CycleCreate.model_validate(cycle_data_dict)
+    crud.create_cycle(db_session, cycle_data=cycle_data_with_user_id)
+    return cycle_data
 
 
 def get_trades_service(db_session: Session, user_id: int) -> list:
