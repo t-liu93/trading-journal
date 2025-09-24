@@ -12,7 +12,22 @@ from fastapi.responses import JSONResponse, Response
 
 import settings
 from trading_journal import db, service
-from trading_journal.dto import CycleBase, ExchangesBase, ExchangesRead, SessionsBase, SessionsCreate, UserCreate, UserLogin, UserRead
+from trading_journal.dto import (
+    CycleBase,
+    CycleRead,
+    CycleUpdate,
+    ExchangesBase,
+    ExchangesRead,
+    SessionsBase,
+    SessionsCreate,
+    TradeCreate,
+    TradeFriendlyNameUpdate,
+    TradeNoteUpdate,
+    TradeRead,
+    UserCreate,
+    UserLogin,
+    UserRead,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -169,4 +184,135 @@ async def create_cycle(request: Request, cycle_data: CycleBase) -> Response:
         return JSONResponse(status_code=status.HTTP_201_CREATED, content=jsonable_encoder(cycle))
     except Exception as e:
         logger.exception("Failed to create cycle: \n")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+@app.get(f"{settings.settings.api_base}/cycles/{{cycle_id}}")
+async def get_cycle_by_id(request: Request, cycle_id: int) -> Response:
+    db_factory: Database = request.app.state.db_factory
+
+    def sync_work() -> CycleBase:
+        with db_factory.get_session_ctx_manager() as db:
+            return service.get_cycle_by_id_service(db, request.state.user_id, cycle_id)
+
+    try:
+        cycle = await asyncio.to_thread(sync_work)
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(cycle))
+    except service.CycleNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Failed to get cycle by id: \n")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+@app.get(f"{settings.settings.api_base}/cycles/user/{{user_id}}")
+async def get_cycles_by_user(request: Request, user_id: int) -> Response:
+    db_factory: Database = request.app.state.db_factory
+
+    def sync_work() -> list[CycleRead]:
+        with db_factory.get_session_ctx_manager() as db:
+            return service.get_cycles_by_user_service(db, user_id)
+
+    try:
+        cycles = await asyncio.to_thread(sync_work)
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(cycles))
+    except Exception as e:
+        logger.exception("Failed to get cycles by user: \n")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+@app.patch(f"{settings.settings.api_base}/cycles")
+async def update_cycle(request: Request, cycle_data: CycleUpdate) -> Response:
+    db_factory: Database = request.app.state.db_factory
+
+    def sync_work() -> CycleRead:
+        with db_factory.get_session_ctx_manager() as db:
+            return service.update_cycle_service(db, request.state.user_id, cycle_data)
+
+    try:
+        cycle = await asyncio.to_thread(sync_work)
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(cycle))
+    except service.InvalidCycleDataError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except service.CycleNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Failed to update cycle: \n")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+@app.post(f"{settings.settings.api_base}/trades")
+async def create_trade(request: Request, trade_data: TradeCreate) -> Response:
+    db_factory: Database = request.app.state.db_factory
+
+    def sync_work() -> TradeRead:
+        with db_factory.get_session_ctx_manager() as db:
+            return service.create_trade_service(db, request.state.user_id, trade_data)
+
+    try:
+        trade = await asyncio.to_thread(sync_work)
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=jsonable_encoder(trade))
+    except service.InvalidTradeDataError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Failed to create trade: \n")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+@app.get(f"{settings.settings.api_base}/trades/{{trade_id}}")
+async def get_trade_by_id(request: Request, trade_id: int) -> Response:
+    db_factory: Database = request.app.state.db_factory
+
+    def sync_work() -> TradeRead:
+        with db_factory.get_session_ctx_manager() as db:
+            return service.get_trade_by_id_service(db, request.state.user_id, trade_id)
+
+    try:
+        trade = await asyncio.to_thread(sync_work)
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(trade))
+    except service.TradeNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Failed to get trade by id: \n")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+@app.patch(f"{settings.settings.api_base}/trades/friendlyname")
+async def update_trade_friendly_name(request: Request, friendly_name_update: TradeFriendlyNameUpdate) -> Response:
+    db_factory: Database = request.app.state.db_factory
+
+    def sync_work() -> TradeRead:
+        with db_factory.get_session_ctx_manager() as db:
+            return service.update_trade_friendly_name_service(
+                db,
+                request.state.user_id,
+                friendly_name_update.id,
+                friendly_name_update.friendly_name,
+            )
+
+    try:
+        trade = await asyncio.to_thread(sync_work)
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(trade))
+    except service.TradeNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Failed to update trade friendly name: \n")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+
+
+@app.patch(f"{settings.settings.api_base}/trades/notes")
+async def update_trade_note(request: Request, note_update: TradeNoteUpdate) -> Response:
+    db_factory: Database = request.app.state.db_factory
+
+    def sync_work() -> TradeRead:
+        with db_factory.get_session_ctx_manager() as db:
+            return service.update_trade_note_service(db, request.state.user_id, note_update.id, note_update.notes)
+
+    try:
+        trade = await asyncio.to_thread(sync_work)
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(trade))
+    except service.TradeNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Failed to update trade note: \n")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e

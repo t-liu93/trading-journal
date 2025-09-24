@@ -13,18 +13,19 @@ from trading_journal import crud, security
 from trading_journal.dto import (
     CycleBase,
     CycleCreate,
+    CycleRead,
+    CycleUpdate,
     ExchangesBase,
     ExchangesCreate,
     ExchangesRead,
     SessionsCreate,
     SessionsUpdate,
+    TradeCreate,
+    TradeRead,
     UserCreate,
     UserLogin,
     UserRead,
 )
-
-SessionsCreate.model_rebuild()
-CycleBase.model_rebuild()
 
 if TYPE_CHECKING:
     from sqlmodel import Session
@@ -108,6 +109,22 @@ class ExchangeAlreadyExistsError(ServiceError):
 
 
 class ExchangeNotFoundError(ServiceError):
+    pass
+
+
+class CycleNotFoundError(ServiceError):
+    pass
+
+
+class TradeNotFoundError(ServiceError):
+    pass
+
+
+class InvalidTradeDataError(ServiceError):
+    pass
+
+
+class InvalidCycleDataError(ServiceError):
     pass
 
 
@@ -211,13 +228,124 @@ def update_exchanges_service(db_session: Session, user_id: int, exchange_id: int
 
 
 # Cycle Service
-def create_cycle_service(db_session: Session, user_id: int, cycle_data: CycleBase) -> CycleBase:
+def create_cycle_service(db_session: Session, user_id: int, cycle_data: CycleBase) -> CycleRead:
     cycle_data_dict = cycle_data.model_dump()
     cycle_data_dict["user_id"] = user_id
     cycle_data_with_user_id: CycleCreate = CycleCreate.model_validate(cycle_data_dict)
-    crud.create_cycle(db_session, cycle_data=cycle_data_with_user_id)
-    return cycle_data
+    created_cycle = crud.create_cycle(db_session, cycle_data=cycle_data_with_user_id)
+    return CycleRead.model_validate(created_cycle)
 
 
-def get_trades_service(db_session: Session, user_id: int) -> list:
-    return crud.get_trades_by_user_id(db_session, user_id)
+def get_cycle_by_id_service(db_session: Session, user_id: int, cycle_id: int) -> CycleRead:
+    cycle = crud.get_cycle_by_id(db_session, cycle_id)
+    if not cycle:
+        raise CycleNotFoundError("Cycle not found")
+    if cycle.user_id != user_id:
+        raise CycleNotFoundError("Cycle not found")
+    return CycleRead.model_validate(cycle)
+
+
+def get_cycles_by_user_service(db_session: Session, user_id: int) -> list[CycleRead]:
+    cycles = crud.get_cycles_by_user_id(db_session, user_id)
+    return [CycleRead.model_validate(cycle) for cycle in cycles]
+
+
+def _validate_cycle_update_data(cycle_data: CycleUpdate) -> tuple[bool, str]:
+    if cycle_data.status == "CLOSED" and cycle_data.end_date is None:
+        return False, "end_date is required when status is CLOSED"
+    if cycle_data.status == "OPEN" and cycle_data.end_date is not None:
+        return False, "end_date must be empty when status is OPEN"
+    return True, ""
+
+
+def update_cycle_service(db_session: Session, user_id: int, cycle_data: CycleUpdate) -> CycleRead:
+    is_valid, err_msg = _validate_cycle_update_data(cycle_data)
+    if not is_valid:
+        raise InvalidCycleDataError(err_msg)
+    cycle_id = cast("int", cycle_data.id)
+    existing_cycle = crud.get_cycle_by_id(db_session, cycle_id)
+    if not existing_cycle:
+        raise CycleNotFoundError("Cycle not found")
+    if existing_cycle.user_id != user_id:
+        raise CycleNotFoundError("Cycle not found")
+
+    provided_data_dict = cycle_data.model_dump(exclude_unset=True)
+    cycle_data_with_user_id: CycleBase = CycleBase.model_validate(provided_data_dict)
+
+    try:
+        updated_cycle = crud.update_cycle(db_session, cycle_id, update_data=cycle_data_with_user_id)
+    except Exception as e:
+        logger.exception("Failed to update cycle: \n")
+        raise ServiceError("Failed to update cycle") from e
+    return CycleRead.model_validate(updated_cycle)
+
+
+# Trades service
+def _append_cashflows(trade_data: TradeCreate) -> TradeCreate:
+    sign_multipler: int
+    if trade_data.trade_type in ("SELL_PUT", "SELL_CALL", "EXERCISE_CALL", "CLOSE_LONG_SPOT", "SHORT_SPOT"):
+        sign_multipler = 1
+    else:
+        sign_multipler = -1
+    quantity = trade_data.quantity * trade_data.quantity_multiplier
+    gross_cash_flow_cents = quantity * trade_data.price_cents * sign_multipler
+    net_cash_flow_cents = gross_cash_flow_cents - trade_data.commission_cents
+    trade_data.gross_cash_flow_cents = gross_cash_flow_cents
+    trade_data.net_cash_flow_cents = net_cash_flow_cents
+    return trade_data
+
+
+def _validate_trade_data(trade_data: TradeCreate) -> bool:
+    return not (
+        trade_data.trade_type in ("SELL_PUT", "SELL_CALL") and (trade_data.expiry_date is None or trade_data.strike_price_cents is None)
+    )
+
+
+def create_trade_service(db_session: Session, user_id: int, trade_data: TradeCreate) -> TradeRead:
+    if not _validate_trade_data(trade_data):
+        raise InvalidTradeDataError("Invalid trade data: expiry_date and strike_price_cents are required for SELL_PUT and SELL_CALL trades")
+    trade_data_dict = trade_data.model_dump()
+    trade_data_dict["user_id"] = user_id
+    trade_data_with_user_id: TradeCreate = TradeCreate.model_validate(trade_data_dict)
+    trade_data_with_user_id = _append_cashflows(trade_data_with_user_id)
+    created_trade = crud.create_trade(db_session, trade_data=trade_data_with_user_id)
+    return TradeRead.model_validate(created_trade)
+
+
+def get_trade_by_id_service(db_session: Session, user_id: int, trade_id: int) -> TradeRead:
+    trade = crud.get_trade_by_id(db_session, trade_id)
+    if not trade:
+        raise TradeNotFoundError("Trade not found")
+    if trade.user_id != user_id:
+        raise TradeNotFoundError("Trade not found")
+    return TradeRead.model_validate(trade)
+
+
+def update_trade_friendly_name_service(db_session: Session, user_id: int, trade_id: int, friendly_name: str) -> TradeRead:
+    existing_trade = crud.get_trade_by_id(db_session, trade_id)
+    if not existing_trade:
+        raise TradeNotFoundError("Trade not found")
+    if existing_trade.user_id != user_id:
+        raise TradeNotFoundError("Trade not found")
+    try:
+        updated_trade = crud.update_trade_friendly_name(db_session, trade_id, friendly_name)
+    except Exception as e:
+        logger.exception("Failed to update trade friendly name: \n")
+        raise ServiceError("Failed to update trade friendly name") from e
+    return TradeRead.model_validate(updated_trade)
+
+
+def update_trade_note_service(db_session: Session, user_id: int, trade_id: int, note: str | None) -> TradeRead:
+    existing_trade = crud.get_trade_by_id(db_session, trade_id)
+    if not existing_trade:
+        raise TradeNotFoundError("Trade not found")
+    if existing_trade.user_id != user_id:
+        raise TradeNotFoundError("Trade not found")
+    if note is None:
+        note = ""
+    try:
+        updated_trade = crud.update_trade_note(db_session, trade_id, note)
+    except Exception as e:
+        logger.exception("Failed to update trade notes: \n")
+        raise ServiceError("Failed to update trade notes") from e
+    return TradeRead.model_validate(updated_trade)

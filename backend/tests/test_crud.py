@@ -172,6 +172,51 @@ def test_create_trade_success_with_cycle(session: Session) -> None:
     assert actual_trade.trade_type == trade_data["trade_type"]
     assert actual_trade.trade_strategy == trade_data["trade_strategy"]
     assert actual_trade.quantity == trade_data["quantity"]
+    assert actual_trade.quantity_multiplier == 1
+    assert actual_trade.price_cents == trade_data["price_cents"]
+    assert actual_trade.gross_cash_flow_cents == trade_data["gross_cash_flow_cents"]
+    assert actual_trade.commission_cents == trade_data["commission_cents"]
+    assert actual_trade.net_cash_flow_cents == trade_data["net_cash_flow_cents"]
+    assert actual_trade.cycle_id == trade_data["cycle_id"]
+
+
+def test_create_trade_with_custom_multipler(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_id = make_cycle(session, user_id, exchange_id)
+
+    trade_data = {
+        "user_id": user_id,
+        "friendly_name": "Test Trade with Multiplier",
+        "symbol": "AAPL",
+        "underlying_currency": models.UnderlyingCurrency.USD,
+        "trade_type": models.TradeType.LONG_SPOT,
+        "trade_strategy": models.TradeStrategy.SPOT,
+        "trade_time_utc": datetime.now(timezone.utc),
+        "quantity": 10,
+        "quantity_multiplier": 100,
+        "price_cents": 15000,
+        "gross_cash_flow_cents": -1500000,
+        "commission_cents": 50000,
+        "net_cash_flow_cents": -1550000,
+        "cycle_id": cycle_id,
+    }
+
+    trade = crud.create_trade(session, trade_data)
+    assert trade.id is not None
+    assert trade.user_id == user_id
+    assert trade.cycle_id == cycle_id
+    session.refresh(trade)
+
+    actual_trade = session.get(models.Trades, trade.id)
+    assert actual_trade is not None
+    assert actual_trade.friendly_name == trade_data["friendly_name"]
+    assert actual_trade.symbol == trade_data["symbol"]
+    assert actual_trade.underlying_currency == trade_data["underlying_currency"]
+    assert actual_trade.trade_type == trade_data["trade_type"]
+    assert actual_trade.trade_strategy == trade_data["trade_strategy"]
+    assert actual_trade.quantity == trade_data["quantity"]
+    assert actual_trade.quantity_multiplier == trade_data["quantity_multiplier"]
     assert actual_trade.price_cents == trade_data["price_cents"]
     assert actual_trade.gross_cash_flow_cents == trade_data["gross_cash_flow_cents"]
     assert actual_trade.commission_cents == trade_data["commission_cents"]
@@ -194,6 +239,9 @@ def test_create_trade_with_auto_created_cycle(session: Session) -> None:
         "trade_time_utc": datetime.now(timezone.utc),
         "quantity": 5,
         "price_cents": 15500,
+        "gross_cash_flow_cents": -77500,
+        "commission_cents": 300,
+        "net_cash_flow_cents": -77800,
     }
 
     trade = crud.create_trade(session, trade_data)
@@ -405,6 +453,24 @@ def test_get_trades_by_user_id(session: Session) -> None:
     assert friendly_names == {"Trade One", "Trade Two"}
 
 
+def test_update_trade_friendly_name(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_id = make_cycle(session, user_id, exchange_id)
+    trade_id = make_trade(session, user_id, cycle_id)
+
+    new_friendly_name = "Updated Trade Name"
+    updated_trade = crud.update_trade_friendly_name(session, trade_id, new_friendly_name)
+    assert updated_trade is not None
+    assert updated_trade.id == trade_id
+    assert updated_trade.friendly_name == new_friendly_name
+
+    session.refresh(updated_trade)
+    actual_trade = session.get(models.Trades, trade_id)
+    assert actual_trade is not None
+    assert actual_trade.friendly_name == new_friendly_name
+
+
 def test_update_trade_note(session: Session) -> None:
     user_id = make_user(session)
     exchange_id = make_exchange(session, user_id)
@@ -457,6 +523,9 @@ def test_replace_trade(session: Session) -> None:
         "trade_time_utc": datetime.now(timezone.utc),
         "quantity": 20,
         "price_cents": 25000,
+        "gross_cash_flow_cents": -500000,
+        "commission_cents": 1000,
+        "net_cash_flow_cents": -501000,
     }
 
     new_trade = crud.replace_trade(session, old_trade_id, new_trade_data)
@@ -514,6 +583,31 @@ def test_create_cycle(session: Session) -> None:
     assert actual_cycle.underlying_currency == cycle_data["underlying_currency"]
     assert actual_cycle.status == cycle_data["status"]
     assert actual_cycle.start_date == cycle_data["start_date"]
+
+
+def test_get_cycle_by_id(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_id = make_cycle(session, user_id, exchange_id, friendly_name="Cycle to Get")
+    cycle = crud.get_cycle_by_id(session, cycle_id)
+    assert cycle is not None
+    assert cycle.id == cycle_id
+    assert cycle.friendly_name == "Cycle to Get"
+    assert cycle.user_id == user_id
+
+
+def test_get_cycles_by_user_id(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_names = ["Cycle One", "Cycle Two", "Cycle Three"]
+    for name in cycle_names:
+        make_cycle(session, user_id, exchange_id, friendly_name=name)
+
+    cycles = crud.get_cycles_by_user_id(session, user_id)
+    assert len(cycles) == len(cycle_names)
+    fetched_names = {cycle.friendly_name for cycle in cycles}
+    for name in cycle_names:
+        assert name in fetched_names
 
 
 def test_update_cycle(session: Session) -> None:

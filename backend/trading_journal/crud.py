@@ -90,13 +90,10 @@ def create_trade(session: Session, trade_data: Mapping[str, Any] | BaseModel) ->
         raise ValueError("price_cents is required")
     if "commission_cents" not in payload:
         payload["commission_cents"] = 0
-    quantity: int = payload["quantity"]
-    price_cents: int = payload["price_cents"]
-    commission_cents: int = payload["commission_cents"]
     if "gross_cash_flow_cents" not in payload:
-        payload["gross_cash_flow_cents"] = -quantity * price_cents
+        raise ValueError("gross_cash_flow_cents is required")
     if "net_cash_flow_cents" not in payload:
-        payload["net_cash_flow_cents"] = payload["gross_cash_flow_cents"] - commission_cents
+        raise ValueError("net_cash_flow_cents is required")
 
     # If no cycle_id provided, create Cycle instance but don't call create_cycle()
     created_cycle = None
@@ -161,6 +158,21 @@ def get_trades_by_user_id(session: Session, user_id: int) -> list[models.Trades]
         models.Trades.user_id == user_id,
     )
     return list(session.exec(statement).all())
+
+
+def update_trade_friendly_name(session: Session, trade_id: int, friendly_name: str) -> models.Trades:
+    trade: models.Trades | None = session.get(models.Trades, trade_id)
+    if trade is None:
+        raise ValueError("trade_id does not exist")
+    trade.friendly_name = friendly_name
+    session.add(trade)
+    try:
+        session.flush()
+    except IntegrityError as e:
+        session.rollback()
+        raise ValueError("update_trade_friendly_name integrity error") from e
+    session.refresh(trade)
+    return trade
 
 
 def update_trade_note(session: Session, trade_id: int, note: str) -> models.Trades:
@@ -240,7 +252,18 @@ def create_cycle(session: Session, cycle_data: Mapping[str, Any] | BaseModel) ->
     return c
 
 
-IMMUTABLE_CYCLE_FIELDS = {"id", "user_id", "start_date", "created_at"}
+IMMUTABLE_CYCLE_FIELDS = {"id", "user_id", "start_date"}
+
+
+def get_cycle_by_id(session: Session, cycle_id: int) -> models.Cycles | None:
+    return session.get(models.Cycles, cycle_id)
+
+
+def get_cycles_by_user_id(session: Session, user_id: int) -> list[models.Cycles]:
+    statement = select(models.Cycles).where(
+        models.Cycles.user_id == user_id,
+    )
+    return list(session.exec(statement).all())
 
 
 def update_cycle(session: Session, cycle_id: int, update_data: Mapping[str, Any] | BaseModel) -> models.Cycles:
