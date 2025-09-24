@@ -69,7 +69,7 @@ class CycleBase(SQLModel):
     funding_source: str | None = None
     capital_exposure_cents: int | None = None
     loan_amount_cents: int | None = None
-    loan_interest_rate_bps: int | None = None
+    loan_interest_rate_tenth_bps: int | None = None
     trades: list[TradeRead] | None = None
     exchange: ExchangesRead | None = None
 

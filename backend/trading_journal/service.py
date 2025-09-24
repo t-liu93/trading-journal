@@ -250,11 +250,23 @@ def get_cycles_by_user_service(db_session: Session, user_id: int) -> list[CycleR
     return [CycleRead.model_validate(cycle) for cycle in cycles]
 
 
-def _validate_cycle_update_data(cycle_data: CycleUpdate) -> tuple[bool, str]:
+def _validate_cycle_update_data(cycle_data: CycleUpdate) -> tuple[bool, str]:  # noqa: PLR0911
     if cycle_data.status == "CLOSED" and cycle_data.end_date is None:
         return False, "end_date is required when status is CLOSED"
     if cycle_data.status == "OPEN" and cycle_data.end_date is not None:
         return False, "end_date must be empty when status is OPEN"
+    if cycle_data.capital_exposure_cents is not None and cycle_data.capital_exposure_cents < 0:
+        return False, "capital_exposure_cents must be non-negative"
+    if (
+        cycle_data.funding_source is not None
+        and cycle_data.funding_source != "CASH"
+        and (cycle_data.loan_amount_cents is None or cycle_data.loan_interest_rate_tenth_bps is None)
+    ):
+        return False, "loan_amount_cents and loan_interest_rate_tenth_bps are required when funding_source is not CASH"
+    if cycle_data.loan_amount_cents is not None and cycle_data.loan_amount_cents < 0:
+        return False, "loan_amount_cents must be non-negative"
+    if cycle_data.loan_interest_rate_tenth_bps is not None and cycle_data.loan_interest_rate_tenth_bps < 0:
+        return False, "loan_interest_rate_tenth_bps must be non-negative"
     return True, ""
 
 
