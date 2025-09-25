@@ -45,6 +45,8 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
                 "loan_interest_rate_tenth_bps": ("INTEGER", 0, 0),
                 "start_date": ("DATE", 1, 0),
                 "end_date": ("DATE", 0, 0),
+                "latest_interest_accrued_date": ("DATE", 0, 0),
+                "total_accrued_amount_cents": ("INTEGER", 1, 0),
             },
             "cycle_loan_change_events": {
                 "id": ("INTEGER", 1, 1),
@@ -170,6 +172,39 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
                 actual_fk_list = [{"table": r[2], "from": r[3], "to": r[4]} for r in fk_rows]
                 for efk in fks:
                     assert efk in actual_fk_list, f"missing FK on {tbl_name}: {efk}"
+
+            # check trades.replaced_by_trade_id self-referential FK
+            fk_rows = conn.execute(text("PRAGMA foreign_key_list('trades')")).fetchall()
+            actual_fk_list = [{"table": r[2], "from": r[3], "to": r[4]} for r in fk_rows]
+            assert {"table": "trades", "from": "replaced_by_trade_id", "to": "id"} in actual_fk_list, (
+                "missing self FK trades.replaced_by_trade_id -> trades.id"
+            )
+
+            # helper to find unique index on a column
+            def has_unique_index(table: str, column: str) -> bool:
+                idx_rows = conn.execute(text(f"PRAGMA index_list('{table}')")).fetchall()
+                for idx in idx_rows:
+                    idx_name = idx[1]
+                    is_unique = bool(idx[2])
+                    if not is_unique:
+                        continue
+                    info = conn.execute(text(f"PRAGMA index_info('{idx_name}')")).fetchall()
+                    cols = [r[2] for r in info]
+                    if column in cols:
+                        return True
+                return False
+
+            assert has_unique_index("trades", "friendly_name"), (
+                "expected unique index on trades(friendly_name) per uq_trades_user_friendly_name"
+            )
+            assert has_unique_index("cycles", "friendly_name"), (
+                "expected unique index on cycles(friendly_name) per uq_cycles_user_friendly_name"
+            )
+            assert has_unique_index("exchanges", "name"), "expected unique index on exchanges(name) per uq_exchanges_user_name"
+            assert has_unique_index("sessions", "session_token_hash"), "expected unique index on sessions(session_token_hash)"
+            assert has_unique_index("cycle_loan_change_events", "related_trade_id"), (
+                "expected unique index on cycle_loan_change_events(related_trade_id)"
+            )
     finally:
         engine.dispose()
         SQLModel.metadata.clear()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from pydantic import BaseModel
@@ -12,6 +12,8 @@ from trading_journal import models
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from enum import Enum
+
+    from sqlalchemy.sql.elements import ColumnElement
 
 
 # Generic enum member type
@@ -299,6 +301,93 @@ def update_cycle(session: Session, cycle_id: int, update_data: Mapping[str, Any]
         raise ValueError("update_cycle integrity error") from e
     session.refresh(cycle)
     return cycle
+
+
+# Cycle loan and interest
+def create_cycle_loan_event(session: Session, loan_data: Mapping[str, Any] | BaseModel) -> models.CycleLoanChangeEvents:
+    data = _data_to_dict(loan_data)
+    allowed = _allowed_columns(models.CycleLoanChangeEvents)
+    payload = {k: v for k, v in data.items() if k in allowed}
+    if "cycle_id" not in payload:
+        raise ValueError("cycle_id is required")
+    cycle = session.get(models.Cycles, payload["cycle_id"])
+    if cycle is None:
+        raise ValueError("cycle_id does not exist")
+
+    payload["effective_date"] = payload.get("effective_date") or datetime.now(timezone.utc).date()
+    payload["created_at"] = datetime.now(timezone.utc)
+    cle = models.CycleLoanChangeEvents(**payload)
+    session.add(cle)
+    try:
+        session.flush()
+    except IntegrityError as e:
+        session.rollback()
+        raise ValueError("create_cycle_loan_event integrity error") from e
+    session.refresh(cle)
+    return cle
+
+
+def get_loan_events_by_cycle_id(session: Session, cycle_id: int) -> list[models.CycleLoanChangeEvents]:
+    eff_col = cast("ColumnElement", models.CycleLoanChangeEvents.effective_date)
+    id_col = cast("ColumnElement", models.CycleLoanChangeEvents.id)
+    statement = (
+        select(models.CycleLoanChangeEvents)
+        .where(
+            models.CycleLoanChangeEvents.cycle_id == cycle_id,
+        )
+        .order_by(eff_col, id_col.asc())
+    )
+    return list(session.exec(statement).all())
+
+
+def create_cycle_daily_accrual(session: Session, cycle_id: int, accrual_date: date, accrual_amount_cents: int) -> models.CycleDailyAccrual:
+    cycle = session.get(models.Cycles, cycle_id)
+    if cycle is None:
+        raise ValueError("cycle_id does not exist")
+    existing = session.exec(
+        select(models.CycleDailyAccrual).where(
+            models.CycleDailyAccrual.cycle_id == cycle_id,
+            models.CycleDailyAccrual.accrual_date == accrual_date,
+        ),
+    ).first()
+    if existing:
+        return existing
+    if accrual_amount_cents < 0:
+        raise ValueError("accrual_amount_cents must be non-negative")
+    row = models.CycleDailyAccrual(
+        cycle_id=cycle_id,
+        accrual_date=accrual_date,
+        accrual_amount_cents=accrual_amount_cents,
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(row)
+    try:
+        session.flush()
+    except IntegrityError as e:
+        session.rollback()
+        raise ValueError("create_cycle_daily_accrual integrity error") from e
+    session.refresh(row)
+    return row
+
+
+def get_cycle_daily_accruals_by_cycle_id(session: Session, cycle_id: int) -> list[models.CycleDailyAccrual]:
+    date_col = cast("ColumnElement", models.CycleDailyAccrual.accrual_date)
+    statement = (
+        select(models.CycleDailyAccrual)
+        .where(
+            models.CycleDailyAccrual.cycle_id == cycle_id,
+        )
+        .order_by(date_col.asc())
+    )
+    return list(session.exec(statement).all())
+
+
+def get_cycle_daily_accrual_by_cycle_id_and_date(session: Session, cycle_id: int, accrual_date: date) -> models.CycleDailyAccrual | None:
+    statement = select(models.CycleDailyAccrual).where(
+        models.CycleDailyAccrual.cycle_id == cycle_id,
+        models.CycleDailyAccrual.accrual_date == accrual_date,
+    )
+    return session.exec(statement).first()
 
 
 # Exchanges

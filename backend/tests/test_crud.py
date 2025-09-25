@@ -137,6 +137,16 @@ def _ensure_utc_aware(dt: datetime | None) -> datetime | None:
     return dt.astimezone(timezone.utc)
 
 
+def _validate_timestamp(actual: datetime, expected: datetime, tolerance: timedelta) -> None:
+    actual_utc = _ensure_utc_aware(actual)
+    expected_utc = _ensure_utc_aware(expected)
+    assert actual_utc is not None
+    assert expected_utc is not None
+    delta = abs(actual_utc - expected_utc)
+    assert delta <= tolerance, f"Timestamps differ by {delta}, which exceeds tolerance of {tolerance}"
+
+
+# Trades
 def test_create_trade_success_with_cycle(session: Session) -> None:
     user_id = make_user(session)
     exchange_id = make_exchange(session, user_id)
@@ -554,6 +564,7 @@ def test_replace_trade(session: Session) -> None:
     assert actual_new_trade.replaced_by_trade_id == old_trade_id
 
 
+# Cycles
 def test_create_cycle(session: Session) -> None:
     user_id = make_user(session)
     exchange_id = make_exchange(session, user_id)
@@ -654,6 +665,216 @@ def test_update_cycle_immutable_fields(session: Session) -> None:
         or "field 'start_date' is immutable" in str(excinfo.value)
         or "field 'created_at' is immutable" in str(excinfo.value)
     )
+
+
+# Cycle loans
+def test_create_cycle_loan_event(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_id = make_cycle(session, user_id, exchange_id)
+
+    loan_data = {
+        "cycle_id": cycle_id,
+        "loan_amount_cents": 100000,
+        "loan_interest_rate_tenth_bps": 5000,  # 5%
+        "notes": "Test loan change for the cycle",
+    }
+
+    loan_event = crud.create_cycle_loan_event(session, loan_data)
+    now = datetime.now(timezone.utc)
+    assert loan_event.id is not None
+    assert loan_event.cycle_id == cycle_id
+    assert loan_event.loan_amount_cents == loan_data["loan_amount_cents"]
+    assert loan_event.loan_interest_rate_tenth_bps == loan_data["loan_interest_rate_tenth_bps"]
+    assert loan_event.notes == loan_data["notes"]
+    assert loan_event.effective_date == now.date()
+    _validate_timestamp(loan_event.created_at, now, timedelta(seconds=1))
+
+    session.refresh(loan_event)
+    actual_loan_event = session.get(models.CycleLoanChangeEvents, loan_event.id)
+    assert actual_loan_event is not None
+    assert actual_loan_event.cycle_id == cycle_id
+    assert actual_loan_event.loan_amount_cents == loan_data["loan_amount_cents"]
+    assert actual_loan_event.loan_interest_rate_tenth_bps == loan_data["loan_interest_rate_tenth_bps"]
+    assert actual_loan_event.notes == loan_data["notes"]
+    assert actual_loan_event.effective_date == now.date()
+    _validate_timestamp(actual_loan_event.created_at, now, timedelta(seconds=1))
+
+
+def test_get_cycle_loan_events_by_cycle_id(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_id = make_cycle(session, user_id, exchange_id)
+
+    loan_data_1 = {
+        "cycle_id": cycle_id,
+        "loan_amount_cents": 100000,
+        "loan_interest_rate_tenth_bps": 5000,
+        "notes": "First loan event",
+    }
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).date()
+    loan_data_2 = {
+        "cycle_id": cycle_id,
+        "loan_amount_cents": 150000,
+        "loan_interest_rate_tenth_bps": 4500,
+        "effective_date": yesterday,
+        "notes": "Second loan event",
+    }
+
+    crud.create_cycle_loan_event(session, loan_data_1)
+    crud.create_cycle_loan_event(session, loan_data_2)
+
+    loan_events = crud.get_loan_events_by_cycle_id(session, cycle_id)
+    assert len(loan_events) == 2
+    notes = [event.notes for event in loan_events]
+    assert loan_events[0].notes == loan_data_2["notes"]
+    assert loan_events[0].effective_date == yesterday
+    assert notes == ["Second loan event", "First loan event"]  # Ordered by effective_date desc
+
+
+def test_get_cycle_loan_events_by_cycle_id_same_date(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_id = make_cycle(session, user_id, exchange_id)
+
+    loan_data_1 = {
+        "cycle_id": cycle_id,
+        "loan_amount_cents": 100000,
+        "loan_interest_rate_tenth_bps": 5000,
+        "notes": "First loan event",
+    }
+    loan_data_2 = {
+        "cycle_id": cycle_id,
+        "loan_amount_cents": 150000,
+        "loan_interest_rate_tenth_bps": 4500,
+        "notes": "Second loan event",
+    }
+
+    crud.create_cycle_loan_event(session, loan_data_1)
+    crud.create_cycle_loan_event(session, loan_data_2)
+
+    loan_events = crud.get_loan_events_by_cycle_id(session, cycle_id)
+    assert len(loan_events) == 2
+    notes = [event.notes for event in loan_events]
+    assert notes == ["First loan event", "Second loan event"]  # Ordered by id desc when effective_date is same
+
+
+def test_create_cycle_loan_event_single_field(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_id = make_cycle(session, user_id, exchange_id)
+
+    loan_data = {
+        "cycle_id": cycle_id,
+        "loan_amount_cents": 200000,
+    }
+
+    loan_event = crud.create_cycle_loan_event(session, loan_data)
+    now = datetime.now(timezone.utc)
+    assert loan_event.id is not None
+    assert loan_event.cycle_id == cycle_id
+    assert loan_event.loan_amount_cents == loan_data["loan_amount_cents"]
+    assert loan_event.loan_interest_rate_tenth_bps is None
+    assert loan_event.notes is None
+    assert loan_event.effective_date == now.date()
+    _validate_timestamp(loan_event.created_at, now, timedelta(seconds=1))
+
+    session.refresh(loan_event)
+    actual_loan_event = session.get(models.CycleLoanChangeEvents, loan_event.id)
+    assert actual_loan_event is not None
+    assert actual_loan_event.cycle_id == cycle_id
+    assert actual_loan_event.loan_amount_cents == loan_data["loan_amount_cents"]
+    assert actual_loan_event.loan_interest_rate_tenth_bps is None
+    assert actual_loan_event.notes is None
+    assert actual_loan_event.effective_date == now.date()
+    _validate_timestamp(actual_loan_event.created_at, now, timedelta(seconds=1))
+
+
+def test_create_cycle_daily_accrual(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_id = make_cycle(session, user_id, exchange_id)
+    today = datetime.now(timezone.utc).date()
+    accrual_data = {
+        "cycle_id": cycle_id,
+        "accrual_date": today,
+        "accrued_interest_cents": 150,
+        "notes": "Daily interest accrual",
+    }
+
+    accrual = crud.create_cycle_daily_accrual(session, cycle_id, accrual_data["accrual_date"], accrual_data["accrued_interest_cents"])
+    assert accrual.id is not None
+    assert accrual.cycle_id == cycle_id
+    assert accrual.accrual_date == accrual_data["accrual_date"]
+    assert accrual.accrual_amount_cents == accrual_data["accrued_interest_cents"]
+
+    session.refresh(accrual)
+    actual_accrual = session.get(models.CycleDailyAccrual, accrual.id)
+    assert actual_accrual is not None
+    assert actual_accrual.cycle_id == cycle_id
+    assert actual_accrual.accrual_date == accrual_data["accrual_date"]
+    assert actual_accrual.accrual_amount_cents == accrual_data["accrued_interest_cents"]
+
+
+def test_get_cycle_daily_accruals_by_cycle_id(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_id = make_cycle(session, user_id, exchange_id)
+
+    today = datetime.now(timezone.utc).date()
+    yesterday = today - timedelta(days=1)
+
+    accrual_data_1 = {
+        "cycle_id": cycle_id,
+        "accrual_date": yesterday,
+        "accrued_interest_cents": 100,
+    }
+    accrual_data_2 = {
+        "cycle_id": cycle_id,
+        "accrual_date": today,
+        "accrued_interest_cents": 150,
+    }
+
+    crud.create_cycle_daily_accrual(session, cycle_id, accrual_data_1["accrual_date"], accrual_data_1["accrued_interest_cents"])
+    crud.create_cycle_daily_accrual(session, cycle_id, accrual_data_2["accrual_date"], accrual_data_2["accrued_interest_cents"])
+
+    accruals = crud.get_cycle_daily_accruals_by_cycle_id(session, cycle_id)
+    assert len(accruals) == 2
+    dates = [accrual.accrual_date for accrual in accruals]
+    assert dates == [yesterday, today]  # Ordered by accrual_date asc
+
+
+def test_get_cycle_daily_accruals_by_cycle_id_and_date(session: Session) -> None:
+    user_id = make_user(session)
+    exchange_id = make_exchange(session, user_id)
+    cycle_id = make_cycle(session, user_id, exchange_id)
+
+    today = datetime.now(timezone.utc).date()
+    yesterday = today - timedelta(days=1)
+
+    accrual_data_1 = {
+        "cycle_id": cycle_id,
+        "accrual_date": yesterday,
+        "accrued_interest_cents": 100,
+    }
+    accrual_data_2 = {
+        "cycle_id": cycle_id,
+        "accrual_date": today,
+        "accrued_interest_cents": 150,
+    }
+
+    crud.create_cycle_daily_accrual(session, cycle_id, accrual_data_1["accrual_date"], accrual_data_1["accrued_interest_cents"])
+    crud.create_cycle_daily_accrual(session, cycle_id, accrual_data_2["accrual_date"], accrual_data_2["accrued_interest_cents"])
+
+    accruals_today = crud.get_cycle_daily_accrual_by_cycle_id_and_date(session, cycle_id, today)
+    assert accruals_today is not None
+    assert accruals_today.accrual_date == today
+    assert accruals_today.accrual_amount_cents == accrual_data_2["accrued_interest_cents"]
+
+    accruals_yesterday = crud.get_cycle_daily_accrual_by_cycle_id_and_date(session, cycle_id, yesterday)
+    assert accruals_yesterday is not None
+    assert accruals_yesterday.accrual_date == yesterday
+    assert accruals_yesterday.accrual_amount_cents == accrual_data_1["accrued_interest_cents"]
 
 
 # Exchanges

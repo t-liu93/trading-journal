@@ -18,8 +18,10 @@ from sqlmodel import (
 
 class TradeType(str, Enum):
     SELL_PUT = "SELL_PUT"
+    CLOSE_SELL_PUT = "CLOSE_SELL_PUT"
     ASSIGNMENT = "ASSIGNMENT"
     SELL_CALL = "SELL_CALL"
+    CLOSE_SELL_CALL = "CLOSE_SELL_CALL"
     EXERCISE_CALL = "EXERCISE_CALL"
     LONG_SPOT = "LONG_SPOT"
     CLOSE_LONG_SPOT = "CLOSE_LONG_SPOT"
@@ -117,12 +119,16 @@ class Cycles(SQLModel, table=True):
     status: CycleStatus = Field(sa_column=Column(Text, nullable=False))
     funding_source: FundingSource = Field(sa_column=Column(Text, nullable=True))
     capital_exposure_cents: int | None = Field(default=None, nullable=True)
-    loan_amount_cents: int | None = Field(default=None, nullable=True)
-    loan_interest_rate_tenth_bps: int | None = Field(default=None, nullable=True)
     start_date: date = Field(sa_column=Column(Date, nullable=False))
     end_date: date | None = Field(default=None, sa_column=Column(Date, nullable=True))
 
     trades: list["Trades"] = Relationship(back_populates="cycle")
+
+    loan_amount_cents: int | None = Field(default=None, nullable=True)
+    loan_interest_rate_tenth_bps: int | None = Field(default=None, nullable=True)
+
+    latest_interest_accrued_date: date | None = Field(default=None, sa_column=Column(Date, nullable=True))
+    total_accrued_amount_cents: int = Field(default=0, sa_column=Column(Integer, nullable=False))
 
     loan_change_events: list["CycleLoanChangeEvents"] = Relationship(back_populates="cycle")
     daily_accruals: list["CycleDailyAccrual"] = Relationship(back_populates="cycle")
@@ -131,7 +137,7 @@ class Cycles(SQLModel, table=True):
 class CycleLoanChangeEvents(SQLModel, table=True):
     __tablename__ = "cycle_loan_change_events"  # type: ignore[attr-defined]
     id: int | None = Field(default=None, primary_key=True)
-    cycle_id: int = Field(foreign_key="cycles.id", nullable=False, index=True)
+    cycle_id: int = Field(sa_column=Column(Integer, ForeignKey("cycles.id", ondelete="CASCADE"), nullable=False, index=True))
     effective_date: date = Field(sa_column=Column(Date, nullable=False))
     loan_amount_cents: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
     loan_interest_rate_tenth_bps: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
@@ -148,7 +154,7 @@ class CycleDailyAccrual(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("cycle_id", "accrual_date", name="uq_cycle_daily_accruals_cycle_date"),)
 
     id: int | None = Field(default=None, primary_key=True)
-    cycle_id: int = Field(foreign_key="cycles.id", nullable=False, index=True)
+    cycle_id: int = Field(sa_column=Column(Integer, ForeignKey("cycles.id", ondelete="CASCADE"), nullable=False, index=True))
     accrual_date: date = Field(sa_column=Column(Date, nullable=False))
     accrual_amount_cents: int = Field(sa_column=Column(Integer, nullable=False))
     created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
