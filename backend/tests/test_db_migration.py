@@ -46,6 +46,23 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
                 "start_date": ("DATE", 1, 0),
                 "end_date": ("DATE", 0, 0),
             },
+            "cycle_loan_change_events": {
+                "id": ("INTEGER", 1, 1),
+                "cycle_id": ("INTEGER", 1, 0),
+                "effective_date": ("DATE", 1, 0),
+                "loan_amount_cents": ("INTEGER", 0, 0),
+                "loan_interest_rate_tenth_bps": ("INTEGER", 0, 0),
+                "related_trade_id": ("INTEGER", 0, 0),
+                "notes": ("TEXT", 0, 0),
+                "created_at": ("DATETIME", 1, 0),
+            },
+            "cycle_daily_accrual": {
+                "id": ("INTEGER", 1, 1),
+                "cycle_id": ("INTEGER", 1, 0),
+                "accrual_date": ("DATE", 1, 0),
+                "accrual_amount_cents": ("INTEGER", 1, 0),
+                "created_at": ("DATETIME", 1, 0),
+            },
             "trades": {
                 "id": ("INTEGER", 1, 1),
                 "user_id": ("INTEGER", 1, 0),
@@ -99,6 +116,13 @@ def test_run_migrations_0_to_1(monkeypatch: pytest.MonkeyPatch) -> None:
             "cycles": [
                 {"table": "users", "from": "user_id", "to": "id"},
                 {"table": "exchanges", "from": "exchange_id", "to": "id"},
+            ],
+            "cycle_loan_change_events": [
+                {"table": "cycles", "from": "cycle_id", "to": "id"},
+                {"table": "trades", "from": "related_trade_id", "to": "id"},
+            ],
+            "cycle_daily_accrual": [
+                {"table": "cycles", "from": "cycle_id", "to": "id"},
             ],
             "sessions": [
                 {"table": "users", "from": "user_id", "to": "id"},

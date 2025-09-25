@@ -1,11 +1,13 @@
 from datetime import date, datetime
 from enum import Enum
+from typing import Optional
 
 from sqlmodel import (
     Column,
     Date,
     DateTime,
     Field,
+    ForeignKey,
     Integer,
     Relationship,
     SQLModel,
@@ -92,7 +94,13 @@ class Trades(SQLModel, table=True):
     replaced_by_trade_id: int | None = Field(default=None, foreign_key="trades.id", nullable=True)
     notes: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     cycle_id: int | None = Field(default=None, foreign_key="cycles.id", nullable=True, index=True)
+
     cycle: "Cycles" = Relationship(back_populates="trades")
+
+    related_loan_change_event: Optional["CycleLoanChangeEvents"] = Relationship(
+        back_populates="trade",
+        sa_relationship_kwargs={"uselist": False},
+    )
 
 
 class Cycles(SQLModel, table=True):
@@ -113,7 +121,39 @@ class Cycles(SQLModel, table=True):
     loan_interest_rate_tenth_bps: int | None = Field(default=None, nullable=True)
     start_date: date = Field(sa_column=Column(Date, nullable=False))
     end_date: date | None = Field(default=None, sa_column=Column(Date, nullable=True))
+
     trades: list["Trades"] = Relationship(back_populates="cycle")
+
+    loan_change_events: list["CycleLoanChangeEvents"] = Relationship(back_populates="cycle")
+    daily_accruals: list["CycleDailyAccrual"] = Relationship(back_populates="cycle")
+
+
+class CycleLoanChangeEvents(SQLModel, table=True):
+    __tablename__ = "cycle_loan_change_events"  # type: ignore[attr-defined]
+    id: int | None = Field(default=None, primary_key=True)
+    cycle_id: int = Field(foreign_key="cycles.id", nullable=False, index=True)
+    effective_date: date = Field(sa_column=Column(Date, nullable=False))
+    loan_amount_cents: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
+    loan_interest_rate_tenth_bps: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
+    related_trade_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey("trades.id"), nullable=True, unique=True))
+    notes: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
+
+    cycle: "Cycles" = Relationship(back_populates="loan_change_events")
+    trade: Optional["Trades"] = Relationship(back_populates="related_loan_change_event")
+
+
+class CycleDailyAccrual(SQLModel, table=True):
+    __tablename__ = "cycle_daily_accrual"  # type: ignore[attr-defined]
+    __table_args__ = (UniqueConstraint("cycle_id", "accrual_date", name="uq_cycle_daily_accruals_cycle_date"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    cycle_id: int = Field(foreign_key="cycles.id", nullable=False, index=True)
+    accrual_date: date = Field(sa_column=Column(Date, nullable=False))
+    accrual_amount_cents: int = Field(sa_column=Column(Integer, nullable=False))
+    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
+
+    cycle: "Cycles" = Relationship(back_populates="daily_accruals")
 
 
 class Exchanges(SQLModel, table=True):

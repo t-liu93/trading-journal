@@ -28,6 +28,8 @@ def _mig_0_1(engine: Engine) -> None:
             models_v1.Users.__table__,  # type: ignore[attr-defined]
             models_v1.Sessions.__table__,  # type: ignore[attr-defined]
             models_v1.Exchanges.__table__,  # type: ignore[attr-defined]
+            models_v1.CycleLoanChangeEvents.__table__,  # type: ignore[attr-defined]
+            models_v1.CycleDailyAccrual.__table__,  # type: ignore[attr-defined]
         ],
     )
 
