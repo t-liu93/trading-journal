@@ -229,6 +229,7 @@ def update_exchanges_service(db_session: Session, user_id: int, exchange_id: int
 
 # Cycle Service
 def create_cycle_service(db_session: Session, user_id: int, cycle_data: CycleBase) -> CycleRead:
+    raise NotImplementedError("Cycle creation not implemented")
     cycle_data_dict = cycle_data.model_dump()
     cycle_data_dict["user_id"] = user_id
     cycle_data_with_user_id: CycleCreate = CycleCreate.model_validate(cycle_data_dict)
