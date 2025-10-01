@@ -23,10 +23,13 @@ def _mig_0_1(engine: Engine) -> None:
     SQLModel.metadata.create_all(
         bind=engine,
         tables=[
-            models_v1.Trades.__table__,
-            models_v1.Cycles.__table__,
-            models_v1.Users.__table__,
-            models_v1.Sessions.__table__,
+            models_v1.Trades.__table__,  # type: ignore[attr-defined]
+            models_v1.Cycles.__table__,  # type: ignore[attr-defined]
+            models_v1.Users.__table__,  # type: ignore[attr-defined]
+            models_v1.Sessions.__table__,  # type: ignore[attr-defined]
+            models_v1.Exchanges.__table__,  # type: ignore[attr-defined]
+            models_v1.CycleLoanChangeEvents.__table__,  # type: ignore[attr-defined]
+            models_v1.CycleDailyAccrual.__table__,  # type: ignore[attr-defined]
         ],
     )
 
@@ -60,7 +63,7 @@ def run_migrations(engine: Engine, target_version: int | None = None) -> int:
                 fn = MIGRATIONS.get(cur_version)
                 if fn is None:
                     raise RuntimeError(
-                        f"No migration from {cur_version} -> {cur_version + 1}"
+                        f"No migration from {cur_version} -> {cur_version + 1}",
                     )
                 # call migration with Engine (fn should use transactions)
                 fn(engine)

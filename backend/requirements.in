@@ -4,3 +4,4 @@ httpx
 pyyaml
 pydantic-settings
 sqlmodel
+argon2-cffi

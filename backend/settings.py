@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,10 @@ class Settings(BaseSettings):
     port: int = 8000
     workers: int = 1
     log_level: str = "info"
+    database_url: str = "sqlite:///:memory:"
+    api_base: str = "/api/v1"
+    session_expiry_seconds: int = 3600 * 24 * 7  # 7 days
+    hmac_key: str | None = None
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 

@@ -1,13 +1,26 @@
-from datetime import datetime, timedelta, timezone
-from typing import Mapping
+from __future__ import annotations
 
+from datetime import date, datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any, TypeVar, cast
+
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from trading_journal import models
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from enum import Enum
 
-def _check_enum(enum_cls, value, field_name: str):
+    from sqlalchemy.sql.elements import ColumnElement
+
+
+# Generic enum member type
+T = TypeVar("T", bound="Enum")
+
+
+def _check_enum(enum_cls: type[T], value: object, field_name: str) -> T:
     if value is None:
         raise ValueError(f"{field_name} is required")
     # already an enum member
@@ -22,38 +35,56 @@ def _check_enum(enum_cls, value, field_name: str):
     raise ValueError(f"Invalid {field_name!s}: {value!r}. Allowed: {allowed}")
 
 
+def _allowed_columns(model: type[models.SQLModel]) -> set[str]:
+    tbl = cast("models.SQLModel", model).__table__  # type: ignore[attr-defined]
+    return {c.name for c in tbl.columns}
+
+
+AnyModel = Any
+
+
+def _data_to_dict(data: AnyModel) -> dict[str, AnyModel]:
+    if isinstance(data, BaseModel):
+        return data.model_dump(exclude_unset=True)
+    if hasattr(data, "dict"):
+        return data.dict(exclude_unset=True)
+    return dict(data)
+
+
 # Trades
-def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
-    if hasattr(trade_data, "dict"):
-        data = trade_data.dict(exclude_unset=True)
-    else:
-        data = dict(trade_data)
-    allowed = {c.name for c in models.Trades.__table__.columns}
+def create_trade(session: Session, trade_data: Mapping[str, Any] | BaseModel) -> models.Trades:
+    data = _data_to_dict(trade_data)
+    allowed = _allowed_columns(models.Trades)
     payload = {k: v for k, v in data.items() if k in allowed}
+    cycle_id = payload.get("cycle_id")
     if "symbol" not in payload:
         raise ValueError("symbol is required")
+    if "exchange_id" not in payload and cycle_id is None:
+        raise ValueError("exchange_id is required when no cycle is attached")
+    # If an exchange_id is provided (and no cycle is attached), ensure the exchange exists
+    # and belongs to the same user as the trade (if user_id is provided).
+    if cycle_id is None and "exchange_id" in payload:
+        ex = session.get(models.Exchanges, payload["exchange_id"])
+        if ex is None:
+            raise ValueError("exchange_id does not exist")
+        user_id = payload.get("user_id")
+        if user_id is not None and ex.user_id != user_id:
+            raise ValueError("exchange.user_id does not match trade.user_id")
     if "underlying_currency" not in payload:
         raise ValueError("underlying_currency is required")
-    payload["underlying_currency"] = _check_enum(
-        models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency"
-    )
+    payload["underlying_currency"] = _check_enum(models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency")
     if "trade_type" not in payload:
         raise ValueError("trade_type is required")
-    payload["trade_type"] = _check_enum(
-        models.TradeType, payload["trade_type"], "trade_type"
-    )
+    payload["trade_type"] = _check_enum(models.TradeType, payload["trade_type"], "trade_type")
     if "trade_strategy" not in payload:
         raise ValueError("trade_strategy is required")
-    payload["trade_strategy"] = _check_enum(
-        models.TradeStrategy, payload["trade_strategy"], "trade_strategy"
-    )
+    payload["trade_strategy"] = _check_enum(models.TradeStrategy, payload["trade_strategy"], "trade_strategy")
     # trade_time_utc is the creation moment: always set to now (caller shouldn't provide)
     now = datetime.now(timezone.utc)
     payload.pop("trade_time_utc", None)
     payload["trade_time_utc"] = now
     if "trade_date" not in payload or payload.get("trade_date") is None:
         payload["trade_date"] = payload["trade_time_utc"].date()
-    cycle_id = payload.get("cycle_id")
     user_id = payload.get("user_id")
     if "quantity" not in payload:
         raise ValueError("quantity is required")
@@ -61,15 +92,10 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
         raise ValueError("price_cents is required")
     if "commission_cents" not in payload:
         payload["commission_cents"] = 0
-    quantity: int = payload["quantity"]
-    price_cents: int = payload["price_cents"]
-    commission_cents: int = payload["commission_cents"]
     if "gross_cash_flow_cents" not in payload:
-        payload["gross_cash_flow_cents"] = -quantity * price_cents
+        raise ValueError("gross_cash_flow_cents is required")
     if "net_cash_flow_cents" not in payload:
-        payload["net_cash_flow_cents"] = (
-            payload["gross_cash_flow_cents"] - commission_cents
-        )
+        raise ValueError("net_cash_flow_cents is required")
 
     # If no cycle_id provided, create Cycle instance but don't call create_cycle()
     created_cycle = None
@@ -77,9 +103,9 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
         c_payload = {
             "user_id": user_id,
             "symbol": payload["symbol"],
+            "exchange_id": payload["exchange_id"],
             "underlying_currency": payload["underlying_currency"],
-            "friendly_name": "Auto-created Cycle by trade "
-            + payload.get("friendly_name", ""),
+            "friendly_name": "Auto-created Cycle by trade " + payload.get("friendly_name", ""),
             "status": models.CycleStatus.OPEN,
             "start_date": payload["trade_date"],
         }
@@ -90,11 +116,13 @@ def create_trade(session: Session, trade_data: Mapping) -> models.Trades:
     # If cycle_id provided, validate existence and ownership
     if cycle_id is not None:
         cycle = session.get(models.Cycles, cycle_id)
+
         if cycle is None:
             raise ValueError("cycle_id does not exist")
-        else:
-            if cycle.user_id != user_id:
-                raise ValueError("cycle.user_id does not match trade.user_id")
+        payload.pop("exchange_id", None)  # ignore exchange_id if provided; use cycle's exchange_id
+        payload["exchange_id"] = cycle.exchange_id
+        if cycle.user_id != user_id:
+            raise ValueError("cycle.user_id does not match trade.user_id")
 
     # Build trade instance; if we created a Cycle instance, link via relationship so a single flush will persist both and populate ids
     t_payload = dict(payload)
@@ -119,9 +147,7 @@ def get_trade_by_id(session: Session, trade_id: int) -> models.Trades | None:
     return session.get(models.Trades, trade_id)
 
 
-def get_trade_by_user_id_and_friendly_name(
-    session: Session, user_id: int, friendly_name: str
-) -> models.Trades | None:
+def get_trade_by_user_id_and_friendly_name(session: Session, user_id: int, friendly_name: str) -> models.Trades | None:
     statement = select(models.Trades).where(
         models.Trades.user_id == user_id,
         models.Trades.friendly_name == friendly_name,
@@ -133,7 +159,22 @@ def get_trades_by_user_id(session: Session, user_id: int) -> list[models.Trades]
     statement = select(models.Trades).where(
         models.Trades.user_id == user_id,
     )
-    return session.exec(statement).all()
+    return list(session.exec(statement).all())
+
+
+def update_trade_friendly_name(session: Session, trade_id: int, friendly_name: str) -> models.Trades:
+    trade: models.Trades | None = session.get(models.Trades, trade_id)
+    if trade is None:
+        raise ValueError("trade_id does not exist")
+    trade.friendly_name = friendly_name
+    session.add(trade)
+    try:
+        session.flush()
+    except IntegrityError as e:
+        session.rollback()
+        raise ValueError("update_trade_friendly_name integrity error") from e
+    session.refresh(trade)
+    return trade
 
 
 def update_trade_note(session: Session, trade_id: int, note: str) -> models.Trades:
@@ -169,36 +210,33 @@ def invalidate_trade(session: Session, trade_id: int) -> models.Trades:
     return trade
 
 
-def replace_trade(
-    session: Session, old_trade_id: int, new_trade_data: Mapping
-) -> models.Trades:
+def replace_trade(session: Session, old_trade_id: int, new_trade_data: Mapping[str, Any] | BaseModel) -> models.Trades:
     invalidate_trade(session, old_trade_id)
-    if hasattr(new_trade_data, "dict"):
-        data = new_trade_data.dict(exclude_unset=True)
-    else:
-        data = dict(new_trade_data)
+    data = _data_to_dict(new_trade_data)
     data["replaced_by_trade_id"] = old_trade_id
-    new_trade = create_trade(session, data)
-    return new_trade
+    return create_trade(session, data)
 
 
 # Cycles
-def create_cycle(session: Session, cycle_data: Mapping) -> models.Cycles:
-    if hasattr(cycle_data, "dict"):
-        data = cycle_data.dict(exclude_unset=True)
-    else:
-        data = dict(cycle_data)
-    allowed = {c.name for c in models.Cycles.__table__.columns}
+def create_cycle(session: Session, cycle_data: Mapping[str, Any] | BaseModel) -> models.Cycles:
+    data = _data_to_dict(cycle_data)
+    allowed = _allowed_columns(models.Cycles)
     payload = {k: v for k, v in data.items() if k in allowed}
     if "user_id" not in payload:
         raise ValueError("user_id is required")
     if "symbol" not in payload:
         raise ValueError("symbol is required")
+    if "exchange_id" not in payload:
+        raise ValueError("exchange_id is required")
+    # ensure the exchange exists and belongs to the same user
+    ex = session.get(models.Exchanges, payload["exchange_id"])
+    if ex is None:
+        raise ValueError("exchange_id does not exist")
+    if ex.user_id != payload.get("user_id"):
+        raise ValueError("exchange.user_id does not match cycle.user_id")
     if "underlying_currency" not in payload:
         raise ValueError("underlying_currency is required")
-    payload["underlying_currency"] = _check_enum(
-        models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency"
-    )
+    payload["underlying_currency"] = _check_enum(models.UnderlyingCurrency, payload["underlying_currency"], "underlying_currency")
     if "status" not in payload:
         raise ValueError("status is required")
     payload["status"] = _check_enum(models.CycleStatus, payload["status"], "status")
@@ -216,30 +254,44 @@ def create_cycle(session: Session, cycle_data: Mapping) -> models.Cycles:
     return c
 
 
-IMMUTABLE_CYCLE_FIELDS = {"id", "user_id", "start_date", "created_at"}
+IMMUTABLE_CYCLE_FIELDS = {"id", "user_id", "start_date"}
 
 
-def update_cycle(
-    session: Session, cycle_id: int, update_data: Mapping
-) -> models.Cycles:
+def get_cycle_by_id(session: Session, cycle_id: int) -> models.Cycles | None:
+    return session.get(models.Cycles, cycle_id)
+
+
+def get_cycles_by_user_id(session: Session, user_id: int) -> list[models.Cycles]:
+    statement = select(models.Cycles).where(
+        models.Cycles.user_id == user_id,
+    )
+    return list(session.exec(statement).all())
+
+
+def update_cycle(session: Session, cycle_id: int, update_data: Mapping[str, Any] | BaseModel) -> models.Cycles:
     cycle: models.Cycles | None = session.get(models.Cycles, cycle_id)
     if cycle is None:
         raise ValueError("cycle_id does not exist")
-    if hasattr(update_data, "dict"):
-        data = update_data.dict(exclude_unset=True)
-    else:
-        data = dict(update_data)
+    data = _data_to_dict(update_data)
 
-    allowed = {c.name for c in models.Cycles.__table__.columns}
+    allowed = _allowed_columns(models.Cycles)
     for k, v in data.items():
         if k in IMMUTABLE_CYCLE_FIELDS:
             raise ValueError(f"field {k!r} is immutable")
         if k not in allowed:
             continue
+        # If trying to change exchange_id, ensure the new exchange exists and belongs to
+        # the same user as the cycle.
+        if k == "exchange_id":
+            ex = session.get(models.Exchanges, v)
+            if ex is None:
+                raise ValueError("exchange_id does not exist")
+            if ex.user_id != cycle.user_id:
+                raise ValueError("exchange.user_id does not match cycle.user_id")
         if k == "underlying_currency":
-            v = _check_enum(models.UnderlyingCurrency, v, "underlying_currency")
+            v = _check_enum(models.UnderlyingCurrency, v, "underlying_currency")  # noqa: PLW2901
         if k == "status":
-            v = _check_enum(models.CycleStatus, v, "status")
+            v = _check_enum(models.CycleStatus, v, "status")  # noqa: PLW2901
         setattr(cycle, k, v)
     session.add(cycle)
     try:
@@ -251,16 +303,179 @@ def update_cycle(
     return cycle
 
 
+# Cycle loan and interest
+def create_cycle_loan_event(session: Session, loan_data: Mapping[str, Any] | BaseModel) -> models.CycleLoanChangeEvents:
+    data = _data_to_dict(loan_data)
+    allowed = _allowed_columns(models.CycleLoanChangeEvents)
+    payload = {k: v for k, v in data.items() if k in allowed}
+    if "cycle_id" not in payload:
+        raise ValueError("cycle_id is required")
+    cycle = session.get(models.Cycles, payload["cycle_id"])
+    if cycle is None:
+        raise ValueError("cycle_id does not exist")
+
+    payload["effective_date"] = payload.get("effective_date") or datetime.now(timezone.utc).date()
+    payload["created_at"] = datetime.now(timezone.utc)
+    cle = models.CycleLoanChangeEvents(**payload)
+    session.add(cle)
+    try:
+        session.flush()
+    except IntegrityError as e:
+        session.rollback()
+        raise ValueError("create_cycle_loan_event integrity error") from e
+    session.refresh(cle)
+    return cle
+
+
+def get_loan_events_by_cycle_id(session: Session, cycle_id: int) -> list[models.CycleLoanChangeEvents]:
+    eff_col = cast("ColumnElement", models.CycleLoanChangeEvents.effective_date)
+    id_col = cast("ColumnElement", models.CycleLoanChangeEvents.id)
+    statement = (
+        select(models.CycleLoanChangeEvents)
+        .where(
+            models.CycleLoanChangeEvents.cycle_id == cycle_id,
+        )
+        .order_by(eff_col, id_col.asc())
+    )
+    return list(session.exec(statement).all())
+
+
+def create_cycle_daily_accrual(session: Session, cycle_id: int, accrual_date: date, accrual_amount_cents: int) -> models.CycleDailyAccrual:
+    cycle = session.get(models.Cycles, cycle_id)
+    if cycle is None:
+        raise ValueError("cycle_id does not exist")
+    existing = session.exec(
+        select(models.CycleDailyAccrual).where(
+            models.CycleDailyAccrual.cycle_id == cycle_id,
+            models.CycleDailyAccrual.accrual_date == accrual_date,
+        ),
+    ).first()
+    if existing:
+        return existing
+    if accrual_amount_cents < 0:
+        raise ValueError("accrual_amount_cents must be non-negative")
+    row = models.CycleDailyAccrual(
+        cycle_id=cycle_id,
+        accrual_date=accrual_date,
+        accrual_amount_cents=accrual_amount_cents,
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(row)
+    try:
+        session.flush()
+    except IntegrityError as e:
+        session.rollback()
+        raise ValueError("create_cycle_daily_accrual integrity error") from e
+    session.refresh(row)
+    return row
+
+
+def get_cycle_daily_accruals_by_cycle_id(session: Session, cycle_id: int) -> list[models.CycleDailyAccrual]:
+    date_col = cast("ColumnElement", models.CycleDailyAccrual.accrual_date)
+    statement = (
+        select(models.CycleDailyAccrual)
+        .where(
+            models.CycleDailyAccrual.cycle_id == cycle_id,
+        )
+        .order_by(date_col.asc())
+    )
+    return list(session.exec(statement).all())
+
+
+def get_cycle_daily_accrual_by_cycle_id_and_date(session: Session, cycle_id: int, accrual_date: date) -> models.CycleDailyAccrual | None:
+    statement = select(models.CycleDailyAccrual).where(
+        models.CycleDailyAccrual.cycle_id == cycle_id,
+        models.CycleDailyAccrual.accrual_date == accrual_date,
+    )
+    return session.exec(statement).first()
+
+
+# Exchanges
+IMMUTABLE_EXCHANGE_FIELDS = {"id"}
+
+
+def create_exchange(session: Session, exchange_data: Mapping[str, Any] | BaseModel) -> models.Exchanges:
+    data = _data_to_dict(exchange_data)
+    allowed = _allowed_columns(models.Exchanges)
+    payload = {k: v for k, v in data.items() if k in allowed}
+    if "name" not in payload:
+        raise ValueError("name is required")
+
+    e = models.Exchanges(**payload)
+    session.add(e)
+    try:
+        session.flush()
+    except IntegrityError as e:
+        session.rollback()
+        raise ValueError("create_exchange integrity error") from e
+    session.refresh(e)
+    return e
+
+
+def get_exchange_by_id(session: Session, exchange_id: int) -> models.Exchanges | None:
+    return session.get(models.Exchanges, exchange_id)
+
+
+def get_exchange_by_name_and_user_id(session: Session, name: str, user_id: int) -> models.Exchanges | None:
+    statement = select(models.Exchanges).where(
+        models.Exchanges.name == name,
+        models.Exchanges.user_id == user_id,
+    )
+    return session.exec(statement).first()
+
+
+def get_all_exchanges(session: Session) -> list[models.Exchanges]:
+    statement = select(models.Exchanges)
+    return list(session.exec(statement).all())
+
+
+def get_all_exchanges_by_user_id(session: Session, user_id: int) -> list[models.Exchanges]:
+    statement = select(models.Exchanges).where(
+        models.Exchanges.user_id == user_id,
+    )
+    return list(session.exec(statement).all())
+
+
+def update_exchange(session: Session, exchange_id: int, update_data: Mapping[str, Any] | BaseModel) -> models.Exchanges:
+    exchange: models.Exchanges | None = session.get(models.Exchanges, exchange_id)
+    if exchange is None:
+        raise ValueError("exchange_id does not exist")
+    data = _data_to_dict(update_data)
+    allowed = _allowed_columns(models.Exchanges)
+    for k, v in data.items():
+        if k in IMMUTABLE_EXCHANGE_FIELDS:
+            raise ValueError(f"field {k!r} is immutable")
+        if k in allowed:
+            setattr(exchange, k, v)
+    session.add(exchange)
+    try:
+        session.flush()
+    except IntegrityError as e:
+        session.rollback()
+        raise ValueError("update_exchange integrity error") from e
+    session.refresh(exchange)
+    return exchange
+
+
+def delete_exchange(session: Session, exchange_id: int) -> None:
+    exchange: models.Exchanges | None = session.get(models.Exchanges, exchange_id)
+    if exchange is None:
+        return
+    session.delete(exchange)
+    try:
+        session.flush()
+    except IntegrityError as e:
+        session.rollback()
+        raise ValueError("delete_exchange integrity error") from e
+
+
 # Users
 IMMUTABLE_USER_FIELDS = {"id", "username", "created_at"}
 
 
-def create_user(session: Session, user_data: Mapping) -> models.Users:
-    if hasattr(user_data, "dict"):
-        data = user_data.dict(exclude_unset=True)
-    else:
-        data = dict(user_data)
-    allowed = {c.name for c in models.Users.__table__.columns}
+def create_user(session: Session, user_data: Mapping[str, Any] | BaseModel) -> models.Users:
+    data = _data_to_dict(user_data)
+    allowed = _allowed_columns(models.Users)
     payload = {k: v for k, v in data.items() if k in allowed}
     if "username" not in payload:
         raise ValueError("username is required")
@@ -278,15 +493,23 @@ def create_user(session: Session, user_data: Mapping) -> models.Users:
     return u
 
 
-def update_user(session: Session, user_id: int, update_data: Mapping) -> models.Users:
+def get_user_by_id(session: Session, user_id: int) -> models.Users | None:
+    return session.get(models.Users, user_id)
+
+
+def get_user_by_username(session: Session, username: str) -> models.Users | None:
+    statement = select(models.Users).where(
+        models.Users.username == username,
+    )
+    return session.exec(statement).first()
+
+
+def update_user(session: Session, user_id: int, update_data: Mapping[str, Any] | BaseModel) -> models.Users:
     user: models.Users | None = session.get(models.Users, user_id)
     if user is None:
         raise ValueError("user_id does not exist")
-    if hasattr(update_data, "dict"):
-        data = update_data.dict(exclude_unset=True)
-    else:
-        data = dict(update_data)
-    allowed = {c.name for c in models.Users.__table__.columns}
+    data = _data_to_dict(update_data)
+    allowed = _allowed_columns(models.Users)
     for k, v in data.items():
         if k in IMMUTABLE_USER_FIELDS:
             raise ValueError(f"field {k!r} is immutable")
@@ -315,10 +538,11 @@ def create_login_session(
     user: models.Users | None = session.get(models.Users, user_id)
     if user is None:
         raise ValueError("user_id does not exist")
+    user_id_val = cast("int", user.id)
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(seconds=session_length_seconds)
     s = models.Sessions(
-        user_id=user.id,
+        user_id=user_id_val,
         session_token_hash=session_token_hash,
         created_at=now,
         expires_at=expires_at,
@@ -337,9 +561,7 @@ def create_login_session(
     return s
 
 
-def get_login_session_by_token_hash_and_user_id(
-    session: Session, session_token_hash: str, user_id: int
-) -> models.Sessions | None:
+def get_login_session_by_token_hash_and_user_id(session: Session, session_token_hash: str, user_id: int) -> models.Sessions | None:
     statement = select(models.Sessions).where(
         models.Sessions.session_token_hash == session_token_hash,
         models.Sessions.user_id == user_id,
@@ -349,25 +571,29 @@ def get_login_session_by_token_hash_and_user_id(
     return session.exec(statement).first()
 
 
+def get_login_session_by_token_hash(session: Session, session_token_hash: str) -> models.Sessions | None:
+    statement = select(models.Sessions).where(
+        models.Sessions.session_token_hash == session_token_hash,
+        models.Sessions.expires_at > datetime.now(timezone.utc),
+    )
+
+    return session.exec(statement).first()
+
+
 IMMUTABLE_SESSION_FIELDS = {"id", "user_id", "session_token_hash", "created_at"}
 
 
-def update_login_session(
-    session: Session, session_token_hashed: str, update_session: Mapping
-) -> models.Sessions | None:
+def update_login_session(session: Session, session_token_hashed: str, update_session: Mapping[str, Any] | BaseModel) -> models.Sessions | None:
     login_session: models.Sessions | None = session.exec(
         select(models.Sessions).where(
             models.Sessions.session_token_hash == session_token_hashed,
             models.Sessions.expires_at > datetime.now(timezone.utc),
-        )
+        ),
     ).first()
     if login_session is None:
         return None
-    if hasattr(update_session, "dict"):
-        data = update_session.dict(exclude_unset=True)
-    else:
-        data = dict(update_session)
-    allowed = {c.name for c in models.Sessions.__table__.columns}
+    data = _data_to_dict(update_session)
+    allowed = _allowed_columns(models.Sessions)
     for k, v in data.items():
         if k in allowed and k not in IMMUTABLE_SESSION_FIELDS:
             setattr(login_session, k, v)
@@ -385,7 +611,7 @@ def delete_login_session(session: Session, session_token_hash: str) -> None:
     login_session: models.Sessions | None = session.exec(
         select(models.Sessions).where(
             models.Sessions.session_token_hash == session_token_hash,
-        )
+        ),
     ).first()
     if login_session is None:
         return

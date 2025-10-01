@@ -13,10 +13,14 @@
                 "app:app",
                 "--host=0.0.0.0",
                 "--reload",
-                "--port=5000"
+                "--port=18881"
             ],
             "jinja": true,
-            "autoStartBrowser": true
+            "autoStartBrowser": false,
+            "env": {
+                "CONFIG_FILE": "devsettings.yaml"
+            },
+            "console": "integratedTerminal"
         }
     ]
 }

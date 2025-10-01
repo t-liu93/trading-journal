@@ -12,7 +12,7 @@ def test_default_settings(monkeypatch: pytest.MonkeyPatch) -> None:
 
     s = load_settings()
     assert s.host == "0.0.0.0"  # noqa: S104
-    assert s.port == 8000  # noqa: PLR2004
+    assert s.port == 8000
     assert s.workers == 1
     assert s.log_level == "info"
 
@@ -26,8 +26,8 @@ def test_env_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
 
     s = load_settings()
     assert s.host == "127.0.0.1"
-    assert s.port == 9000  # noqa: PLR2004
-    assert s.workers == 3  # noqa: PLR2004
+    assert s.port == 9000
+    assert s.workers == 3
     assert s.log_level == "debug"
 
 
@@ -40,6 +40,6 @@ def test_yaml_config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
 
     s = load_settings()
     assert s.host == "10.0.0.5"
-    assert s.port == 8088  # noqa: PLR2004
-    assert s.workers == 5  # noqa: PLR2004
+    assert s.port == 8088
+    assert s.workers == 5
     assert s.log_level == "debug"

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from sqlalchemy import event
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, create_engine
-
-from trading_journal import db_migration
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -24,17 +23,13 @@ class Database:
     ) -> None:
         self._database_url = database_url or "sqlite:///:memory:"
 
-        default_connect = (
-            {"check_same_thread": False, "timeout": 30}
-            if self._database_url.startswith("sqlite")
-            else {}
-        )
+        default_connect = {"check_same_thread": False, "timeout": 30} if self._database_url.startswith("sqlite") else {}
         merged_connect = {**default_connect, **(connect_args or {})}
 
         if self._database_url == "sqlite:///:memory:":
             logger = logging.getLogger(__name__)
             logger.warning(
-                "Using in-memory SQLite database; all data will be lost when the application stops."
+                "Using in-memory SQLite database; all data will be lost when the application stops.",
             )
             self._engine = create_engine(
                 self._database_url,
@@ -43,15 +38,11 @@ class Database:
                 poolclass=StaticPool,
             )
         else:
-            self._engine = create_engine(
-                self._database_url, echo=echo, connect_args=merged_connect
-            )
+            self._engine = create_engine(self._database_url, echo=echo, connect_args=merged_connect)
 
         if self._database_url.startswith("sqlite"):
 
-            def _enable_sqlite_pragmas(
-                dbapi_conn: DBAPIConnection, _connection_record: object
-            ) -> None:
+            def _enable_sqlite_pragmas(dbapi_conn: DBAPIConnection, _connection_record: object) -> None:
                 try:
                     cur = dbapi_conn.cursor()
                     cur.execute("PRAGMA journal_mode=WAL;")
@@ -66,9 +57,21 @@ class Database:
             event.listen(self._engine, "connect", _enable_sqlite_pragmas)
 
     def init_db(self) -> None:
-        db_migration.run_migrations(self._engine)
+        pass
 
     def get_session(self) -> Generator[Session, None, None]:
+        session = Session(self._engine)
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    @contextmanager
+    def get_session_ctx_manager(self) -> Generator[Session, None, None]:
         session = Session(self._engine)
         try:
             yield session

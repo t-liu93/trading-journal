@@ -1,11 +1,13 @@
-from datetime import date, datetime  # noqa: TC003
+from datetime import date, datetime
 from enum import Enum
+from typing import Optional
 
 from sqlmodel import (
     Column,
     Date,
     DateTime,
     Field,
+    ForeignKey,
     Integer,
     Relationship,
     SQLModel,
@@ -16,8 +18,10 @@ from sqlmodel import (
 
 class TradeType(str, Enum):
     SELL_PUT = "SELL_PUT"
+    CLOSE_SELL_PUT = "CLOSE_SELL_PUT"
     ASSIGNMENT = "ASSIGNMENT"
     SELL_CALL = "SELL_CALL"
+    CLOSE_SELL_CALL = "CLOSE_SELL_CALL"
     EXERCISE_CALL = "EXERCISE_CALL"
     LONG_SPOT = "LONG_SPOT"
     CLOSE_LONG_SPOT = "CLOSE_LONG_SPOT"
@@ -64,102 +68,132 @@ class FundingSource(str, Enum):
 
 
 class Trades(SQLModel, table=True):
-    __tablename__ = "trades"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id", "friendly_name", name="uq_trades_user_friendly_name"
-        ),
-    )
+    __tablename__ = "trades"  # type: ignore[attr-defined]
+    __table_args__ = (UniqueConstraint("user_id", "friendly_name", name="uq_trades_user_friendly_name"),)
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", nullable=False, index=True)
     # allow null while user may omit friendly_name; uniqueness enforced per-user by constraint
-    friendly_name: str | None = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
+    friendly_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     symbol: str = Field(sa_column=Column(Text, nullable=False))
-    underlying_currency: UnderlyingCurrency = Field(
-        sa_column=Column(Text, nullable=False)
-    )
+    exchange_id: int = Field(foreign_key="exchanges.id", nullable=False, index=True)
+    exchange: "Exchanges" = Relationship(back_populates="trades")
+    underlying_currency: UnderlyingCurrency = Field(sa_column=Column(Text, nullable=False))
     trade_type: TradeType = Field(sa_column=Column(Text, nullable=False))
     trade_strategy: TradeStrategy = Field(sa_column=Column(Text, nullable=False))
     trade_date: date = Field(sa_column=Column(Date, nullable=False))
-    trade_time_utc: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), nullable=False)
-    )
+    trade_time_utc: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
     expiry_date: date | None = Field(default=None, nullable=True)
     strike_price_cents: int | None = Field(default=None, nullable=True)
     quantity: int = Field(sa_column=Column(Integer, nullable=False))
+    quantity_multiplier: int = Field(sa_column=Column(Integer, nullable=False), default=1)
     price_cents: int = Field(sa_column=Column(Integer, nullable=False))
     gross_cash_flow_cents: int = Field(sa_column=Column(Integer, nullable=False))
     commission_cents: int = Field(sa_column=Column(Integer, nullable=False))
     net_cash_flow_cents: int = Field(sa_column=Column(Integer, nullable=False))
     is_invalidated: bool = Field(default=False, nullable=False)
-    invalidated_at: datetime | None = Field(
-        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
-    )
-    replaced_by_trade_id: int | None = Field(
-        default=None, foreign_key="trades.id", nullable=True
-    )
+    invalidated_at: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
+    replaced_by_trade_id: int | None = Field(default=None, foreign_key="trades.id", nullable=True)
     notes: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
-    cycle_id: int | None = Field(
-        default=None, foreign_key="cycles.id", nullable=True, index=True
-    )
+    cycle_id: int | None = Field(default=None, foreign_key="cycles.id", nullable=True, index=True)
+
     cycle: "Cycles" = Relationship(back_populates="trades")
+
+    related_loan_change_event: Optional["CycleLoanChangeEvents"] = Relationship(
+        back_populates="trade",
+        sa_relationship_kwargs={"uselist": False},
+    )
 
 
 class Cycles(SQLModel, table=True):
-    __tablename__ = "cycles"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id", "friendly_name", name="uq_cycles_user_friendly_name"
-        ),
-    )
+    __tablename__ = "cycles"  # type: ignore[attr-defined]
+    __table_args__ = (UniqueConstraint("user_id", "friendly_name", name="uq_cycles_user_friendly_name"),)
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", nullable=False, index=True)
-    friendly_name: str | None = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
+    friendly_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     symbol: str = Field(sa_column=Column(Text, nullable=False))
-    underlying_currency: UnderlyingCurrency = Field(
-        sa_column=Column(Text, nullable=False)
-    )
+    exchange_id: int = Field(foreign_key="exchanges.id", nullable=False, index=True)
+    exchange: "Exchanges" = Relationship(back_populates="cycles")
+    underlying_currency: UnderlyingCurrency = Field(sa_column=Column(Text, nullable=False))
     status: CycleStatus = Field(sa_column=Column(Text, nullable=False))
     funding_source: FundingSource = Field(sa_column=Column(Text, nullable=True))
     capital_exposure_cents: int | None = Field(default=None, nullable=True)
-    loan_amount_cents: int | None = Field(default=None, nullable=True)
-    loan_interest_rate_bps: int | None = Field(default=None, nullable=True)
     start_date: date = Field(sa_column=Column(Date, nullable=False))
     end_date: date | None = Field(default=None, sa_column=Column(Date, nullable=True))
+
     trades: list["Trades"] = Relationship(back_populates="cycle")
+
+    loan_amount_cents: int | None = Field(default=None, nullable=True)
+    loan_interest_rate_tenth_bps: int | None = Field(default=None, nullable=True)
+
+    latest_interest_accrued_date: date | None = Field(default=None, sa_column=Column(Date, nullable=True))
+    total_accrued_amount_cents: int = Field(default=0, sa_column=Column(Integer, nullable=False))
+
+    loan_change_events: list["CycleLoanChangeEvents"] = Relationship(back_populates="cycle")
+    daily_accruals: list["CycleDailyAccrual"] = Relationship(back_populates="cycle")
+
+
+class CycleLoanChangeEvents(SQLModel, table=True):
+    __tablename__ = "cycle_loan_change_events"  # type: ignore[attr-defined]
+    id: int | None = Field(default=None, primary_key=True)
+    cycle_id: int = Field(sa_column=Column(Integer, ForeignKey("cycles.id", ondelete="CASCADE"), nullable=False, index=True))
+    effective_date: date = Field(sa_column=Column(Date, nullable=False))
+    loan_amount_cents: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
+    loan_interest_rate_tenth_bps: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
+    related_trade_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey("trades.id"), nullable=True, unique=True))
+    notes: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
+
+    cycle: "Cycles" = Relationship(back_populates="loan_change_events")
+    trade: Optional["Trades"] = Relationship(back_populates="related_loan_change_event")
+
+
+class CycleDailyAccrual(SQLModel, table=True):
+    __tablename__ = "cycle_daily_accrual"  # type: ignore[attr-defined]
+    __table_args__ = (UniqueConstraint("cycle_id", "accrual_date", name="uq_cycle_daily_accruals_cycle_date"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    cycle_id: int = Field(sa_column=Column(Integer, ForeignKey("cycles.id", ondelete="CASCADE"), nullable=False, index=True))
+    accrual_date: date = Field(sa_column=Column(Date, nullable=False))
+    accrual_amount_cents: int = Field(sa_column=Column(Integer, nullable=False))
+    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
+
+    cycle: "Cycles" = Relationship(back_populates="daily_accruals")
+
+
+class Exchanges(SQLModel, table=True):
+    __tablename__ = "exchanges"  # type: ignore[attr-defined]
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_exchanges_user_name"),)
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", nullable=False, index=True)
+    name: str = Field(sa_column=Column(Text, nullable=False))
+    notes: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    trades: list["Trades"] = Relationship(back_populates="exchange")
+    cycles: list["Cycles"] = Relationship(back_populates="exchange")
+    user: "Users" = Relationship(back_populates="exchanges")
 
 
 class Users(SQLModel, table=True):
-    __tablename__ = "users"
+    __tablename__ = "users"  # type: ignore[attr-defined]
     id: int | None = Field(default=None, primary_key=True)
     # unique=True already creates an index; no need to also set index=True
     username: str = Field(sa_column=Column(Text, nullable=False, unique=True))
     password_hash: str = Field(sa_column=Column(Text, nullable=False))
     is_active: bool = Field(default=True, nullable=False)
+    sessions: list["Sessions"] = Relationship(back_populates="user")
+    exchanges: list["Exchanges"] = Relationship(back_populates="user")
 
 
 class Sessions(SQLModel, table=True):
-    __tablename__ = "sessions"
+    __tablename__ = "sessions"  # type: ignore[attr-defined]
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", nullable=False, index=True)
     session_token_hash: str = Field(sa_column=Column(Text, nullable=False, unique=True))
-    created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), nullable=False)
-    )
-    expires_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), nullable=False, index=True)
-    )
-    last_seen_at: datetime | None = Field(
-        sa_column=Column(DateTime(timezone=True), nullable=True)
-    )
-    last_used_ip: str | None = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
+    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
+    expires_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False, index=True))
+    last_seen_at: datetime | None = Field(sa_column=Column(DateTime(timezone=True), nullable=True))
+    last_used_ip: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     user_agent: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     device_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    user: "Users" = Relationship(back_populates="sessions")
