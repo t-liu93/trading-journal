@@ -1,0 +1,554 @@
+openapi: "3.0.3"
+info:
+  title: Trading Journal API
+  version: "1.0.0"
+  description: OpenAPI description generated from [`app.py`](app.py) and DTOs in [`trading_journal/dto.py`](trading_journal/dto.py).
+servers:
+  - url: "http://127.0.0.1:18881{basePath}"
+    variables:
+      basePath:
+        default: "/api/v1"
+        description: "API base path (matches settings.settings.api_base)"
+components:
+  securitySchemes:
+    session_cookie:
+      type: apiKey
+      in: cookie
+      name: session_token
+  schemas:
+    UserCreate:
+      $ref: "#/components/schemas/UserCreate_impl"
+    UserCreate_impl:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        is_active:
+          type: boolean
+          default: true
+        password:
+          type: string
+    UserLogin:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    UserRead:
+      type: object
+      required:
+        - id
+        - username
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        is_active:
+          type: boolean
+    SessionsBase:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: integer
+    SessionsCreate:
+      allOf:
+        - $ref: "#/components/schemas/SessionsBase"
+        - type: object
+          required:
+            - expires_at
+          properties:
+            expires_at:
+              type: string
+              format: date-time
+    ExchangesBase:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        notes:
+          type: string
+          nullable: true
+    ExchangesRead:
+      allOf:
+        - $ref: "#/components/schemas/ExchangesBase"
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: integer
+    CycleBase:
+      type: object
+      properties:
+        friendly_name:
+          type: string
+          nullable: true
+        status:
+          type: string
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        funding_source:
+          type: string
+          nullable: true
+        capital_exposure_cents:
+          type: integer
+          nullable: true
+        loan_amount_cents:
+          type: integer
+          nullable: true
+        loan_interest_rate_tenth_bps:
+          type: integer
+          nullable: true
+        trades:
+          type: array
+          items:
+            $ref: "#/components/schemas/TradeRead"
+          nullable: true
+        exchange:
+          $ref: "#/components/schemas/ExchangesRead"
+          nullable: true
+    CycleCreate:
+      allOf:
+        - $ref: "#/components/schemas/CycleBase"
+        - type: object
+          required:
+            - user_id
+            - symbol
+            - exchange_id
+            - underlying_currency
+            - start_date
+          properties:
+            user_id:
+              type: integer
+            symbol:
+              type: string
+            exchange_id:
+              type: integer
+            underlying_currency:
+              type: string
+            start_date:
+              type: string
+              format: date
+    CycleUpdate:
+      allOf:
+        - $ref: "#/components/schemas/CycleBase"
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: integer
+    CycleRead:
+      allOf:
+        - $ref: "#/components/schemas/CycleCreate"
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: integer
+    TradeBase:
+      type: object
+      required:
+        - symbol
+        - underlying_currency
+        - trade_type
+        - trade_strategy
+        - trade_date
+        - quantity
+        - price_cents
+        - commission_cents
+      properties:
+        friendly_name:
+          type: string
+          nullable: true
+        symbol:
+          type: string
+        exchange_id:
+          type: integer
+        underlying_currency:
+          type: string
+        trade_type:
+          type: string
+        trade_strategy:
+          type: string
+        trade_date:
+          type: string
+          format: date
+        quantity:
+          type: integer
+        price_cents:
+          type: integer
+        commission_cents:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        cycle_id:
+          type: integer
+          nullable: true
+    TradeCreate:
+      allOf:
+        - $ref: "#/components/schemas/TradeBase"
+        - type: object
+          properties:
+            user_id:
+              type: integer
+              nullable: true
+            trade_time_utc:
+              type: string
+              format: date-time
+              nullable: true
+            gross_cash_flow_cents:
+              type: integer
+              nullable: true
+            net_cash_flow_cents:
+              type: integer
+              nullable: true
+            quantity_multiplier:
+              type: integer
+              default: 1
+            expiry_date:
+              type: string
+              format: date
+              nullable: true
+            strike_price_cents:
+              type: integer
+              nullable: true
+            is_invalidated:
+              type: boolean
+              default: false
+            invalidated_at:
+              type: string
+              format: date-time
+              nullable: true
+            replaced_by_trade_id:
+              type: integer
+              nullable: true
+    TradeNoteUpdate:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+    TradeFriendlyNameUpdate:
+      type: object
+      required:
+        - id
+        - friendly_name
+      properties:
+        id:
+          type: integer
+        friendly_name:
+          type: string
+    TradeRead:
+      allOf:
+        - $ref: "#/components/schemas/TradeCreate"
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: integer
+paths:
+  /status:
+    get:
+      summary: "Get API status"
+      security: [] # no auth required
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+  /register:
+    post:
+      summary: "Register user"
+      security: [] # no auth required
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserRead"
+        "400":
+          description: Bad Request (user exists)
+        "500":
+          description: Internal Server Error
+  /login:
+    post:
+      summary: "Login"
+      security: [] # no auth required
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserLogin"
+      responses:
+        "200":
+          description: OK (sets session cookie)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionsBase"
+          headers:
+            Set-Cookie:
+              description: session cookie
+              schema:
+                type: string
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+  /exchanges:
+    post:
+      summary: "Create exchange"
+      security:
+        - session_cookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExchangesBase"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangesRead"
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+    get:
+      summary: "List user exchanges"
+      security:
+        - session_cookie: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExchangesRead"
+        "401":
+          description: Unauthorized
+  /exchanges/{exchange_id}:
+    patch:
+      summary: "Update exchange"
+      security:
+        - session_cookie: []
+      parameters:
+        - name: exchange_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExchangesBase"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangesRead"
+        "404":
+          description: Not found
+        "400":
+          description: Bad request
+  /cycles:
+    post:
+      summary: "Create cycle (currently returns 405 in code)"
+      security:
+        - session_cookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CycleBase"
+      responses:
+        "405":
+          description: Method not allowed (app currently returns 405)
+    patch:
+      summary: "Update cycle"
+      security:
+        - session_cookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CycleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CycleRead"
+        "400":
+          description: Invalid data
+        "404":
+          description: Not found
+  /cycles/{cycle_id}:
+    get:
+      summary: "Get cycle by id"
+      security:
+        - session_cookie: []
+      parameters:
+        - name: cycle_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CycleRead"
+        "404":
+          description: Not found
+  /cycles/user/{user_id}:
+    get:
+      summary: "Get cycles by user id"
+      security:
+        - session_cookie: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CycleRead"
+  /trades:
+    post:
+      summary: "Create trade"
+      security:
+        - session_cookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradeCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeRead"
+        "400":
+          description: Invalid trade data
+        "500":
+          description: Internal Server Error
+  /trades/{trade_id}:
+    get:
+      summary: "Get trade by id"
+      security:
+        - session_cookie: []
+      parameters:
+        - name: trade_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeRead"
+        "404":
+          description: Not found
+  /trades/friendlyname:
+    patch:
+      summary: "Update trade friendly name"
+      security:
+        - session_cookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradeFriendlyNameUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeRead"
+        "404":
+          description: Not found
+  /trades/notes:
+    patch:
+      summary: "Update trade notes"
+      security:
+        - session_cookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradeNoteUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeRead"
+        "404":
+          description: Not found

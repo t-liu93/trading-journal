@@ -52,8 +52,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
         await asyncio.to_thread(_db.dispose)
 
 
+origins = [
+    "http://127.0.0.1:18881",
+]
+
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(service.AuthMiddleWare)
+app.add_middleware(
+    service.AuthMiddleWare,
+)
 app.state.db_factory = _db
 
 
@@ -77,7 +83,7 @@ async def register_user(request: Request, user_in: UserCreate) -> Response:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:
         logger.exception("Failed to register user: \n")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error") from e
 
 
 @app.post(f"{settings.settings.api_base}/login")
@@ -110,7 +116,7 @@ async def login(request: Request, user_in: UserLogin) -> Response:
         )
     except Exception as e:
         logger.exception("Failed to login user: \n")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from e
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error") from e
     else:
         return response
 
