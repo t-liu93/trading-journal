@@ -1,28 +1,22 @@
+# Trading Journal
 
-# Trading Journal (Work In Progress)
+[中文说明](./README_zh.md)
 
-A simple trading journal application (work in progress).
+This repository is a new trading journal project.
 
-This repository contains the backend of a trading journal designed to help you record and analyse trades. The system is specially designed to support journaling trades for the "wheel" options strategy, but it also supports other trade types such as long/short spot positions, forex, and more.
+Current status: Phase 0.
 
-Important: the project is still under active development. There is a backend in this repo, but the frontend UI has not been implemented yet.
+The current goal is to establish a clean repo shape for small, reviewable iterations. Backend and frontend will be built in later phases instead of generating the full system in one pass.
 
-## Key features
+Planned direction:
 
-- Journal trades with rich metadata (strategy, entry/exit, P/L, notes).
-- Built-in support and data model conveniences for the Wheel strategy (puts/calls lifecycle tracking).
-- Flexible support for other trade types: long/short spots, forex, futures, etc.
-- Backend-first design with tests and migration helpers.
+- Backend: FastAPI
+- Database: PostgreSQL
+- Frontend v1: Vue 3 + TypeScript + Vite, SPA-first
+- Deployment: containerized, with Docker Compose at minimum
 
-## Repository layout
+Repository areas:
 
-- `backend/` — Python backend code (API, models, services, migrations, tests).
-- `backend/trading_journal/` — core application modules: CRUD, models, DTOs, services, and security.
-- `backend/tests/` — unit tests targeting the backend logic and DB layer.
-
-
-## License
-
-See the `LICENSE` file in the project root for license details.
-
-
+- [backend](./backend/README.md)
+- [frontend](./frontend/README.md)
+- [docs](./docs/README.md)
