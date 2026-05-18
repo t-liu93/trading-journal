@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     cookie_secret: str = "dev-only-change-me-before-anywhere-real"
     debug: bool = False
 
+    # Auth / session
+    cookie_name: str = "trading_journal_session"
+    cookie_secure: bool = False  # MUST be True behind HTTPS in production.
+    session_lifetime_seconds: int = 60 * 60 * 24 * 7  # 7 days
+    min_password_length: int = 8
+
 
 @lru_cache
 def get_settings() -> Settings:
