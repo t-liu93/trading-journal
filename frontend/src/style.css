@@ -1,0 +1,5 @@
+/* Minimal global reset. Naive UI components handle their own styling;
+   `vfonts` brings the recommended font family via main.ts. */
+body {
+  margin: 0;
+}
