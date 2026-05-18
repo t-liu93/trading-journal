@@ -7,7 +7,7 @@ Run during development with:
 
 from fastapi import FastAPI
 
-from trading_journal.api import health
+from trading_journal.api import accounts, health
 from trading_journal.auth.backend import auth_backend, fastapi_users
 from trading_journal.schemas.user import UserCreate, UserRead, UserUpdate
 
@@ -36,6 +36,8 @@ def create_app() -> FastAPI:
         prefix="/users",
         tags=["users"],
     )
+    # Domain: Account CRUD.
+    app.include_router(accounts.router)
     return app
 
 

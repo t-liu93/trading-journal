@@ -47,27 +47,36 @@ async def db_session_maker(
 
 
 @pytest.fixture
-async def client(
+async def _override_session(
     db_session_maker: async_sessionmaker[AsyncSession],
-) -> AsyncIterator[AsyncClient]:
-    """``AsyncClient`` bound to the app with ``get_session`` pointed at the test DB.
+) -> AsyncIterator[None]:
+    """Bind the app's ``get_session`` dependency to the per-test DB.
 
-    The default ``follow_redirects=False`` matches real browser behaviour for
-    POST/login and lets us assert on the actual status codes FastAPI Users
-    returns rather than chasing redirects.
+    Shared between ``client`` and ``second_user_client`` so both AsyncClient
+    instances hit the same test database.
     """
 
-    async def _override_get_session() -> AsyncIterator[AsyncSession]:
+    async def _provider() -> AsyncIterator[AsyncSession]:
         async with db_session_maker() as session:
             yield session
 
-    app.dependency_overrides[get_session] = _override_get_session
-    transport = ASGITransport(app=app)
+    app.dependency_overrides[get_session] = _provider
     try:
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            yield ac
+        yield
     finally:
         app.dependency_overrides.pop(get_session, None)
+
+
+def _new_async_client() -> AsyncClient:
+    transport = ASGITransport(app=app)
+    return AsyncClient(transport=transport, base_url="http://test")
+
+
+@pytest.fixture
+async def client(_override_session: None) -> AsyncIterator[AsyncClient]:
+    """``AsyncClient`` bound to the app with ``get_session`` pointed at the test DB."""
+    async with _new_async_client() as ac:
+        yield ac
 
 
 @pytest.fixture
@@ -99,3 +108,26 @@ async def auth_client(client: AsyncClient, registered_user: dict[str, str]) -> A
     )
     assert response.status_code == 204, response.text
     return client
+
+
+@pytest.fixture
+async def second_user_client(
+    _override_session: None,
+    second_credentials: dict[str, str],
+) -> AsyncIterator[AsyncClient]:
+    """A second logged-in user. Independent cookie jar from ``client`` / ``auth_client``.
+
+    Used to verify cross-user isolation: Bob must not see or modify Alice's data.
+    """
+    async with _new_async_client() as ac:
+        register = await ac.post("/auth/register", json=second_credentials)
+        assert register.status_code == 201, register.text
+        login = await ac.post(
+            "/auth/login",
+            data={
+                "username": second_credentials["email"],
+                "password": second_credentials["password"],
+            },
+        )
+        assert login.status_code == 204, login.text
+        yield ac

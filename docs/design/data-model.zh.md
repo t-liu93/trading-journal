@@ -2,7 +2,7 @@
 
 **语言：** [English](./data-model.md) | 中文
 
-> 状态：**DRAFT v0.3**（2026-05-18）。`refactoring/rebuild` 分支重构的初版设计。本文档是 schema 讨论的 source of truth；写 migration 之前在这里迭代。文末有 changelog。
+> 状态：**DRAFT v0.4**（2026-05-18）。`refactoring/rebuild` 分支重构的初版设计。本文档是 schema 讨论的 source of truth；写 migration 之前在这里迭代。文末有 changelog。
 
 ## 1. 目的与设计原则
 
@@ -95,7 +95,7 @@ erDiagram
 | name | text | "Fidelity Roth"、"IBKR Margin" 等。 |
 | broker | text | "Fidelity" / "IBKR" / "Saxo" / ... |
 | account_type | enum | `cash`、`margin`、`paper`。 |
-| base_currency | text | ISO 4217：`USD`、`EUR` 等。 |
+| base_currency | text | ISO 4217。**仅作元数据** —— 表示券商把账户余额展示成哪种货币。**不参与任何 PnL 计算**；每个 position 的 PnL 落在 position 自己的货币里（见 §4.4、§6）。 |
 | notes | text nullable | |
 | created_at | timestamptz | |
 | archived_at | timestamptz nullable | 软删除；保留历史。 |
@@ -112,7 +112,7 @@ erDiagram
 | kind | enum | `stock`、`option`、`forex`（未来：`future`、`crypto`）。 |
 | symbol | text | "NVDA"、"EURUSD"。期权情况下指 underlying 的 symbol。 |
 | exchange | text nullable | "NASDAQ"、"EURONEXT"。按你的要求和 symbol 拆开，方便未来跨交易所标的。 |
-| currency | text | Instrument 的交易货币，ISO 4217。 |
+| currency | text | Instrument 的交易 / 结算货币，ISO 4217。也是任何持有该 instrument 的 position 的 PnL 货币。对 forex pair 而言，必须等于 `ForexPair.quote_currency`（见 §6）。 |
 | created_at | timestamptz | |
 
 #### OptionContract（kind=option 时扩展 Instrument）
@@ -137,6 +137,8 @@ erDiagram
 | pip_size | numeric(10, 8) | 主流货币对多为 0.0001。 |
 | contract_size | numeric(18, 4) nullable | Lot size；MVP 阶段不确定可暂缓。 |
 
+**Forex PnL 约定**：外汇对的 PnL 永远落在 **quote 货币**（EURUSD → USD；USDCAD → CAD；EURJPY → JPY；GBPCHF → CHF）。所以 `Instrument.currency` 对 forex pair 必须等于 `ForexPair.quote_currency`。schema 不跨表强制这一点 —— 写入时由 API 层负责保持同步。
+
 **股票** 不需要扩展表——MVP 所需字段 Instrument 已经覆盖。
 
 ### 4.4 Position（统一的策略实例聚合）
@@ -157,7 +159,7 @@ erDiagram
 | max_risk_at_open | numeric(18, 4) nullable | 开仓时的最大亏损 snapshot。适用于任何 defined-risk position（IC、vertical、butterfly 等）。Undefined-risk position（PMCC、spot）保持 null。 |
 | max_reward_at_open | numeric(18, 4) nullable | 开仓时的最大盈利 snapshot。适用范围同 `max_risk_at_open`。 |
 | pnl_realized | numeric(18, 4) nullable | **关仓时冻结**：status 翻为 `closed` 时从 trade cash flow 计算并存储。Open 阶段保持 null。 |
-| currency | text | Position 的报告货币（通常与 account 一致）。 |
+| currency | text | 该 position 的 PnL 累计货币。**等于 `primary_instrument.currency`**（从 instrument 自动派生，用户不可设置）。详见 §6。 |
 | notes | text nullable | 自由文本理由。 |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
@@ -373,10 +375,20 @@ schema 不强制任何顺序或数量约束。任意合法原子 trade 序列都
 - 与"始终派生"的 tradeoff：存储开销很小；查询性能和稳定性收益显著。
 
 ### Currency 放哪里
-- `Instrument.currency`：instrument 的 quote 货币。
-- `Account.base_currency`：券商给账户记账的货币。
-- `Position.currency`：报表货币（通常 = account base）。
-- 跨币种 PnL 换算延后处理。MVP 假设 position currency = instrument currency = account currency。
+
+三张表上的三种 currency 各司其职：
+
+| 字段 | 角色 |
+|---|---|
+| `Instrument.currency` | Instrument 的**交易 / 结算货币**。股票：上市地货币（NVDA=USD，ASML.AS=EUR）。期权：标的的货币。外汇对：**quote 货币**（EURUSD→USD，USDCAD→CAD）。 |
+| `Position.currency` | **等于 `Instrument.currency`。** 这个 position 的 PnL 落在这一货币里 —— MVP 阶段不做换算、不做跨币种聚合。 |
+| `Account.base_currency` | **仅作元数据。** 表示券商把账户余额展示成哪种货币。**不驱动任何 PnL 计算**。 |
+
+**MVP 不做汇率换算。** EUR 本位账户持有 NVDA，NVDA 的 PnL 记为 USD；同一账户持有 ASML.AS，PnL 记为 EUR；USDCAD position 的 PnL 记为 CAD。组合报表**按 currency 分桶**展示（"+$1,250 USD，+€180 EUR，−$45 CAD"），**不**合并成单一货币总额。
+
+设计动机：这正好对应零换算零售交易者的心智模型 —— 交易者跟踪的就是交易货币里的原始 P&L；至于券商月底在账户层面换算到本位币，那是另一个运营层面的问题（也是真实存在的 FX 敞口，交易者可以选择对冲或忽略）。同时这也让 MVP 不必依赖实时汇率源。
+
+**未来扩展（暂缓，详见 §7）。** 一旦接入汇率 provider，报表层可以提供 opt-in 的**展示期**换算到 `Account.base_currency`。这个换算只活在聚合 / 报表代码里，不写进 `Position.pnl_realized` —— 原始 PnL 永远以交易货币为准，历史结果不会因为汇率变化而漂移。
 
 ### SQLite → Postgres 可移植
 - 所有数值列用 `numeric(p, s)`，两个引擎都精确十进制。
@@ -405,6 +417,7 @@ schema 不强制任何顺序或数量约束。任意合法原子 trade 序列都
 | `MfaCredential` + `MfaBackupCode` | 在支持任何密码之外的敏感操作之前（接入 broker API 之前一定要做完） | `MfaCredential(user_id FK, method=totp/webauthn, secret_encrypted, device_name, created_at, last_used_at)`；`MfaBackupCode(user_id FK, code_hash, used_at)`。 |
 | `AuditLog` | 接入 broker API 之前；理想情况下更早 | `id, user_id FK, event_type enum, ip, user_agent, metadata jsonb, occurred_at`。Append-only。 |
 | `BrokerCredential` | broker API 集成开始时 | `id, user_id FK, account_id FK, broker_name, credential_encrypted, kek_id, scope, created_at, last_used_at`。Envelope-encrypted；主 KEK 放环境变量 / secrets manager。 |
+| `FxRate` + 汇率源集成 | 用户希望跨多币种持仓得到单一货币的组合视图时 | 按天（或按分钟）从外部 API 缓存的汇率 snapshot（ECB 基准汇率、OANDA、exchangerate.host 等）。Schema 草图：`FxRate(base, quote, rate, asof, source)`，主键 `(base, quote, asof)`。**仅作展示期换算** —— **不**修改 `Position.pnl_realized` 的存储方式。"换算到 Account.base_currency" 的逻辑活在报表 / 聚合层，每张报表 opt-in 决定要不要换算。 |
 
 这四项都是**纯加法**——加任何一项都不修改 `User`、`Account`、`Position`、`Trade`。
 
@@ -419,6 +432,7 @@ schema 不强制任何顺序或数量约束。任意合法原子 trade 序列都
 
 ## Changelog
 
+- **v0.4（2026-05-18）** —— 货币模型澄清。`Account.base_currency` 明确为仅作元数据；`Position.currency` 等于 `Instrument.currency`（不是"通常等于 account base"）；外汇对的 PnL 落在 quote 货币；§6 "Currency 放哪里" 整段重写，撤销 MVP "position currency = account currency" 的简化假设；§7 新增 `FxRate` 表 + 汇率源集成的未来扩展条目，支持 opt-in 的展示期换算到 `Account.base_currency`。**schema 不变** —— 现有列承载新语义，新默认值 / 不变式在应用层维护。
 - **v0.3（2026-05-18）** —— 针对真实交易场景做 Wheel 部分修订（v0.2 描述与现实不符）：§5.1 改写为"生命周期不变式 + 典型流程表"（现在显式覆盖多 put 摊低成本场景）；§4.4 `capital_used` Wheel 注释改为单调累加求和；§6 新增"为什么不把 Wheel 状态机烧进 schema"。**schema 文件不变**——原子 trade + 泛化 Position 模型本来就支持这个场景，是 v0.2 的文字描述错了。
 - **v0.2（2026-05-18）** —— 应用用户审阅：TradePlan 改为事件流；删除 IcPositionMeta，改为泛化的 `Position.max_risk_at_open` 和 `max_reward_at_open`；User 重塑为 FastAPI Users 默认字段，未来鉴权表延后到 §7；`Account.account_type` 改为 `cash`/`margin`/`paper`；解释 `numeric(p, s)` 并明确默认值；quantity 扩到 `numeric(18, 8)` 支持分数股；`Position.pnl_realized` 改为关仓 snapshot；TradeAction 收缩到 6 个，`assign`/`exercise`/`expire` 按原子 trade 建模并给出显式映射表；新增 `Trade.order_group_id` 用于多腿 / 多笔聚合。
 - **v0.1（2026-05-17）** —— 初版草案。

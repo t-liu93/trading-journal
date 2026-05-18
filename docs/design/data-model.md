@@ -2,7 +2,7 @@
 
 **Language:** English | [中文](./data-model.zh.md)
 
-> Status: **DRAFT v0.3** (2026-05-18). Initial design for the rebuild on `refactoring/rebuild`. This document is the source of truth for schema discussion; iterate here before writing migrations. Changelog at the bottom.
+> Status: **DRAFT v0.4** (2026-05-18). Initial design for the rebuild on `refactoring/rebuild`. This document is the source of truth for schema discussion; iterate here before writing migrations. Changelog at the bottom.
 
 ## 1. Purpose and design principles
 
@@ -95,7 +95,7 @@ A broker trading account. Distinct from the journal's app-level User.
 | name | text | "Fidelity Roth", "IBKR Margin", etc. |
 | broker | text | "Fidelity" / "IBKR" / "Saxo" / ... |
 | account_type | enum | `cash`, `margin`, `paper`. |
-| base_currency | text | ISO 4217: `USD`, `EUR`, ... |
+| base_currency | text | ISO 4217. **Metadata only** — the currency the broker displays your account balance in. Does NOT drive PnL calculation; per-position PnL accrues in the position's own currency (see §4.4, §6). |
 | notes | text nullable | |
 | created_at | timestamptz | |
 | archived_at | timestamptz nullable | Soft delete; preserves history. |
@@ -112,7 +112,7 @@ A broker trading account. Distinct from the journal's app-level User.
 | kind | enum | `stock`, `option`, `forex` (future: `future`, `crypto`). |
 | symbol | text | "NVDA", "EURUSD". For options this is the underlying symbol. |
 | exchange | text nullable | "NASDAQ", "EURONEXT". Separated per user's note: future support for cross-exchange listings. |
-| currency | text | Trading currency of the instrument, ISO 4217. |
+| currency | text | Trading / settlement currency of the instrument, ISO 4217. This is the PnL currency for any position holding this instrument. For forex pairs, must equal `ForexPair.quote_currency` (see §6). |
 | created_at | timestamptz | |
 
 #### OptionContract (extends Instrument when kind=option)
@@ -137,6 +137,8 @@ A broker trading account. Distinct from the journal's app-level User.
 | pip_size | numeric(10, 8) | e.g., 0.0001 for most majors. |
 | contract_size | numeric(18, 4) nullable | Lot size; defer for MVP if unsure. |
 
+**PnL convention for forex.** A forex pair's PnL always accrues in the **quote currency** (EURUSD → USD; USDCAD → CAD; EURJPY → JPY; GBPCHF → CHF). Therefore `Instrument.currency` for a forex pair must equal `ForexPair.quote_currency`. The schema doesn't enforce this cross-table — the API layer is responsible for keeping them in sync at write time.
+
 **Stocks** need no extension table — Instrument fields cover everything for MVP.
 
 ### 4.4 Position (universal strategy instance)
@@ -157,7 +159,7 @@ The single most important entity. Every active strategy instance — wheel cycle
 | max_risk_at_open | numeric(18, 4) nullable | Snapshot of max loss at open. Applies to any defined-risk position (IC, vertical, butterfly, etc.). Stays null for undefined-risk positions (PMCC, spot). |
 | max_reward_at_open | numeric(18, 4) nullable | Snapshot of max profit at open. Same applicability as `max_risk_at_open`. |
 | pnl_realized | numeric(18, 4) nullable | **Frozen on close**: when status transitions to `closed`, computed from trade cash flows and stored. Stays null while open. |
-| currency | text | Reporting currency for this position (usually matches account). |
+| currency | text | The currency PnL accrues in for this position. **Equals `primary_instrument.currency`** (set automatically from the instrument; not user-provided). See §6. |
 | notes | text nullable | Free-text rationale. |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
@@ -373,10 +375,20 @@ This is the same principle as dropping `assign` / `exercise` / `expire` as enum 
 - Tradeoff vs. always-derive: small storage cost; substantial query and stability benefit.
 
 ### Currency placement
-- `Instrument.currency` is the quote currency of the instrument.
-- `Account.base_currency` is what the broker books the account in.
-- `Position.currency` is the reporting currency (usually account base).
-- Cross-currency PnL conversion is deferred. MVP assumes position currency = instrument currency = account currency.
+
+Three currencies live on three tables and play three distinct roles:
+
+| Field | Role |
+|---|---|
+| `Instrument.currency` | The **trading / settlement currency** of the instrument. Stocks: listing currency (NVDA=USD, ASML.AS=EUR). Options: the underlying's currency. Forex pairs: the **quote currency** (EURUSD→USD, USDCAD→CAD). |
+| `Position.currency` | **Equals `Instrument.currency`.** PnL for this position accrues in this currency — never converted, never aggregated across currencies in MVP. |
+| `Account.base_currency` | **Metadata only.** The currency the broker displays your account balance in. Does not drive any PnL calculation. |
+
+**No FX conversion in MVP.** A EUR-based account holding NVDA records its NVDA PnL in USD; the same account's ASML.AS PnL is recorded in EUR; a USDCAD position's PnL is recorded in CAD. Portfolio reports aggregate **per-currency** ("+$1,250 USD, +€180 EUR, −$45 CAD"), not into a single converted total.
+
+Rationale: this matches how zero-conversion retail traders actually think — the trader tracks raw P&L in the trading currency; whatever the broker converts to the home currency on the account ledger is a separate operational concern (and a real FX exposure the trader can choose to hedge or ignore). It also avoids requiring a live FX rate source for the MVP.
+
+**Future extension (deferred to a separate design pass — see §7).** Once we integrate an FX rate provider, the reporting layer can offer an opt-in *display-time* conversion to `Account.base_currency`. The conversion lives in aggregation code, not in `Position.pnl_realized` — raw PnL stays in the trade currency forever, so historical results don't drift when FX rates change.
 
 ### SQLite → Postgres portability
 - All numeric columns use `numeric(p, s)`, exact-decimal in both engines.
@@ -405,6 +417,7 @@ Each item below will get a dedicated design pass in `docs/design/auth-and-securi
 | `MfaCredential` + `MfaBackupCode` | Before any sensitive action support beyond password (definitely before broker API) | `MfaCredential(user_id FK, method=totp/webauthn, secret_encrypted, device_name, created_at, last_used_at)`; `MfaBackupCode(user_id FK, code_hash, used_at)`. |
 | `AuditLog` | Before broker API integration; ideally earlier | `id, user_id FK, event_type enum, ip, user_agent, metadata jsonb, occurred_at`. Append-only. |
 | `BrokerCredential` | When broker API integration begins | `id, user_id FK, account_id FK, broker_name, credential_encrypted, kek_id, scope, created_at, last_used_at`. Envelope-encrypted; main KEK in env / secrets manager. |
+| `FxRate` + provider integration | When the user wants a single-currency portfolio view across multi-currency holdings | Per-day (or per-minute) FX snapshots cached from an external API (ECB reference rates, OANDA, exchangerate.host, ...). Schema sketch: `FxRate(base, quote, rate, asof, source)` keyed on `(base, quote, asof)`. **Pure display-time conversion** — does not modify how `Position.pnl_realized` is stored. The "convert to Account.base_currency" computation lives in the reporting / aggregation layer, opt-in per report. |
 
 All four are **purely additive** — adding any of them does not modify `User`, `Account`, `Position`, or `Trade`.
 
@@ -419,6 +432,7 @@ All four are **purely additive** — adding any of them does not modify `User`, 
 
 ## Changelog
 
+- **v0.4 (2026-05-18)** — Currency model clarified. `Account.base_currency` is now explicitly metadata-only; `Position.currency` equals `Instrument.currency` (not "usually account base"); forex pairs' PnL accrues in their quote currency; §6 "Currency placement" rewritten to drop the MVP simplification "position currency = account currency"; new future-extensions entry for an `FxRate` table + FX provider integration to enable opt-in display-time conversion to `Account.base_currency`. **No schema change** — existing columns absorb the new semantics; the application layer carries the new defaults / invariants.
 - **v0.3 (2026-05-18)** — Wheel-only revisions in response to a real-trading scenario the v0.2 draft mis-described: §5.1 rewritten with lifecycle invariants and a "typical flows" table (now explicitly covers multi-put cost-basis averaging); §4.4 `capital_used` Wheel note updated to the cumulative monotonic-non-decreasing sum; §6 adds "Why no Wheel state machine encoded in the schema". **No schema change** — atomic-trade + generic-Position model already supports the scenario; the v0.2 prose was wrong.
 - **v0.2 (2026-05-18)** — Applied user review: TradePlan becomes an event stream; drop IcPositionMeta in favor of generic `Position.max_risk_at_open` and `max_reward_at_open`; User reshaped to FastAPI Users defaults with future auth tables deferred to §7; `Account.account_type` becomes `cash`/`margin`/`paper`; explained `numeric(p, s)` and chose defaults; quantity widened to `numeric(18, 8)` for fractional shares; `Position.pnl_realized` becomes a close-time snapshot; TradeAction shrunk to 6 values, `assign`/`exercise`/`expire` modeled as atomic trades with an explicit mapping table; added `Trade.order_group_id` for multi-leg / multi-fill grouping.
 - **v0.1 (2026-05-17)** — Initial draft.
