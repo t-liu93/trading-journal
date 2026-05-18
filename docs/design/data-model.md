@@ -2,7 +2,7 @@
 
 **Language:** English | [中文](./data-model.zh.md)
 
-> Status: **DRAFT v0.2** (2026-05-18). Initial design for the rebuild on `refactoring/rebuild`. This document is the source of truth for schema discussion; iterate here before writing migrations. Changelog at the bottom.
+> Status: **DRAFT v0.3** (2026-05-18). Initial design for the rebuild on `refactoring/rebuild`. This document is the source of truth for schema discussion; iterate here before writing migrations. Changelog at the bottom.
 
 ## 1. Purpose and design principles
 
@@ -165,7 +165,7 @@ The single most important entity. Every active strategy instance — wheel cycle
 **Derived (NOT stored)**: `days_open`, `pnl_unrealized`, `pnl_total`, `roi_on_capital`, `annualized_return`, `result` (win/loss). Computed at read time from `Trade` rows (and market quotes for unrealized when status=open).
 
 **`capital_used` semantics per strategy**:
-- Wheel: `strike × 100 − premium` (currently manual; trivially computable from the first sell-put trade).
+- Wheel: cumulative `Σ (strike × 100 × qty − premium)` summed over **every** `sto put` event in the position. **Monotonically non-decreasing** — when a put expires worthless or is bought back, `capital_used` is *not* reduced, because that capital was at risk at some point and a conservative ROI denominator avoids inflated annualised returns. Manual in MVP; the services layer will compute it automatically later.
 - Iron condor / vertical spread / butterfly: equal to `max_risk_at_open`.
 - PMCC: LEAP buy cost.
 - Spot stock: total buy cost.
@@ -295,10 +295,24 @@ Extension tables are 1:1 with Position (matched by `position_id`). They hold *sn
 ## 5. How each strategy maps to the model
 
 ### 5.1 Wheel
+
 - One Position with `strategy_type = wheel`, `primary_instrument_id` = the underlying stock.
-- Trades: `sto`(put), optionally `btc`(put), the assignment pair (`btc` put @ 0 + `buy` 100 shares), `sto`(call) × N interleaved with `btc`(call) or expirations, eventually either the exercise pair (`btc` call @ 0 + `sell` 100 shares) or a discretionary `sell` of the stock.
-- WheelCycleMeta carries funding info.
-- Status flips to `closed` when there are no open option legs and net stock position is 0.
+- `WheelCycleMeta` carries funding / loan / interest info.
+
+**Lifecycle invariants.** A wheel Position is `open` as long as the user holds at least one of: an open short put leg, an open short call leg, or a non-zero long stock position — all on the same underlying. It transitions to `closed` the moment **all three** become empty: no open option legs *and* net stock = 0.
+
+**Allowed atomic trades** (in any order, any number of times, on the same Position): `sto put`, `btc put`, `sto call`, `btc call`, `buy` stock, `sell` stock — plus the synthetic event encodings from §4.5.2 (`btc` / `stc` @ 0 for worthless expirations; same `order_group_id` pairs for assignment and exercise).
+
+**Typical flows the model supports.**
+
+| Flow | Trade sequence |
+|---|---|
+| Premium harvest, no assignment | `sto put` → `btc put` *or* worthless-expire row → close |
+| Classic single-assignment wheel | `sto put` → assign pair → `sto call` × N (with `btc` / expire interleaved) → exercise pair *or* discretionary `sell` stock → close |
+| **Cost-basis averaging** (the case that prompted this revision) | `sto put` @ K₁ → assign pair → stock drops → `sto put` @ K₂<K₁ on the same Position → either worthless-expire (premium retained, cost basis effectively reduced) *or* a second assign pair (more shares, lower average cost) → continue with further puts / calls → eventual full exit → close |
+| Multi-contract assignment | Multiple `sto put` rows at same strike/expiry → multiple assign pairs from one broker event → larger stock holding → continue |
+
+The schema enforces no ordering or count constraint. Any sequence of compatible atomic trades is a legal wheel; the "strategy shape" is recovered by reading the trade log, not by schema rules. See §6 for the design rationale.
 
 ### 5.2 Iron condor
 - One Position with `strategy_type = iron_condor`, `primary_instrument_id` = the underlying stock.
@@ -344,6 +358,14 @@ Extension tables are 1:1 with Position (matched by `position_id`). They hold *sn
 
 ### `assign` / `exercise` / `expire` as atomic trades, not enum values
 **Decision:** Drop these from TradeAction; record them as their actual broker fills. **Why:** the broker reports atomic trades (option close at 0, stock fill at strike). Matching that representation eliminates a divergence between the journal's data and what the broker actually did. UI labels are a pure rendering concern, detected via `order_group_id` + zero-price patterns.
+
+### Why no Wheel state machine encoded in the schema
+
+A wheel Position can take many shapes: a single put that expires (no assignment); the classic put → assignment → calls → exit; or (as we discovered after the v0.2 draft) put → assignment → a *second* put at a lower strike to average down on cost basis → exit. Any sequence of compatible atomic trades is a legal wheel.
+
+Had we encoded "Wheel = exactly one sell-put + optional assignment + optional calls" into the schema (separate `sell_put_event` / `assignment_event` / `call_event` tables, or constraints on `Trade.action` sequence), the cost-basis-averaging flow would have required schema changes. Instead, the schema accepts any sequence of atomic `Trade` rows on a Position; strategy *meaning* is recovered at read time.
+
+This is the same principle as dropping `assign` / `exercise` / `expire` as enum values: keep the data model faithful to broker reality, and let interpretation live in the application layer.
 
 ### PnL: stored only after close
 - While open: computed from realized trade cash flows + mark-to-market on remaining legs.
@@ -397,6 +419,7 @@ All four are **purely additive** — adding any of them does not modify `User`, 
 
 ## Changelog
 
+- **v0.3 (2026-05-18)** — Wheel-only revisions in response to a real-trading scenario the v0.2 draft mis-described: §5.1 rewritten with lifecycle invariants and a "typical flows" table (now explicitly covers multi-put cost-basis averaging); §4.4 `capital_used` Wheel note updated to the cumulative monotonic-non-decreasing sum; §6 adds "Why no Wheel state machine encoded in the schema". **No schema change** — atomic-trade + generic-Position model already supports the scenario; the v0.2 prose was wrong.
 - **v0.2 (2026-05-18)** — Applied user review: TradePlan becomes an event stream; drop IcPositionMeta in favor of generic `Position.max_risk_at_open` and `max_reward_at_open`; User reshaped to FastAPI Users defaults with future auth tables deferred to §7; `Account.account_type` becomes `cash`/`margin`/`paper`; explained `numeric(p, s)` and chose defaults; quantity widened to `numeric(18, 8)` for fractional shares; `Position.pnl_realized` becomes a close-time snapshot; TradeAction shrunk to 6 values, `assign`/`exercise`/`expire` modeled as atomic trades with an explicit mapping table; added `Trade.order_group_id` for multi-leg / multi-fill grouping.
 - **v0.1 (2026-05-17)** — Initial draft.
 

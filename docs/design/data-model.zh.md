@@ -2,7 +2,7 @@
 
 **语言：** [English](./data-model.md) | 中文
 
-> 状态：**DRAFT v0.2**（2026-05-18）。`refactoring/rebuild` 分支重构的初版设计。本文档是 schema 讨论的 source of truth；写 migration 之前在这里迭代。文末有 changelog。
+> 状态：**DRAFT v0.3**（2026-05-18）。`refactoring/rebuild` 分支重构的初版设计。本文档是 schema 讨论的 source of truth；写 migration 之前在这里迭代。文末有 changelog。
 
 ## 1. 目的与设计原则
 
@@ -165,7 +165,7 @@ erDiagram
 **派生（不存储）：** `days_open`、`pnl_unrealized`、`pnl_total`、`roi_on_capital`、`annualized_return`、`result`（win/loss）。读取时从 `Trade` 行实时算出（status=open 的未实现部分需要市场行情）。
 
 **`capital_used` 在各策略下的含义：**
-- Wheel：`strike × 100 − premium`（目前手填；其实可从第一笔 sell-put trade 算出）。
+- Wheel：对 Position 内**每一次** `sto put` 事件，累加 `(strike × 100 × qty − premium)`。**单调不减**——put 过期作废或被 btc 平仓时**不会**回退 `capital_used`，因为这笔资金曾在风险敞口里；保守的 ROI 分母可避免年化收益被高估。MVP 阶段手填；以后 services 层会自动计算。
 - Iron condor / vertical spread / butterfly：等于 `max_risk_at_open`。
 - PMCC：LEAP 的买入成本。
 - Spot stock：总买入成本。
@@ -295,10 +295,24 @@ erDiagram
 ## 5. 各策略到模型的映射
 
 ### 5.1 Wheel
+
 - 一个 Position，`strategy_type = wheel`，`primary_instrument_id` = underlying 股票。
-- Trades：`sto`(put)，可选 `btc`(put)，被指派对（`btc` put @ 0 + `buy` 100 股），N 次 `sto`(call) 与 `btc`(call) 或过期行交错，最终要么是行权对（`btc` call @ 0 + `sell` 100 股），要么是主动 `sell` 股票。
-- WheelCycleMeta 携带 funding 信息。
-- 没有未平期权腿、净股票持仓为 0 时，status 翻为 `closed`。
+- `WheelCycleMeta` 携带 funding / loan / interest 信息。
+
+**生命周期不变式。** Wheel Position 处于 `open` 状态的条件：用户在同一 underlying 上至少持有以下之一——一条未平 short put 腿、一条未平 short call 腿、或非零的多头持股。当**三项同时为空**（无未平期权 *且* 净持股 = 0）时，状态翻为 `closed`。
+
+**允许的原子 trade**（同一 Position 上任意顺序、任意次数）：`sto put`、`btc put`、`sto call`、`btc call`、`buy` 股票、`sell` 股票——加上 §4.5.2 的合成事件编码（过期作废用 `btc` / `stc` @ 0；assignment 和 exercise 用共享 `order_group_id` 的配对行）。
+
+**模型支持的典型流程。**
+
+| 流程 | Trade 序列 |
+|---|---|
+| 收权利金，未被指派 | `sto put` → `btc put` *或* 0 价过期行 → 关闭 |
+| 经典单次指派的 wheel | `sto put` → assign 对 → N 次 `sto call`（穿插 `btc` / 过期） → exercise 对 *或* 主动 `sell` 股票 → 关闭 |
+| **均价摊低**（本次修订的触发场景） | `sto put` @ K₁ → assign 对 → 股价继续下跌 → 同一 Position 上 `sto put` @ K₂<K₁ → 要么 0 价过期（权利金保留，等效摊低成本基础），要么再 assign 对（更多股票，均价降低） → 继续 put / call 操作 → 最终全部出场 → 关闭 |
+| 同 strike/expiry 多张指派 | 同 strike/expiry 多行 `sto put` → 一次券商事件出多对 assign → 持股量更大 → 后续操作 |
+
+schema 不强制任何顺序或数量约束。任意合法原子 trade 序列都是合法的 wheel；"策略形状"通过读 trade log 还原，不在 schema 规则里。设计理由见 §6。
 
 ### 5.2 Iron condor
 - 一个 Position，`strategy_type = iron_condor`，`primary_instrument_id` = underlying 股票。
@@ -344,6 +358,14 @@ erDiagram
 
 ### `assign` / `exercise` / `expire` 按原子 trade 表达，不做枚举值
 **决定：** 从 TradeAction 删除；按真实券商 fill 记录。**理由：** 券商上报的就是原子 trade（期权 0 平仓、股票按 strike 成交）。匹配该表示形式消除了"journal 数据 vs 券商实际行为"的分歧。UI 标签纯粹是渲染层，靠 `order_group_id` + 0 价模式识别。
+
+### 为什么不把 Wheel 状态机烧进 schema
+
+一个 Wheel Position 可以有多种形状：单 put 过期（未指派）；经典的 put → 指派 → call → 出场；或 v0.2 之后才发现的 put → 指派 → 在更低 strike 上**再开一张 put** 摊低成本 → 出场。任意合法原子 trade 序列都是合法 wheel。
+
+如果当初把 "Wheel = 恰好一张 sell-put + 可选 assign + 可选 call" 烧进 schema（比如分开建 `sell_put_event` / `assignment_event` / `call_event` 表，或者对 `Trade.action` 序列做约束），那"均价摊低"流程就必须改 schema 才能记录。我们反过来——schema 接受 Position 上任意原子 `Trade` 序列；策略**含义**留给读取时还原。
+
+这和把 `assign` / `exercise` / `expire` 从枚举里去掉是同一条原则：让数据模型忠于券商真实，让解读发生在应用层。
 
 ### PnL：关仓后才存
 - 未平仓：从已实现 trade cash flow + 未平腿 mark-to-market 计算。
@@ -397,6 +419,7 @@ erDiagram
 
 ## Changelog
 
+- **v0.3（2026-05-18）** —— 针对真实交易场景做 Wheel 部分修订（v0.2 描述与现实不符）：§5.1 改写为"生命周期不变式 + 典型流程表"（现在显式覆盖多 put 摊低成本场景）；§4.4 `capital_used` Wheel 注释改为单调累加求和；§6 新增"为什么不把 Wheel 状态机烧进 schema"。**schema 文件不变**——原子 trade + 泛化 Position 模型本来就支持这个场景，是 v0.2 的文字描述错了。
 - **v0.2（2026-05-18）** —— 应用用户审阅：TradePlan 改为事件流；删除 IcPositionMeta，改为泛化的 `Position.max_risk_at_open` 和 `max_reward_at_open`；User 重塑为 FastAPI Users 默认字段，未来鉴权表延后到 §7；`Account.account_type` 改为 `cash`/`margin`/`paper`；解释 `numeric(p, s)` 并明确默认值；quantity 扩到 `numeric(18, 8)` 支持分数股；`Position.pnl_realized` 改为关仓 snapshot；TradeAction 收缩到 6 个，`assign`/`exercise`/`expire` 按原子 trade 建模并给出显式映射表；新增 `Trade.order_group_id` 用于多腿 / 多笔聚合。
 - **v0.1（2026-05-17）** —— 初版草案。
 
