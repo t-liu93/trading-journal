@@ -20,6 +20,12 @@ build/
 htmlcov/
 pip-wheel-metadata/
 
+# SQLite (local dev database)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
 # Node.js
 node_modules/
 dist/

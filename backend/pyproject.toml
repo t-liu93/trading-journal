@@ -1,0 +1,46 @@
+[project]
+name = "trading-journal"
+version = "0.1.0"
+description = "Self-hosted trading journal backend"
+readme = "README.md"
+authors = [
+    { name = "Tianyu Liu", email = "liu.tianyu93@hotmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "alembic>=1.18.4",
+    "fastapi-users[sqlalchemy]>=15.0.5",
+    "fastapi[standard]>=0.136.1",
+    "pydantic-settings>=2.14.1",
+    "sqlalchemy[asyncio]>=2.0.49",
+    "uvicorn[standard]>=0.47.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.8,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.1.0",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "ruff>=0.15.13",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
