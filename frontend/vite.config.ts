@@ -19,6 +19,14 @@ export default defineConfig({
     // Never bind 0.0.0.0 unless you intend to expose the dev server to the LAN.
     host: '127.0.0.1',
     port: 5173,
-    // Backend API proxy is added in F0.2.
+    // Reverse-proxy API paths to the FastAPI backend (default uvicorn dev port).
+    // The browser sees a single origin (localhost:5173), so the backend stays
+    // CORS-free in both dev and prod. See docs/design/frontend-implementation-plan.md §5.
+    proxy: {
+      '/auth': 'http://127.0.0.1:8000',
+      '/users': 'http://127.0.0.1:8000',
+      '/accounts': 'http://127.0.0.1:8000',
+      '/health': 'http://127.0.0.1:8000',
+    },
   },
 })
