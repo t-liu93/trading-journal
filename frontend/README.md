@@ -37,6 +37,34 @@ Then open `http://localhost:5173` in your laptop's browser.
 | `npm run dev` | Vite dev server with HMR. Binds `localhost:5173`. |
 | `npm run build` | Type-checks with `vue-tsc` then builds production bundle to `dist/`. |
 | `npm run preview` | Serves the production build locally for sanity-checking. |
+| `npm run codegen` | Regenerates `src/api/schema.d.ts` from the backend's `/openapi.json`. **Requires the backend to be running on `127.0.0.1:8000`.** Run after any backend schema change. |
+
+## API types — codegen workflow
+
+API request/response types are auto-generated from the backend's `/openapi.json`
+spec via `openapi-typescript`, and written to `src/api/schema.d.ts`.
+
+That file is **committed to git** so that fresh checkouts compile without
+needing the backend running first. But once you change the backend schema
+(new endpoint, new field, renamed field, enum value added), re-run:
+
+```bash
+# Backend must be up on :8000
+npm run codegen
+git diff src/api/schema.d.ts   # review what changed
+npm run build                  # confirm no downstream breakage
+```
+
+**Don't hand-edit `schema.d.ts`** — re-run codegen instead. Consume types from it like:
+
+```ts
+import type { components } from './schema'
+type Account = components['schemas']['AccountRead']
+```
+
+The hand-written file `src/api/types.ts` keeps only things that aren't 1:1 with
+an OpenAPI schema (the `ApiError` class, payload aliases for our login
+marshalling).
 
 ## Common pitfalls
 
@@ -85,3 +113,4 @@ so the backend can stay CORS-free in both dev and prod (see plan §5).
 - **vfonts** (Lato + Fira Code fonts that Naive UI is designed around)
 - **Pinia** (state management; wired in F0.2)
 - **Vue Router** (router; wired in F0.3)
+- **openapi-typescript** (build-time only; turns the backend's `/openapi.json` into TS types — see "API types" above)
