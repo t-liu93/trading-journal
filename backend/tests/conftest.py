@@ -1,11 +1,18 @@
 """Shared pytest fixtures.
 
 Per-test isolation via a fresh sqlite file under ``tmp_path``. Schema is built
-from ``Base.metadata.create_all`` (the migration round-trip is exercised
-separately in ``tests/test_migrations.py``), and the app's ``get_session``
-dependency is overridden to bind every request inside the test to that DB.
+by running ``alembic upgrade head`` (so endpoint tests exercise the real
+migrated schema, not ``Base.metadata.create_all`` — any drift between the
+migrations and the ORM is caught here, not just in ``tests/test_migrations.py``).
+Migrations run **once per session** into a template DB; each test copies that
+file, so we pay the alembic cost once rather than per test. The app's
+``get_session`` dependency is overridden to bind every request inside the test
+to its own copy.
 """
 
+import shutil
+import subprocess
+import sys
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -18,21 +25,50 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from trading_journal import models  # noqa: F401  (populates Base.metadata)
-from trading_journal.db import Base, get_session
+from trading_journal.db import get_session
 from trading_journal.main import app
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 CREDENTIALS_DEFAULT = {"email": "alice@example.com", "password": "correct horse battery"}
 CREDENTIALS_SECOND = {"email": "bob@example.com", "password": "another good passphrase"}
 
 
+@pytest.fixture(scope="session")
+def _migrated_template_db(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Build the schema once per session via ``alembic upgrade head``.
+
+    Alembic runs in a subprocess because ``env.py`` calls ``asyncio.run``,
+    which clashes with pytest-asyncio's running event loop if invoked
+    in-process (same reason ``tests/test_migrations.py`` shells out).
+    """
+    template = tmp_path_factory.mktemp("schema") / "template.db"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "-x",
+            f"url=sqlite+aiosqlite:///{template}",
+            "upgrade",
+            "head",
+        ],
+        cwd=BACKEND_DIR,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"alembic upgrade head failed\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
+    return template
+
+
 @pytest.fixture
-async def db_engine(tmp_path: Path) -> AsyncIterator[AsyncEngine]:
-    """Fresh per-test sqlite DB with the full schema pre-created."""
+async def db_engine(_migrated_template_db: Path, tmp_path: Path) -> AsyncIterator[AsyncEngine]:
+    """Fresh per-test sqlite DB — a copy of the session's migrated template."""
     db_path = tmp_path / "test.db"
+    shutil.copyfile(_migrated_template_db, db_path)
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     try:
         yield engine
     finally:

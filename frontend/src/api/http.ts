@@ -28,14 +28,28 @@ interface RequestOptions {
 
 function deriveMessage(detail: ApiErrorDetail, status: number): string {
   if (typeof detail === 'string' && detail.length > 0) return detail
+
   if (
     detail !== null &&
     typeof detail === 'object' &&
+    !Array.isArray(detail) &&
     'reason' in detail &&
     typeof (detail as { reason: unknown }).reason === 'string'
   ) {
     return (detail as { reason: string }).reason
   }
+
+  // FastAPI/Pydantic validation error: detail is an array of
+  // { loc: [...], msg: string, ... }. Show the first error, prefixed with the
+  // field path (loc[0] is "body"/"query" — drop it).
+  if (Array.isArray(detail)) {
+    const first = detail[0] as { msg?: unknown; loc?: unknown } | undefined
+    if (first && typeof first.msg === 'string') {
+      const loc = Array.isArray(first.loc) ? first.loc.slice(1).join('.') : ''
+      return loc ? `${loc}: ${first.msg}` : first.msg
+    }
+  }
+
   return `HTTP ${status}`
 }
 

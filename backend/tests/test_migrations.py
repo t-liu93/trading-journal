@@ -61,6 +61,43 @@ def _table_names(sync_url: str) -> set[str]:
         engine.dispose()
 
 
+def _columns(sync_url: str, table: str) -> dict[str, dict[str, object]]:
+    engine = create_engine(sync_url)
+    try:
+        return {c["name"]: c for c in inspect(engine).get_columns(table)}
+    finally:
+        engine.dispose()
+
+
+# Column sets verified against the ORM models in src/trading_journal/models/.
+# These three are the stable auth/account tables; Position/Trade columns are
+# still in flux so they're deliberately left out (see fix plan Fix 5).
+EXPECTED_COLUMNS = {
+    "accounts": {
+        "id",
+        "user_id",
+        "name",
+        "broker",
+        "account_type",
+        "base_currency",
+        "notes",
+        "created_at",
+        "archived_at",
+    },
+    "users": {
+        "id",
+        "email",
+        "hashed_password",
+        "is_active",
+        "is_superuser",
+        "is_verified",
+        "last_login_at",
+        "created_at",
+    },
+    "access_tokens": {"token", "user_id", "created_at"},
+}
+
+
 def test_alembic_upgrade_creates_all_tables(temp_db: tuple[str, str]) -> None:
     async_url, sync_url = temp_db
     _alembic("upgrade", "head", url=async_url)
@@ -69,6 +106,22 @@ def test_alembic_upgrade_creates_all_tables(temp_db: tuple[str, str]) -> None:
     assert "alembic_version" in tables
     missing = EXPECTED_DOMAIN_TABLES - tables
     assert not missing, f"missing tables after upgrade: {sorted(missing)}"
+
+
+def test_alembic_upgrade_creates_expected_columns(temp_db: tuple[str, str]) -> None:
+    """Migrations build the same columns the ORM declares for the stable tables.
+
+    The API-test fixture builds schema from ``Base.metadata.create_all`` (ORM),
+    not from migrations, so a migration that drifts from the ORM would slip
+    through. This pins the column set for the auth/account tables.
+    """
+    async_url, sync_url = temp_db
+    _alembic("upgrade", "head", url=async_url)
+
+    for table, expected in EXPECTED_COLUMNS.items():
+        actual = set(_columns(sync_url, table))
+        missing = expected - actual
+        assert not missing, f"{table}: missing columns after upgrade: {sorted(missing)}"
 
 
 def test_alembic_downgrade_roundtrip(temp_db: tuple[str, str]) -> None:

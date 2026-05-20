@@ -73,7 +73,9 @@ async def list_accounts(
     include_archived: bool = False,
 ) -> list[Account]:
     stmt = (
-        select(Account).where(Account.user_id == user.id).order_by(Account.created_at, Account.id)
+        select(Account)
+        .where(Account.user_id == user.id)
+        .order_by(Account.created_at.desc(), Account.id.desc())
     )
     if not include_archived:
         stmt = stmt.where(Account.archived_at.is_(None))

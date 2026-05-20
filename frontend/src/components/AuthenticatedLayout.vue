@@ -30,11 +30,11 @@ async function handleLogout(): Promise<void> {
   try {
     await auth.logout()
   } catch (err) {
-    // 401 = session already gone; silent. Anything else surfaces.
-    if (!(err instanceof ApiError && err.status === 401)) {
-      const msg = err instanceof ApiError ? err.message : 'Logout failed: unexpected error.'
-      message.error(msg)
-    }
+    // Non-401 failure (network / 5xx): the server session may still be valid,
+    // so we stay put and surface the error rather than navigating away.
+    const msg = err instanceof ApiError ? err.message : 'Logout failed: unexpected error.'
+    message.error(msg)
+    return
   }
   await router.push({ name: 'login' })
 }

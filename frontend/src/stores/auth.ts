@@ -51,8 +51,22 @@ export const useAuthStore = defineStore('auth', () => {
     await fetchMe()
   }
 
+  /**
+   * Clears the local session. A 401 means the server-side session is already
+   * gone — the local mirror must still be cleared, so we swallow it. Any other
+   * error (network / 5xx) leaves `user` intact and is re-thrown so the caller
+   * can surface it; the server session may still be valid in that case.
+   */
   async function logout(): Promise<void> {
-    await http.post('/api/auth/logout')
+    try {
+      await http.post('/api/auth/logout')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        user.value = null
+        return
+      }
+      throw err
+    }
     user.value = null
   }
 

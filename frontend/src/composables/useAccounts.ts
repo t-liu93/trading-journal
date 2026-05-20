@@ -18,15 +18,24 @@ export function useAccounts() {
   const error = ref<string | null>(null)
   const includeArchived = ref(false)
 
+  // Monotonic id so only the most recent refresh writes to state. Without this,
+  // rapid "Show archived" toggling can let an older response overwrite a newer
+  // one (last-resolved-wins instead of last-requested-wins).
+  let refreshSeq = 0
+
   async function refresh(): Promise<void> {
+    const seq = ++refreshSeq
     loading.value = true
     error.value = null
     try {
-      accounts.value = await accountsApi.list(includeArchived.value)
+      const result = await accountsApi.list(includeArchived.value)
+      if (seq === refreshSeq) accounts.value = result
     } catch (err) {
-      error.value = err instanceof ApiError ? err.message : 'Failed to load accounts.'
+      if (seq === refreshSeq) {
+        error.value = err instanceof ApiError ? err.message : 'Failed to load accounts.'
+      }
     } finally {
-      loading.value = false
+      if (seq === refreshSeq) loading.value = false
     }
   }
 
