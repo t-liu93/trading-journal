@@ -129,16 +129,16 @@ npm run dev
 **Goal.** Console-driven evidence that the browser can reach the backend through the Vite proxy and that auth state survives in Pinia.
 
 **Tasks.**
-1. **Vite proxy** in `vite.config.ts`:
+1. **Vite proxy** in `vite.config.ts`. The backend mounts every route under the
+   `/api` prefix (see backend `main.py`), so a single rule suffices and the
+   SPA's own routes (`/accounts`, `/login`, …) never collide with API paths:
    ```ts
    server: {
      port: 5173,
-     host: '127.0.0.1',
+     host: 'localhost',
+     strictPort: true,
      proxy: {
-       '/auth':     'http://127.0.0.1:8000',
-       '/users':    'http://127.0.0.1:8000',
-       '/accounts': 'http://127.0.0.1:8000',
-       '/health':   'http://127.0.0.1:8000',
+       '/api': 'http://127.0.0.1:8000',
      }
    }
    ```

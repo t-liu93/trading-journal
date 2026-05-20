@@ -19,12 +19,12 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => user.value !== null)
 
   /**
-   * Refresh `user` from `/users/me`. A 401 is the normal "no active session"
-   * response and is silently swallowed; any other error is re-thrown.
+   * Refresh `user` from `/api/users/me`. A 401 is the normal "no active
+   * session" response and is silently swallowed; any other error is re-thrown.
    */
   async function fetchMe(): Promise<void> {
     try {
-      user.value = (await http.get('/users/me')) as User
+      user.value = (await http.get('/api/users/me')) as User
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         user.value = null
@@ -35,16 +35,16 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function register(payload: RegisterPayload): Promise<void> {
-    await http.post('/auth/register', payload)
+    await http.post('/api/auth/register', payload)
   }
 
   /**
-   * `/auth/login` uses `OAuth2PasswordRequestForm` — the wire format is
+   * `/api/auth/login` uses `OAuth2PasswordRequestForm` — the wire format is
    * form-urlencoded with `username` (= email) and `password`. We expose the
    * caller-friendly `{email, password}` shape and marshal here.
    */
   async function login(payload: LoginPayload): Promise<void> {
-    await http.postForm('/auth/login', {
+    await http.postForm('/api/auth/login', {
       username: payload.email,
       password: payload.password,
     })
@@ -52,18 +52,29 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<void> {
-    await http.post('/auth/logout')
+    await http.post('/api/auth/logout')
     user.value = null
   }
 
   /**
    * Called once at app bootstrap (before `router.isReady()`) to seed `user`
    * from any existing cookie. Subsequent calls are no-ops.
+   *
+   * MUST NOT throw: it's awaited in `main.ts` *before* `app.mount()`, so an
+   * unhandled rejection here means the app never mounts (blank page). If the
+   * backend is unreachable at bootstrap (502 / network error), we degrade to
+   * "no session" — the app still mounts and lands on /login; the user re-auths
+   * once the backend is back. A 401 is already handled inside `fetchMe`.
    */
   async function init(): Promise<void> {
     if (initialized.value) return
-    await fetchMe()
-    initialized.value = true
+    try {
+      await fetchMe()
+    } catch {
+      user.value = null
+    } finally {
+      initialized.value = true
+    }
   }
 
   return {

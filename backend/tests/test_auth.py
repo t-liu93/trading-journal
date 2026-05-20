@@ -4,7 +4,7 @@ from httpx import AsyncClient
 
 
 async def test_register_success(client: AsyncClient, credentials: dict[str, str]) -> None:
-    response = await client.post("/auth/register", json=credentials)
+    response = await client.post("/api/auth/register", json=credentials)
     assert response.status_code == 201, response.text
     data = response.json()
     assert data["email"] == credentials["email"]
@@ -20,14 +20,14 @@ async def test_register_success(client: AsyncClient, credentials: dict[str, str]
 async def test_register_duplicate_email_rejected(
     client: AsyncClient, registered_user: dict[str, str]
 ) -> None:
-    response = await client.post("/auth/register", json=registered_user)
+    response = await client.post("/api/auth/register", json=registered_user)
     assert response.status_code == 400
     assert response.json()["detail"] == "REGISTER_USER_ALREADY_EXISTS"
 
 
 async def test_register_invalid_email_422(client: AsyncClient) -> None:
     response = await client.post(
-        "/auth/register",
+        "/api/auth/register",
         json={"email": "not-an-email", "password": "correct horse battery"},
     )
     assert response.status_code == 422
@@ -35,7 +35,7 @@ async def test_register_invalid_email_422(client: AsyncClient) -> None:
 
 async def test_register_password_too_short_400(client: AsyncClient) -> None:
     response = await client.post(
-        "/auth/register",
+        "/api/auth/register",
         json={"email": "alice@example.com", "password": "short"},
     )
     assert response.status_code == 400
@@ -48,7 +48,7 @@ async def test_login_success_sets_cookie(
     client: AsyncClient, registered_user: dict[str, str]
 ) -> None:
     response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         data={
             "username": registered_user["email"],
             "password": registered_user["password"],
@@ -65,7 +65,7 @@ async def test_login_wrong_password_400(
     client: AsyncClient, registered_user: dict[str, str]
 ) -> None:
     response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         data={"username": registered_user["email"], "password": "wrong-password"},
     )
     assert response.status_code == 400
@@ -74,7 +74,7 @@ async def test_login_wrong_password_400(
 
 async def test_login_unknown_user_400(client: AsyncClient) -> None:
     response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         data={"username": "ghost@example.com", "password": "does not matter"},
     )
     assert response.status_code == 400
@@ -82,14 +82,14 @@ async def test_login_unknown_user_400(client: AsyncClient) -> None:
 
 
 async def test_me_without_cookie_401(client: AsyncClient) -> None:
-    response = await client.get("/users/me")
+    response = await client.get("/api/users/me")
     assert response.status_code == 401
 
 
 async def test_me_with_cookie_200(
     auth_client: AsyncClient, registered_user: dict[str, str]
 ) -> None:
-    response = await auth_client.get("/users/me")
+    response = await auth_client.get("/api/users/me")
     assert response.status_code == 200
     data = response.json()
     assert data["email"] == registered_user["email"]
@@ -102,11 +102,11 @@ async def test_logout_invalidates_session(
     auth_client: AsyncClient,
 ) -> None:
     # Sanity: session is alive
-    me_before = await auth_client.get("/users/me")
+    me_before = await auth_client.get("/api/users/me")
     assert me_before.status_code == 200
 
-    logout = await auth_client.post("/auth/logout")
+    logout = await auth_client.post("/api/auth/logout")
     assert logout.status_code == 204
 
-    me_after = await auth_client.get("/users/me")
+    me_after = await auth_client.get("/api/users/me")
     assert me_after.status_code == 401

@@ -100,9 +100,16 @@ pkill -f vite
 
 ## How API calls reach the backend
 
-Starting in F0.2, `vite.config.ts` proxies `/auth/*`, `/users/*`, `/accounts/*`, `/health`
-to the backend on `127.0.0.1:8000`. The browser sees a single origin (`localhost:5173`),
-so the backend can stay CORS-free in both dev and prod (see plan §5).
+Every backend route lives under the `/api` prefix (`/api/auth/login`,
+`/api/users/me`, `/api/accounts`, …). `vite.config.ts` proxies the single
+`/api` namespace to `127.0.0.1:8000`. The browser sees a single origin
+(`localhost:5173`), so the backend can stay CORS-free in both dev and prod.
+
+The prefix exists to keep API paths from colliding with the SPA's own client-side
+routes. Without it, an SPA route like `/accounts` and a backend route at
+`/accounts` shadow each other — a full page reload on `/accounts` ends up
+proxied to the backend and rendered as JSON in the browser. Hoisting the API
+under `/api` makes the two namespaces disjoint.
 
 ## Stack
 

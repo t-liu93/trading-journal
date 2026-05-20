@@ -27,14 +27,17 @@ export default defineConfig({
     // 5176, …) — but the SSH tunnel and any browser bookmarks still point at
     // 5173, so the user ends up looking at stale code without realising it.
     strictPort: true,
-    // Reverse-proxy API paths to the FastAPI backend (default uvicorn dev port).
-    // The browser sees a single origin (localhost:5173), so the backend stays
-    // CORS-free in both dev and prod. See docs/design/frontend-implementation-plan.md §5.
+    // Reverse-proxy the entire `/api` namespace to the FastAPI backend (default
+    // uvicorn dev port). The browser sees a single origin (localhost:5173), so
+    // the backend stays CORS-free in both dev and prod.
+    //
+    // Why a single `/api` prefix rather than per-resource rules: SPA routes
+    // (e.g. `/accounts`) used to collide with backend routes of the same
+    // name — a full page refresh on `/accounts` was being proxied to the
+    // backend and rendered as JSON in the browser. Hoisting all API routes
+    // under `/api` keeps the SPA namespace separate.
     proxy: {
-      '/auth': 'http://127.0.0.1:8000',
-      '/users': 'http://127.0.0.1:8000',
-      '/accounts': 'http://127.0.0.1:8000',
-      '/health': 'http://127.0.0.1:8000',
+      '/api': 'http://127.0.0.1:8000',
     },
   },
 })

@@ -91,7 +91,7 @@ def second_credentials() -> dict[str, str]:
 
 @pytest.fixture
 async def registered_user(client: AsyncClient, credentials: dict[str, str]) -> dict[str, str]:
-    response = await client.post("/auth/register", json=credentials)
+    response = await client.post("/api/auth/register", json=credentials)
     assert response.status_code == 201, response.text
     return credentials
 
@@ -100,7 +100,7 @@ async def registered_user(client: AsyncClient, credentials: dict[str, str]) -> d
 async def auth_client(client: AsyncClient, registered_user: dict[str, str]) -> AsyncClient:
     """``client`` after a successful login. Subsequent calls carry the session cookie."""
     response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         data={
             "username": registered_user["email"],
             "password": registered_user["password"],
@@ -120,10 +120,10 @@ async def second_user_client(
     Used to verify cross-user isolation: Bob must not see or modify Alice's data.
     """
     async with _new_async_client() as ac:
-        register = await ac.post("/auth/register", json=second_credentials)
+        register = await ac.post("/api/auth/register", json=second_credentials)
         assert register.status_code == 201, register.text
         login = await ac.post(
-            "/auth/login",
+            "/api/auth/login",
             data={
                 "username": second_credentials["email"],
                 "password": second_credentials["password"],

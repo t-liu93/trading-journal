@@ -129,16 +129,16 @@ npm run dev
 **目标。** 在 console 里验证浏览器能通过 Vite proxy 打到后端，且 auth 状态在 Pinia 里活着。
 
 **任务。**
-1. **Vite proxy** 配进 `vite.config.ts`：
+1. **Vite proxy** 配进 `vite.config.ts`。后端所有 route 都挂在 `/api` 前缀下
+   （见后端 `main.py`），所以一条规则就够了，SPA 自己的 route（`/accounts`、
+   `/login` 等）跟 API path 不会撞：
    ```ts
    server: {
      port: 5173,
-     host: '127.0.0.1',
+     host: 'localhost',
+     strictPort: true,
      proxy: {
-       '/auth':     'http://127.0.0.1:8000',
-       '/users':    'http://127.0.0.1:8000',
-       '/accounts': 'http://127.0.0.1:8000',
-       '/health':   'http://127.0.0.1:8000',
+       '/api': 'http://127.0.0.1:8000',
      }
    }
    ```

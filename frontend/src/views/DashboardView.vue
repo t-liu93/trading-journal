@@ -1,48 +1,84 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-import { useMessage } from 'naive-ui'
+import { onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
+import AuthenticatedLayout from '../components/AuthenticatedLayout.vue'
+import { useAccounts } from '../composables/useAccounts'
 import { useAuthStore } from '../stores/auth'
-import { ApiError } from '../api/types'
 
-const router = useRouter()
 const auth = useAuthStore()
-const message = useMessage()
+const { accounts, loading, error, refresh } = useAccounts()
 
-async function handleLogout(): Promise<void> {
-  try {
-    await auth.logout()
-  } catch (err) {
-    // A 401 means the session was already gone — silent. Anything else surfaces.
-    if (!(err instanceof ApiError && err.status === 401)) {
-      const msg = err instanceof ApiError ? err.message : 'Logout failed: unexpected error.'
-      message.error(msg)
-    }
-  }
-  await router.push({ name: 'login' })
-}
+onMounted(refresh)
 </script>
 
 <template>
-  <n-layout style="min-height: 100vh;">
-    <n-layout-header bordered style="padding: 0 1.5rem;">
-      <n-space justify="space-between" align="center" style="height: 64px;">
-        <n-h2 style="margin: 0; font-size: 18px;">Trading Journal</n-h2>
-        <n-space align="center" :size="12">
-          <n-text v-if="auth.user" depth="2">{{ auth.user.email }}</n-text>
-          <n-button size="small" @click="handleLogout">Logout</n-button>
-        </n-space>
-      </n-space>
-    </n-layout-header>
+  <AuthenticatedLayout>
+    <n-h1 style="margin-top: 0;">
+      Welcome<span v-if="auth.user">, {{ auth.user.email }}</span>
+    </n-h1>
 
-    <n-layout-content content-style="padding: 2rem; max-width: 960px; margin: 0 auto;">
-      <n-h1>Welcome{{ auth.user ? `, ${auth.user.email}` : '' }}</n-h1>
-      <n-card title="Accounts (coming in Phase F1)">
-        <n-text depth="3">
-          Account list, create / edit / archive will live here in the next phase.
-          The backend endpoints are already in place (see
-          <n-text code>GET /accounts</n-text>); the UI just isn't wired yet.
-        </n-text>
-      </n-card>
-    </n-layout-content>
-  </n-layout>
+    <n-grid :cols="3" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
+      <n-grid-item span="3 m:1">
+        <n-card title="Your accounts" hoverable>
+          <n-skeleton v-if="loading" text :repeat="2" />
+          <template v-else>
+            <p class="metric" :class="{ 'metric-error': error }">
+              {{ error ? '?' : accounts.length }}
+            </p>
+            <n-text v-if="error" depth="3" style="font-size: 0.85rem; color: var(--n-color-error, #d03050);">
+              Couldn't load accounts: {{ error }}
+            </n-text>
+            <n-text v-else depth="3" style="font-size: 0.85rem;">active accounts</n-text>
+            <div style="margin-top: 0.75rem;">
+              <RouterLink :to="{ name: 'accounts' }" class="card-link">
+                Manage accounts →
+              </RouterLink>
+            </div>
+          </template>
+        </n-card>
+      </n-grid-item>
+
+      <n-grid-item span="3 m:1">
+        <n-card title="Positions">
+          <n-text depth="3">Coming in Phase F2.</n-text>
+          <div style="margin-top: 0.75rem;">
+            <n-text depth="3" style="font-size: 0.85rem;">
+              Wheel, iron condor, PMCC, spot — all your in-flight strategies will live here.
+            </n-text>
+          </div>
+        </n-card>
+      </n-grid-item>
+
+      <n-grid-item span="3 m:1">
+        <n-card title="Trades">
+          <n-text depth="3">Coming in Phase F3.</n-text>
+          <div style="margin-top: 0.75rem;">
+            <n-text depth="3" style="font-size: 0.85rem;">
+              Atomic broker fills, multi-leg entries, assignment / exercise pairs.
+            </n-text>
+          </div>
+        </n-card>
+      </n-grid-item>
+    </n-grid>
+  </AuthenticatedLayout>
 </template>
+
+<style scoped>
+.metric {
+  font-size: 2.25rem;
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.1;
+}
+.metric-error {
+  color: var(--n-color-error, #d03050);
+}
+.card-link {
+  color: var(--n-color-primary, #18a058);
+  text-decoration: none;
+  font-weight: 500;
+}
+.card-link:hover {
+  text-decoration: underline;
+}
+</style>

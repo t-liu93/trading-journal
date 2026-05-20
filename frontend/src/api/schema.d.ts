@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/health": {
+    "/api/health": {
         parameters: {
             query?: never;
             header?: never;
@@ -12,7 +12,7 @@ export interface paths {
             cookie?: never;
         };
         /** Health */
-        get: operations["health_health_get"];
+        get: operations["health_api_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -21,7 +21,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/register": {
+    "/api/auth/register": {
         parameters: {
             query?: never;
             header?: never;
@@ -31,14 +31,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Register:Register */
-        post: operations["register_register_auth_register_post"];
+        post: operations["register_register_api_auth_register_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/auth/login": {
+    "/api/auth/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -48,14 +48,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Auth:Cookie.Login */
-        post: operations["auth_cookie_login_auth_login_post"];
+        post: operations["auth_cookie_login_api_auth_login_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/auth/logout": {
+    "/api/auth/logout": {
         parameters: {
             query?: never;
             header?: never;
@@ -65,14 +65,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Auth:Cookie.Logout */
-        post: operations["auth_cookie_logout_auth_logout_post"];
+        post: operations["auth_cookie_logout_api_auth_logout_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/users/me": {
+    "/api/users/me": {
         parameters: {
             query?: never;
             header?: never;
@@ -80,17 +80,17 @@ export interface paths {
             cookie?: never;
         };
         /** Users:Current User */
-        get: operations["users_current_user_users_me_get"];
+        get: operations["users_current_user_api_users_me_get"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
         /** Users:Patch Current User */
-        patch: operations["users_patch_current_user_users_me_patch"];
+        patch: operations["users_patch_current_user_api_users_me_patch"];
         trace?: never;
     };
-    "/users/{id}": {
+    "/api/users/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -98,18 +98,18 @@ export interface paths {
             cookie?: never;
         };
         /** Users:User */
-        get: operations["users_user_users__id__get"];
+        get: operations["users_user_api_users__id__get"];
         put?: never;
         post?: never;
         /** Users:Delete User */
-        delete: operations["users_delete_user_users__id__delete"];
+        delete: operations["users_delete_user_api_users__id__delete"];
         options?: never;
         head?: never;
         /** Users:Patch User */
-        patch: operations["users_patch_user_users__id__patch"];
+        patch: operations["users_patch_user_api_users__id__patch"];
         trace?: never;
     };
-    "/accounts": {
+    "/api/accounts": {
         parameters: {
             query?: never;
             header?: never;
@@ -117,17 +117,17 @@ export interface paths {
             cookie?: never;
         };
         /** List Accounts */
-        get: operations["list_accounts_accounts_get"];
+        get: operations["list_accounts_api_accounts_get"];
         put?: never;
         /** Create Account */
-        post: operations["create_account_accounts_post"];
+        post: operations["create_account_api_accounts_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/accounts/{account_id}": {
+    "/api/accounts/{account_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -135,15 +135,15 @@ export interface paths {
             cookie?: never;
         };
         /** Get Account */
-        get: operations["get_account_accounts__account_id__get"];
+        get: operations["get_account_api_accounts__account_id__get"];
         put?: never;
         post?: never;
         /** Soft Delete Account */
-        delete: operations["soft_delete_account_accounts__account_id__delete"];
+        delete: operations["soft_delete_account_api_accounts__account_id__delete"];
         options?: never;
         head?: never;
         /** Update Account */
-        patch: operations["update_account_accounts__account_id__patch"];
+        patch: operations["update_account_api_accounts__account_id__patch"];
         trace?: never;
     };
 }
@@ -208,8 +208,8 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
-        /** Body_auth_cookie_login_auth_login_post */
-        Body_auth_cookie_login_auth_login_post: {
+        /** Body_auth_cookie_login_api_auth_login_post */
+        Body_auth_cookie_login_api_auth_login_post: {
             /** Grant Type */
             grant_type?: string | null;
             /** Username */
@@ -339,7 +339,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_health_get: {
+    health_api_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -361,7 +361,7 @@ export interface operations {
             };
         };
     };
-    register_register_auth_register_post: {
+    register_register_api_auth_register_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -403,7 +403,7 @@ export interface operations {
             };
         };
     };
-    auth_cookie_login_auth_login_post: {
+    auth_cookie_login_api_auth_login_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -412,7 +412,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/x-www-form-urlencoded": components["schemas"]["Body_auth_cookie_login_auth_login_post"];
+                "application/x-www-form-urlencoded": components["schemas"]["Body_auth_cookie_login_api_auth_login_post"];
             };
         };
         responses: {
@@ -452,7 +452,7 @@ export interface operations {
             };
         };
     };
-    auth_cookie_logout_auth_logout_post: {
+    auth_cookie_logout_api_auth_logout_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -486,7 +486,7 @@ export interface operations {
             };
         };
     };
-    users_current_user_users_me_get: {
+    users_current_user_api_users_me_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -513,7 +513,7 @@ export interface operations {
             };
         };
     };
-    users_patch_current_user_users_me_patch: {
+    users_patch_current_user_api_users_me_patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -562,7 +562,7 @@ export interface operations {
             };
         };
     };
-    users_user_users__id__get: {
+    users_user_api_users__id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -614,7 +614,7 @@ export interface operations {
             };
         };
     };
-    users_delete_user_users__id__delete: {
+    users_delete_user_api_users__id__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -664,7 +664,7 @@ export interface operations {
             };
         };
     };
-    users_patch_user_users__id__patch: {
+    users_patch_user_api_users__id__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -729,7 +729,7 @@ export interface operations {
             };
         };
     };
-    list_accounts_accounts_get: {
+    list_accounts_api_accounts_get: {
         parameters: {
             query?: {
                 include_archived?: boolean;
@@ -760,7 +760,7 @@ export interface operations {
             };
         };
     };
-    create_account_accounts_post: {
+    create_account_api_accounts_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -793,7 +793,7 @@ export interface operations {
             };
         };
     };
-    get_account_accounts__account_id__get: {
+    get_account_api_accounts__account_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -824,7 +824,7 @@ export interface operations {
             };
         };
     };
-    soft_delete_account_accounts__account_id__delete: {
+    soft_delete_account_api_accounts__account_id__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -853,7 +853,7 @@ export interface operations {
             };
         };
     };
-    update_account_accounts__account_id__patch: {
+    update_account_api_accounts__account_id__patch: {
         parameters: {
             query?: never;
             header?: never;

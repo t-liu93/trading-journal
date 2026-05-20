@@ -16,7 +16,7 @@ VALID_BODY = {
 
 async def _create(client: AsyncClient, **overrides: object) -> dict[str, object]:
     body = {**VALID_BODY, **overrides}
-    response = await client.post("/accounts", json=body)
+    response = await client.post("/api/accounts", json=body)
     assert response.status_code == 201, response.text
     data: dict[str, object] = response.json()
     return data
@@ -28,7 +28,7 @@ async def _create(client: AsyncClient, **overrides: object) -> dict[str, object]
 
 
 async def test_create_account(auth_client: AsyncClient) -> None:
-    response = await auth_client.post("/accounts", json=VALID_BODY)
+    response = await auth_client.post("/api/accounts", json=VALID_BODY)
     assert response.status_code == 201, response.text
     data = response.json()
     assert data["name"] == VALID_BODY["name"]
@@ -43,7 +43,7 @@ async def test_create_account(auth_client: AsyncClient) -> None:
 
 
 async def test_list_accounts_empty(auth_client: AsyncClient) -> None:
-    response = await auth_client.get("/accounts")
+    response = await auth_client.get("/api/accounts")
     assert response.status_code == 200
     assert response.json() == []
 
@@ -51,7 +51,7 @@ async def test_list_accounts_empty(auth_client: AsyncClient) -> None:
 async def test_list_accounts_after_create(auth_client: AsyncClient) -> None:
     await _create(auth_client, name="A")
     await _create(auth_client, name="B")
-    response = await auth_client.get("/accounts")
+    response = await auth_client.get("/api/accounts")
     assert response.status_code == 200
     # Order across rapid inserts isn't guaranteed (SQLite created_at is
     # second-precision); presence is what matters here.
@@ -61,14 +61,14 @@ async def test_list_accounts_after_create(auth_client: AsyncClient) -> None:
 
 async def test_get_account_by_id(auth_client: AsyncClient) -> None:
     created = await _create(auth_client)
-    response = await auth_client.get(f"/accounts/{created['id']}")
+    response = await auth_client.get(f"/api/accounts/{created['id']}")
     assert response.status_code == 200
     assert response.json()["id"] == created["id"]
 
 
 async def test_update_account_partial(auth_client: AsyncClient) -> None:
     created = await _create(auth_client)
-    response = await auth_client.patch(f"/accounts/{created['id']}", json={"notes": "edited"})
+    response = await auth_client.patch(f"/api/accounts/{created['id']}", json={"notes": "edited"})
     assert response.status_code == 200
     body = response.json()
     assert body["notes"] == "edited"
@@ -79,19 +79,19 @@ async def test_update_account_partial(auth_client: AsyncClient) -> None:
 
 async def test_soft_delete_excludes_from_default_list(auth_client: AsyncClient) -> None:
     created = await _create(auth_client)
-    delete = await auth_client.delete(f"/accounts/{created['id']}")
+    delete = await auth_client.delete(f"/api/accounts/{created['id']}")
     assert delete.status_code == 204
 
-    listed = await auth_client.get("/accounts")
+    listed = await auth_client.get("/api/accounts")
     assert listed.status_code == 200
     assert listed.json() == []
 
 
 async def test_include_archived_param(auth_client: AsyncClient) -> None:
     created = await _create(auth_client)
-    await auth_client.delete(f"/accounts/{created['id']}")
+    await auth_client.delete(f"/api/accounts/{created['id']}")
 
-    listed = await auth_client.get("/accounts", params={"include_archived": "true"})
+    listed = await auth_client.get("/api/accounts", params={"include_archived": "true"})
     assert listed.status_code == 200
     body = listed.json()
     assert len(body) == 1
@@ -107,11 +107,11 @@ async def test_include_archived_param(auth_client: AsyncClient) -> None:
 @pytest.mark.parametrize(
     ("method", "path"),
     [
-        ("POST", "/accounts"),
-        ("GET", "/accounts"),
-        ("GET", "/accounts/00000000-0000-0000-0000-000000000000"),
-        ("PATCH", "/accounts/00000000-0000-0000-0000-000000000000"),
-        ("DELETE", "/accounts/00000000-0000-0000-0000-000000000000"),
+        ("POST", "/api/accounts"),
+        ("GET", "/api/accounts"),
+        ("GET", "/api/accounts/00000000-0000-0000-0000-000000000000"),
+        ("PATCH", "/api/accounts/00000000-0000-0000-0000-000000000000"),
+        ("DELETE", "/api/accounts/00000000-0000-0000-0000-000000000000"),
     ],
 )
 async def test_requires_auth(client: AsyncClient, method: str, path: str) -> None:
@@ -127,13 +127,15 @@ async def test_requires_auth(client: AsyncClient, method: str, path: str) -> Non
 
 
 async def test_create_rejects_invalid_account_type(auth_client: AsyncClient) -> None:
-    response = await auth_client.post("/accounts", json={**VALID_BODY, "account_type": "checking"})
+    response = await auth_client.post(
+        "/api/accounts", json={**VALID_BODY, "account_type": "checking"}
+    )
     assert response.status_code == 422
 
 
 async def test_create_rejects_missing_required_fields(auth_client: AsyncClient) -> None:
     response = await auth_client.post(
-        "/accounts",
+        "/api/accounts",
         json={"name": "X"},  # missing broker, account_type, base_currency
     )
     assert response.status_code == 422
@@ -141,18 +143,20 @@ async def test_create_rejects_missing_required_fields(auth_client: AsyncClient) 
 
 @pytest.mark.parametrize("bad", ["usd", "US", "USDD", "U$D", "123"])
 async def test_create_rejects_invalid_currency_code(auth_client: AsyncClient, bad: str) -> None:
-    response = await auth_client.post("/accounts", json={**VALID_BODY, "base_currency": bad})
+    response = await auth_client.post("/api/accounts", json={**VALID_BODY, "base_currency": bad})
     assert response.status_code == 422
 
 
 async def test_create_rejects_unknown_field(auth_client: AsyncClient) -> None:
-    response = await auth_client.post("/accounts", json={**VALID_BODY, "totally_unknown": "x"})
+    response = await auth_client.post("/api/accounts", json={**VALID_BODY, "totally_unknown": "x"})
     assert response.status_code == 422
 
 
 async def test_update_rejects_unknown_field(auth_client: AsyncClient) -> None:
     created = await _create(auth_client)
-    response = await auth_client.patch(f"/accounts/{created['id']}", json={"totally_unknown": "x"})
+    response = await auth_client.patch(
+        f"/api/accounts/{created['id']}", json={"totally_unknown": "x"}
+    )
     assert response.status_code == 422
 
 
@@ -167,8 +171,8 @@ async def test_list_only_returns_own_accounts(
     await _create(auth_client, name="alice-acct")
     await _create(second_user_client, name="bob-acct")
 
-    alice_list = (await auth_client.get("/accounts")).json()
-    bob_list = (await second_user_client.get("/accounts")).json()
+    alice_list = (await auth_client.get("/api/accounts")).json()
+    bob_list = (await second_user_client.get("/api/accounts")).json()
 
     assert {a["name"] for a in alice_list} == {"alice-acct"}
     assert {a["name"] for a in bob_list} == {"bob-acct"}
@@ -178,7 +182,7 @@ async def test_get_other_users_account_returns_404(
     auth_client: AsyncClient, second_user_client: AsyncClient
 ) -> None:
     alice_acct = await _create(auth_client)
-    response = await second_user_client.get(f"/accounts/{alice_acct['id']}")
+    response = await second_user_client.get(f"/api/accounts/{alice_acct['id']}")
     assert response.status_code == 404
 
 
@@ -187,12 +191,12 @@ async def test_update_other_users_account_returns_404(
 ) -> None:
     alice_acct = await _create(auth_client)
     response = await second_user_client.patch(
-        f"/accounts/{alice_acct['id']}", json={"notes": "hax"}
+        f"/api/accounts/{alice_acct['id']}", json={"notes": "hax"}
     )
     assert response.status_code == 404
 
     # Verify Alice's row was not touched.
-    refetched = (await auth_client.get(f"/accounts/{alice_acct['id']}")).json()
+    refetched = (await auth_client.get(f"/api/accounts/{alice_acct['id']}")).json()
     assert refetched["notes"] == alice_acct["notes"]
 
 
@@ -200,11 +204,11 @@ async def test_delete_other_users_account_returns_404(
     auth_client: AsyncClient, second_user_client: AsyncClient
 ) -> None:
     alice_acct = await _create(auth_client)
-    response = await second_user_client.delete(f"/accounts/{alice_acct['id']}")
+    response = await second_user_client.delete(f"/api/accounts/{alice_acct['id']}")
     assert response.status_code == 404
 
     # Alice's account is still visible to her.
-    refetched = await auth_client.get(f"/accounts/{alice_acct['id']}")
+    refetched = await auth_client.get(f"/api/accounts/{alice_acct['id']}")
     assert refetched.status_code == 200
     assert refetched.json()["archived_at"] is None
 
@@ -215,29 +219,29 @@ async def test_delete_other_users_account_returns_404(
 
 
 async def test_get_nonexistent_returns_404(auth_client: AsyncClient) -> None:
-    response = await auth_client.get("/accounts/00000000-0000-0000-0000-000000000000")
+    response = await auth_client.get("/api/accounts/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
 
 
 async def test_get_archived_by_default_returns_404(auth_client: AsyncClient) -> None:
     created = await _create(auth_client)
-    await auth_client.delete(f"/accounts/{created['id']}")
-    response = await auth_client.get(f"/accounts/{created['id']}")
+    await auth_client.delete(f"/api/accounts/{created['id']}")
+    response = await auth_client.get(f"/api/accounts/{created['id']}")
     assert response.status_code == 404
 
 
 async def test_delete_already_archived_returns_404(auth_client: AsyncClient) -> None:
     created = await _create(auth_client)
-    first = await auth_client.delete(f"/accounts/{created['id']}")
+    first = await auth_client.delete(f"/api/accounts/{created['id']}")
     assert first.status_code == 204
-    second = await auth_client.delete(f"/accounts/{created['id']}")
+    second = await auth_client.delete(f"/api/accounts/{created['id']}")
     assert second.status_code == 404
 
 
 async def test_user_id_in_body_is_ignored(auth_client: AsyncClient) -> None:
     """Schema forbids user_id; even if a malicious client sends it, 422."""
     response = await auth_client.post(
-        "/accounts",
+        "/api/accounts",
         json={**VALID_BODY, "user_id": str(uuid.uuid4())},
     )
     assert response.status_code == 422

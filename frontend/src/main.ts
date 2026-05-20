@@ -17,7 +17,7 @@ app.use(createPinia())
 // (it calls `router.push(location)` inside install — see vue-router source). The
 // `beforeEach` guard runs as part of that initial navigation. So the guard
 // would otherwise observe `user === null` and bounce a logged-in reload to
-// `/login`, EVEN IF `/users/me` would have succeeded — the request just
+// `/login`, EVEN IF `/api/users/me` would have succeeded — the request just
 // completes after the guard has already decided.
 //
 // We therefore seed the auth store from the existing cookie BEFORE installing
