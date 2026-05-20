@@ -30,6 +30,10 @@ pip-wheel-metadata/
 node_modules/
 dist/
 
+# Local review notes
+review-notes/
+review notes/
+
 # Editor / OS
 .DS_Store
 .idea/
