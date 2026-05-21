@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from 'vue'
-import { type DataTableColumns, NButton, NSpace, NTag, NText } from 'naive-ui'
+import { type DataTableColumns, NButton, NSpace, NTag, NText, useDialog, useMessage } from 'naive-ui'
 import AuthenticatedLayout from '../components/AuthenticatedLayout.vue'
 import AccountFormModal from '../components/AccountFormModal.vue'
 import { useAccounts } from '../composables/useAccounts'
-import type { Account } from '../api/accounts'
+import { type Account, accountsApi } from '../api/accounts'
+import { ApiError } from '../api/types'
 
 const { accounts, loading, error, includeArchived, refresh } = useAccounts()
+const dialog = useDialog()
+const message = useMessage()
 
 onMounted(refresh)
 
@@ -39,6 +42,25 @@ function openEdit(row: Account) {
 
 function onSaved() {
   void refresh()
+}
+
+function handleArchive(row: Account) {
+  dialog.warning({
+    title: 'Archive this account?',
+    content: `"${row.name}" will be hidden from your default list. You can recover it any time by toggling "Show archived".`,
+    positiveText: 'Archive',
+    negativeText: 'Cancel',
+    onPositiveClick: async () => {
+      try {
+        await accountsApi.remove(row.id)
+        message.success(`Archived "${row.name}"`)
+        await refresh()
+      } catch (err) {
+        if (err instanceof ApiError) message.error(err.message)
+        else throw err
+      }
+    },
+  })
 }
 
 const columns = computed<DataTableColumns<Account>>(() => [
@@ -76,7 +98,7 @@ const columns = computed<DataTableColumns<Account>>(() => [
     key: 'actions',
     render: (row) => {
       if (isArchived(row)) {
-        return h(NText, { depth: 3 }, () => '(F1.5)')
+        return h(NText, { depth: 3 }, () => '(archived)')
       }
       return h(
         NSpace,
@@ -87,7 +109,11 @@ const columns = computed<DataTableColumns<Account>>(() => [
             { text: true, type: 'primary', size: 'small', onClick: () => openEdit(row) },
             () => 'Edit',
           ),
-          h(NText, { depth: 3 }, () => 'Archive'),
+          h(
+            NButton,
+            { text: true, type: 'error', size: 'small', onClick: () => handleArchive(row) },
+            () => 'Archive',
+          ),
         ],
       )
     },
