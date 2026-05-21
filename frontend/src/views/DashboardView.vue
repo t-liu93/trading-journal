@@ -39,7 +39,7 @@ onMounted(refresh)
       </n-grid-item>
 
       <n-grid-item span="3 m:1">
-        <n-card title="Positions">
+        <n-card title="Positions (Phase F2)" class="card-disabled">
           <n-text depth="3">Coming in Phase F2.</n-text>
           <div style="margin-top: 0.75rem;">
             <n-text depth="3" style="font-size: 0.85rem;">
@@ -50,7 +50,7 @@ onMounted(refresh)
       </n-grid-item>
 
       <n-grid-item span="3 m:1">
-        <n-card title="Trades">
+        <n-card title="Trades (Phase F3)" class="card-disabled">
           <n-text depth="3">Coming in Phase F3.</n-text>
           <div style="margin-top: 0.75rem;">
             <n-text depth="3" style="font-size: 0.85rem;">
@@ -80,5 +80,11 @@ onMounted(refresh)
 }
 .card-link:hover {
   text-decoration: underline;
+}
+.card-disabled {
+  opacity: 0.55;
+}
+.card-disabled :deep(.n-card-header__main) {
+  color: var(--n-text-color-3, rgba(0, 0, 0, 0.38));
 }
 </style>
