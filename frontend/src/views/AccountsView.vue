@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, h, onMounted } from 'vue'
-import { type DataTableColumns, NTag, NText } from 'naive-ui'
+import { computed, h, onMounted, ref } from 'vue'
+import { type DataTableColumns, NButton, NSpace, NTag, NText } from 'naive-ui'
 import AuthenticatedLayout from '../components/AuthenticatedLayout.vue'
+import AccountFormModal from '../components/AccountFormModal.vue'
 import { useAccounts } from '../composables/useAccounts'
 import type { Account } from '../api/accounts'
 
@@ -18,6 +19,27 @@ const dateFmt = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   day: '2-digit',
 })
+
+// --- Modal state ---
+const modalShow = ref(false)
+const modalMode = ref<'create' | 'edit'>('create')
+const editingAccount = ref<Account | undefined>(undefined)
+
+function openCreate() {
+  modalMode.value = 'create'
+  editingAccount.value = undefined
+  modalShow.value = true
+}
+
+function openEdit(row: Account) {
+  modalMode.value = 'edit'
+  editingAccount.value = row
+  modalShow.value = true
+}
+
+function onSaved() {
+  void refresh()
+}
 
 const columns = computed<DataTableColumns<Account>>(() => [
   {
@@ -52,7 +74,23 @@ const columns = computed<DataTableColumns<Account>>(() => [
   {
     title: 'Actions',
     key: 'actions',
-    render: () => h(NText, { depth: 3 }, () => '(F1.4 / F1.5)'),
+    render: (row) => {
+      if (isArchived(row)) {
+        return h(NText, { depth: 3 }, () => '(F1.5)')
+      }
+      return h(
+        NSpace,
+        { size: 'small' },
+        () => [
+          h(
+            NButton,
+            { text: true, type: 'primary', size: 'small', onClick: () => openEdit(row) },
+            () => 'Edit',
+          ),
+          h(NText, { depth: 3 }, () => 'Archive'),
+        ],
+      )
+    },
   },
 ])
 
@@ -71,7 +109,7 @@ function rowClassName(row: Account): string {
           <n-switch v-model:value="includeArchived" size="small" />
           <n-text depth="2">Show archived</n-text>
         </div>
-        <n-button type="primary" disabled>+ New account</n-button>
+        <n-button type="primary" @click="openCreate">+ New account</n-button>
       </div>
     </header>
 
@@ -88,11 +126,18 @@ function rowClassName(row: Account): string {
       <template #empty>
         <n-empty description="No accounts yet.">
           <template #extra>
-            <n-button type="primary" disabled>+ Create your first account</n-button>
+            <n-button type="primary" @click="openCreate">+ Create your first account</n-button>
           </template>
         </n-empty>
       </template>
     </n-data-table>
+
+    <AccountFormModal
+      v-model:show="modalShow"
+      :mode="modalMode"
+      :initial="editingAccount"
+      @saved="onSaved"
+    />
   </AuthenticatedLayout>
 </template>
 
