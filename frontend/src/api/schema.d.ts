@@ -146,6 +146,41 @@ export interface paths {
         patch: operations["update_account_api_accounts__account_id__patch"];
         trace?: never;
     };
+    "/api/instruments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Instruments */
+        get: operations["list_instruments_api_instruments_get"];
+        put?: never;
+        /** Create Instrument */
+        post: operations["create_instrument_api_instruments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/instruments/{instrument_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Instrument */
+        get: operations["get_instrument_api_instruments__instrument_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -239,10 +274,138 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** ForexCreate */
+        ForexCreate: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "forex";
+            /** Symbol */
+            symbol: string;
+            /** Base Currency */
+            base_currency: string;
+            /** Quote Currency */
+            quote_currency: string;
+            /** Pip Size */
+            pip_size: number | string;
+            /** Contract Size */
+            contract_size?: number | string | null;
+        };
+        /** ForexPairRead */
+        ForexPairRead: {
+            /** Base Currency */
+            base_currency: string;
+            /** Quote Currency */
+            quote_currency: string;
+            /** Pip Size */
+            pip_size: string;
+            /** Contract Size */
+            contract_size: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * InstrumentKind
+         * @enum {string}
+         */
+        InstrumentKind: "stock" | "option" | "forex";
+        /** InstrumentRead */
+        InstrumentRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["InstrumentKind"];
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string | null;
+            /** Currency */
+            currency: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            option?: components["schemas"]["OptionContractRead"] | null;
+            forex?: components["schemas"]["ForexPairRead"] | null;
+        };
+        /**
+         * OptType
+         * @enum {string}
+         */
+        OptType: "call" | "put";
+        /** OptionContractRead */
+        OptionContractRead: {
+            /**
+             * Underlying Id
+             * Format: uuid
+             */
+            underlying_id: string;
+            opt_type: components["schemas"]["OptType"];
+            /** Strike */
+            strike: string;
+            /**
+             * Expiry
+             * Format: date
+             */
+            expiry: string;
+            /** Multiplier */
+            multiplier: number;
+            style: components["schemas"]["OptionStyle"];
+        };
+        /** OptionCreate */
+        OptionCreate: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "option";
+            /** Underlying Symbol */
+            underlying_symbol: string;
+            /** Underlying Exchange */
+            underlying_exchange?: string | null;
+            /** Currency */
+            currency: string;
+            opt_type: components["schemas"]["OptType"];
+            /** Strike */
+            strike: number | string;
+            /**
+             * Expiry
+             * Format: date
+             */
+            expiry: string;
+            /**
+             * Multiplier
+             * @default 100
+             */
+            multiplier: number;
+            /** @default american */
+            style: components["schemas"]["OptionStyle"];
+        };
+        /**
+         * OptionStyle
+         * @enum {string}
+         */
+        OptionStyle: "american" | "european";
+        /** StockCreate */
+        StockCreate: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "stock";
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange?: string | null;
+            /** Currency */
+            currency: string;
         };
         /** UserCreate */
         UserCreate: {
@@ -875,6 +1038,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_instruments_api_instruments_get: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["InstrumentKind"] | null;
+                q?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstrumentRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_instrument_api_instruments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockCreate"] | components["schemas"]["OptionCreate"] | components["schemas"]["ForexCreate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstrumentRead"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstrumentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_instrument_api_instruments__instrument_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instrument_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstrumentRead"];
                 };
             };
             /** @description Validation Error */
