@@ -14,7 +14,7 @@ stay at the root (FastAPI manages them; consumers expect them there).
 
 from fastapi import APIRouter, FastAPI
 
-from trading_journal.api import accounts, health, instruments
+from trading_journal.api import accounts, health, instruments, strategy_configs
 from trading_journal.auth.backend import auth_backend, fastapi_users
 from trading_journal.schemas.user import UserCreate, UserRead, UserUpdate
 
@@ -52,6 +52,8 @@ def create_app() -> FastAPI:
     api.include_router(accounts.router)
     # Domain: Instrument dictionary under /api/instruments.
     api.include_router(instruments.router)
+    # Domain: per-user StrategyConfig under /api/strategy-configs.
+    api.include_router(strategy_configs.router)
 
     app.include_router(api)
     return app

@@ -181,6 +181,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategy-configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Strategy Configs */
+        get: operations["list_strategy_configs_api_strategy_configs_get"];
+        put?: never;
+        /** Create Strategy Config */
+        post: operations["create_strategy_config_api_strategy_configs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategy-configs/{strategy_type}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Strategy Config */
+        get: operations["get_strategy_config_api_strategy_configs__strategy_type__get"];
+        put?: never;
+        post?: never;
+        /** Delete Strategy Config */
+        delete: operations["delete_strategy_config_api_strategy_configs__strategy_type__delete"];
+        options?: never;
+        head?: never;
+        /** Update Strategy Config */
+        patch: operations["update_strategy_config_api_strategy_configs__strategy_type__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -407,6 +444,55 @@ export interface components {
             /** Currency */
             currency: string;
         };
+        /** StrategyConfigCreate */
+        StrategyConfigCreate: {
+            strategy_type: components["schemas"]["StrategyType"];
+            /** Max Exposure */
+            max_exposure?: number | string | null;
+            /** Exposure Currency */
+            exposure_currency: string;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** StrategyConfigRead */
+        StrategyConfigRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            strategy_type: components["schemas"]["StrategyType"];
+            /** Max Exposure */
+            max_exposure: string | null;
+            /** Exposure Currency */
+            exposure_currency: string;
+            /** Notes */
+            notes: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** StrategyConfigUpdate */
+        StrategyConfigUpdate: {
+            /** Max Exposure */
+            max_exposure?: number | string | null;
+            /** Exposure Currency */
+            exposure_currency?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /**
+         * StrategyType
+         * @enum {string}
+         */
+        StrategyType: "wheel" | "iron_condor" | "pmcc" | "spot_stock" | "spot_forex";
         /** UserCreate */
         UserCreate: {
             /**
@@ -1144,6 +1230,163 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InstrumentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_strategy_configs_api_strategy_configs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyConfigRead"][];
+                };
+            };
+        };
+    };
+    create_strategy_config_api_strategy_configs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyConfigCreate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyConfigRead"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyConfigRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strategy_config_api_strategy_configs__strategy_type__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_type: components["schemas"]["StrategyType"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyConfigRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_strategy_config_api_strategy_configs__strategy_type__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_type: components["schemas"]["StrategyType"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_strategy_config_api_strategy_configs__strategy_type__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_type: components["schemas"]["StrategyType"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyConfigRead"];
                 };
             };
             /** @description Validation Error */
