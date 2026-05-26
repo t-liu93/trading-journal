@@ -56,3 +56,6 @@ class Trade(Base):
     order_group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     broker_trade_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )

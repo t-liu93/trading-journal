@@ -255,6 +255,43 @@ export interface paths {
         patch: operations["update_position_api_positions__position_id__patch"];
         trace?: never;
     };
+    "/api/trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Trades */
+        get: operations["list_trades_api_trades_get"];
+        put?: never;
+        /** Create Trades */
+        post: operations["create_trades_api_trades_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trades/{trade_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Trade */
+        get: operations["get_trade_api_trades__trade_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Trade */
+        delete: operations["delete_trade_api_trades__trade_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Trade */
+        patch: operations["update_trade_api_trades__trade_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -332,7 +369,7 @@ export interface components {
              * Scope
              * @default
              */
-            scope: string;
+            scope?: string;
             /** Client Id */
             client_id?: string | null;
             /**
@@ -458,9 +495,9 @@ export interface components {
              * Multiplier
              * @default 100
              */
-            multiplier: number;
+            multiplier?: number;
             /** @default american */
-            style: components["schemas"]["OptionStyle"];
+            style?: components["schemas"]["OptionStyle"];
         };
         /**
          * OptionStyle
@@ -630,6 +667,103 @@ export interface components {
          * @enum {string}
          */
         StrategyType: "wheel" | "iron_condor" | "pmcc" | "spot_stock" | "spot_forex";
+        /**
+         * TradeAction
+         * @enum {string}
+         */
+        TradeAction: "buy" | "sell" | "bto" | "sto" | "btc" | "stc";
+        /** TradeCreate */
+        TradeCreate: {
+            /**
+             * Position Id
+             * Format: uuid
+             */
+            position_id: string;
+            /**
+             * Instrument Id
+             * Format: uuid
+             */
+            instrument_id: string;
+            action: components["schemas"]["TradeAction"];
+            /** Quantity */
+            quantity: number | string;
+            /** Price */
+            price: number | string;
+            /**
+             * Commission
+             * @default 0
+             */
+            commission?: number | string;
+            /**
+             * Fees
+             * @default 0
+             */
+            fees?: number | string;
+            /**
+             * Executed At
+             * Format: date-time
+             */
+            executed_at: string;
+            /** Order Group Id */
+            order_group_id?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** TradeRead */
+        TradeRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Position Id
+             * Format: uuid
+             */
+            position_id: string;
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /**
+             * Instrument Id
+             * Format: uuid
+             */
+            instrument_id: string;
+            action: components["schemas"]["TradeAction"];
+            /** Quantity */
+            quantity: string;
+            /** Price */
+            price: string;
+            /** Commission */
+            commission: string;
+            /** Fees */
+            fees: string;
+            /** Cash Flow */
+            cash_flow: string;
+            /**
+             * Executed At
+             * Format: date-time
+             */
+            executed_at: string;
+            /** Order Group Id */
+            order_group_id: string | null;
+            /** Broker Trade Id */
+            broker_trade_id: string | null;
+            /** Notes */
+            notes: string | null;
+            /** Archived At */
+            archived_at: string | null;
+        };
+        /**
+         * TradeUpdate
+         * @description Only ``notes`` may change. To amend numeric data, archive + re-POST.
+         */
+        TradeUpdate: {
+            /** Notes */
+            notes?: string | null;
+        };
         /** UserCreate */
         UserCreate: {
             /**
@@ -643,17 +777,17 @@ export interface components {
              * Is Active
              * @default true
              */
-            is_active: boolean | null;
+            is_active?: boolean | null;
             /**
              * Is Superuser
              * @default false
              */
-            is_superuser: boolean | null;
+            is_superuser?: boolean | null;
             /**
              * Is Verified
              * @default false
              */
-            is_verified: boolean | null;
+            is_verified?: boolean | null;
         };
         /** UserRead */
         UserRead: {
@@ -671,17 +805,17 @@ export interface components {
              * Is Active
              * @default true
              */
-            is_active: boolean;
+            is_active?: boolean;
             /**
              * Is Superuser
              * @default false
              */
-            is_superuser: boolean;
+            is_superuser?: boolean;
             /**
              * Is Verified
              * @default false
              */
-            is_verified: boolean;
+            is_verified?: boolean;
             /** Last Login At */
             last_login_at?: string | null;
             /**
@@ -1684,6 +1818,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PositionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_trades_api_trades_get: {
+        parameters: {
+            query?: {
+                position_id?: string | null;
+                order_group_id?: string | null;
+                include_archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_trades_api_trades_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TradeCreate"] | components["schemas"]["TradeCreate"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_trade_api_trades__trade_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trade_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_trade_api_trades__trade_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trade_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_trade_api_trades__trade_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trade_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TradeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeRead"];
                 };
             };
             /** @description Validation Error */

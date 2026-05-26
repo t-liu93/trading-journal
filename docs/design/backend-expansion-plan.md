@@ -265,7 +265,9 @@ phases share the same vocabulary; the per-phase detail plans implement them.
    - `action ↔ instrument.kind` consistency enforced (422 on mismatch).
    - `quantity > 0` always; integer required for option trades; fractional
      allowed for stock / forex.
-   - `price > 0` always (per-unit fill price; sign lives in cash flow).
+   - `price >= 0` always (per-unit fill price; sign lives entirely in cash_flow
+     via the action sign — see data-model §4.5.2 for worthless-expire / assignment
+     flows that legitimately use price=0).
    - `commission >= 0`, `fees >= 0` (unsigned costs).
    - **`cash_flow` is server-computed** from
      `sign(action) × price × quantity × multiplier − commission − fees`;
@@ -320,6 +322,10 @@ phases share the same vocabulary; the per-phase detail plans implement them.
 
 ## Changelog
 
+- **v0.4 (2026-05-26)** — P9 Trade CRUD shipped. §6④ amended:
+  `price > 0` → `price >= 0` to honor data-model §4.5.2 worthless-expire /
+  assignment flows that legitimately use `price=0`. Backend test suite: 272
+  passing.
 - **v0.3 (2026-05-26)** — Decisions ②③④ all settled.
   ② Position is **Trade-led**: `opened_at` supplied at create-time as the first
   Trade's `executed_at`; `status`/`closed_at`/`capital_used` manual; `pnl_realized`

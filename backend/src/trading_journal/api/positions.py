@@ -212,7 +212,10 @@ async def delete_position(
     if trade_count is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="position has attached trades; delete the trades first or archive via PATCH",
+            detail=(
+                "position has attached trades and cannot be deleted; "
+                "trades are retained for audit even if archived"
+            ),
         )
 
     await session.delete(position)

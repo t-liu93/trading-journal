@@ -233,7 +233,7 @@ Instrument（无 user_id；全局 ───┘
 4. **Trade 校验深度**（曾卡 P9）。**2026-05-26 已定：**
    - `action ↔ instrument.kind` 一致（不一致 422）。
    - `quantity > 0` 始终成立；期权必须正整数；股票 / 外汇允许小数。
-   - `price > 0` 始终成立（每单位成交价；符号交给 cash flow）。
+   - `price >= 0` 始终成立（每单位成交价；符号完全由 `cash_flow` 中的 `action` 符号决定——参见 data-model §4.5.2 中合法使用 price=0 的 worthless-expire / assignment 场景）。
    - `commission >= 0`、`fees >= 0`（无符号成本）。
    - **`cash_flow` 服务端计算**：
      `sign(action) × price × quantity × multiplier − commission − fees`；
@@ -280,6 +280,9 @@ Instrument（无 user_id；全局 ───┘
 
 ## 变更日志
 
+- **v0.4（2026-05-26）** — P9 Trade CRUD 交付。§6④ 修正：
+  `price > 0` → `price >= 0`，以兼容 data-model §4.5.2 中合法使用
+  `price=0` 的 worthless-expire / assignment 场景。后端测试套件：272 条全绿。
 - **v0.3（2026-05-26）** — 决策②③④全部 settle。
   ② Position 改为 **Trade-led**：`opened_at` 在创建时由客户端传入（= 首笔 Trade
   的 `executed_at`）；`status`/`closed_at`/`capital_used` 手填；PATCH `open→closed`
