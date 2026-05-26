@@ -99,9 +99,61 @@ async function request(
   return parsed
 }
 
+/** Low-level request that returns both the Response and the parsed body. */
+async function requestWithResponse(
+  method: Method,
+  path: string,
+  options: RequestOptions = {},
+): Promise<{ response: Response; parsed: unknown }> {
+  const headers: Record<string, string> = { ...(options.headers ?? {}) }
+  let body: BodyInit | undefined
+
+  if (options.body !== undefined && options.body !== null) {
+    if (options.bodyType === 'form') {
+      const params = new URLSearchParams()
+      for (const [k, v] of Object.entries(options.body as Record<string, string>)) {
+        params.set(k, v)
+      }
+      body = params
+      headers['Content-Type'] = 'application/x-www-form-urlencoded'
+    } else {
+      body = JSON.stringify(options.body)
+      headers['Content-Type'] = 'application/json'
+    }
+  }
+
+  const response = await fetch(path, { method, headers, body, credentials: 'include' })
+
+  if (response.status === 204) return { response, parsed: null }
+
+  const contentType = response.headers.get('content-type') ?? ''
+  const isJson = contentType.includes('application/json')
+  const parsed: unknown = isJson ? await response.json() : await response.text()
+
+  if (!response.ok) {
+    const detail: ApiErrorDetail =
+      isJson && parsed !== null && typeof parsed === 'object' && 'detail' in parsed
+        ? (parsed as { detail: ApiErrorDetail }).detail
+        : parsed
+    throw new ApiError(response.status, detail, deriveMessage(detail, response.status))
+  }
+
+  return { response, parsed }
+}
+
+export interface ResponseWithStatus<T = unknown> {
+  data: T
+  status: number
+}
+
 export const http = {
   get: (path: string) => request('GET', path),
   post: (path: string, body?: unknown) => request('POST', path, { body }),
+  /** Like `post`, but returns both the parsed body and the HTTP status code. */
+  postWithStatus: async <T = unknown>(path: string, body?: unknown): Promise<ResponseWithStatus<T>> => {
+    const { response, parsed } = await requestWithResponse('POST', path, { body })
+    return { data: parsed as T, status: response.status }
+  },
   postForm: (path: string, body: Record<string, string>) =>
     request('POST', path, { body, bodyType: 'form' }),
   patch: (path: string, body?: unknown) => request('PATCH', path, { body }),

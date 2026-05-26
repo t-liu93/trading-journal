@@ -22,6 +22,14 @@ const menuOptions = computed<MenuOption[]>(() => [
     key: 'accounts',
     label: () => h(RouterLink, { to: { name: 'accounts' } }, () => 'Accounts'),
   },
+  {
+    key: 'instruments',
+    label: () => h(RouterLink, { to: { name: 'instruments' } }, () => 'Instruments'),
+  },
+  {
+    key: 'settings',
+    label: () => h(RouterLink, { to: { name: 'settings-strategies' } }, () => 'Settings'),
+  },
 ])
 
 const activeKey = computed(() => (route.name as string | undefined) ?? '')
