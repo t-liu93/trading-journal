@@ -54,13 +54,13 @@ UI iteration than micro-stepped F2.x slices would.
 
 ## 3. Backend ↔ Frontend mapping
 
-| F-phase | Backend gate | UI deliverable |
-|---|---|---|
-| **F2** | [P6](./backend-expansion-plan.md#p6--instrument-base--extensions) ✅ + [P7](./backend-expansion-plan.md#p7--strategyconfig) | `InstrumentPicker` component + `/instruments` browse page + `/settings/strategies` page |
-| **F3** | [P8](./backend-expansion-plan.md#p8--position) + [P10](./backend-expansion-plan.md#p10--strategy-meta-extensions) + [P11](./backend-expansion-plan.md#p11--tradeplan-event-stream) | Position list + create/edit + detail page (with strategy-meta tabs and Plan tab) |
-| **F4** | [P9](./backend-expansion-plan.md#p9--trade) | Trade entry (multi-leg `order_group_id` UX) + Position-detail trade log |
-| **F5** | [P12](./backend-expansion-plan.md#p12--derived-read-layer) | Dashboards: per-currency PnL + open/closed positions + charts |
-| **F6** | [Backend Phase 5](./mvp-implementation-plan.md#phase-5--docker-single-container-deployment) | Single-container Docker production build wiring (FastAPI serves `frontend/dist`) |
+| F-phase | Backend gate | UI deliverable | Status |
+|---|---|---|---|
+| **F2** | [P6](./backend-expansion-plan.md#p6--instrument-base--extensions) ✅ + [P7](./backend-expansion-plan.md#p7--strategyconfig) ✅ | `InstrumentPicker` component + `/instruments` browse page + `/settings/strategies` page | ✅ done (2026-05-26) |
+| **F3** | [P8](./backend-expansion-plan.md#p8--position) + [P10](./backend-expansion-plan.md#p10--strategy-meta-extensions) + [P11](./backend-expansion-plan.md#p11--tradeplan-event-stream) | Position list + create/edit + detail page (with strategy-meta tabs and Plan tab) | ⏳ next (after P8/P10/P11) |
+| **F4** | [P9](./backend-expansion-plan.md#p9--trade) | Trade entry (multi-leg `order_group_id` UX) + Position-detail trade log | — |
+| **F5** | [P12](./backend-expansion-plan.md#p12--derived-read-layer) | Dashboards: per-currency PnL + open/closed positions + charts | — |
+| **F6** | [Backend Phase 5](./mvp-implementation-plan.md#phase-5--docker-single-container-deployment) | Single-container Docker production build wiring (FastAPI serves `frontend/dist`) | — |
 
 [P6.x — external instrument validation](./backend-expansion-plan.md#p6x--external-instrument-validation-first-external-api-integration-optional-non-blocking)
 is **deferred and non-blocking**; it slips into F2 as a small enhancement (typeahead
@@ -74,7 +74,7 @@ Execution cadence: `P6→P7→F2 / P8→P10→P11→F3 / P9→F4 / P12→F5 / Ph
 Each F-phase is detailed in its own `frontend-implementation-plan-fN.md` doc. The
 sections below are scope summaries.
 
-### F2 — Instrument & StrategyConfig frontend
+### F2 — Instrument & StrategyConfig frontend ✅ done (2026-05-26)
 
 **Detailed plan:** [frontend-implementation-plan-f2.md](./frontend-implementation-plan-f2.md)
 (+ [中文](./frontend-implementation-plan-f2.zh.md)).
@@ -228,6 +228,14 @@ Each item is **OPEN** pending sign-off. My leanings noted.
 
 ## Changelog
 
+- **v0.3 (2026-05-26)** — Mark F2 as done. Delivered `InstrumentPicker` (typeahead,
+  reusable for F3/F4), `InstrumentForm` (stock/option/forex tabs with get-or-create
+  UX), `/instruments` browse page, `/settings/strategies` page (PATCH-aware,
+  hard-delete-aware), and nav entries in `AuthenticatedLayout`. Decision ①
+  (option picker UX) deferred — `InstrumentPicker` ships as select-only typeahead;
+  the two-step underlying + contract attributes flow lands inside F3's Position
+  create when `allowCreate` is added. Frontend: `vue-tsc` clean + `vite build` clean
+  + `schema.d.ts` fresh against live OpenAPI.
 - **v0.2 (2026-05-24)** — Re-scoped F-phases to coarser, "one-shot agent-executable"
   granularity. F2 collapses former F2.1/F2.2 (Instrument + StrategyConfig); former
   F2.3/F2.4/F2.5 (Position + meta + Plan) become F3; former F3 (Trade entry) becomes

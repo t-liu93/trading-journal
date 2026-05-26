@@ -64,20 +64,21 @@ Instrument (NO user_id; global ─┘
 
 ## 4. Phase roadmap
 
-| Phase | Entity / scope | Risk | Unblocks |
-|---|---|---|---|
-| **P6** | `Instrument` + `OptionContract` + `ForexPair` (create / get / list / search; update/delete restricted — see §6①) | ⭐⭐⭐ | everything; frontend instrument picker |
-| **P7** | `StrategyConfig` CRUD (`(user_id, strategy_type)` unique, upsert-style) | ⭐ | strategy settings UI |
-| **P8** | `Position` CRUD (owner-scoped; MVP manual fields — see §6②) | ⭐⭐ | frontend F2 |
-| **P9** | `Trade` CRUD (atomic fills under a Position; `order_group_id` multi-leg) | ⭐⭐⭐ | frontend F3 |
-| **P10** | `WheelCycleMeta` + `PmccCycleMeta` (1:1 Position extensions) | ⭐ | strategy-specific views |
-| **P11** | `TradePlan` event-stream (append revision / list / current) | ⭐⭐ | forex plan UI |
-| **P12** | Derived read layer (services): `days_open`, `pnl_realized` on close, `pnl_total`, `roi`; unrealized deferred | ⭐⭐⭐ | dashboards / charts (F4) |
+| Phase | Entity / scope | Risk | Unblocks | Status |
+|---|---|---|---|---|
+| **P6** | `Instrument` + `OptionContract` + `ForexPair` (create / get / list / search; update/delete restricted — see §6①) | ⭐⭐⭐ | everything; frontend instrument picker | ✅ done (2026-05-24) |
+| **P7** | `StrategyConfig` CRUD (`(user_id, strategy_type)` unique, upsert-style) | ⭐ | strategy settings UI | ✅ done (2026-05-24) |
+| **P8** | `Position` CRUD (owner-scoped; Trade-led — see §6②; manual `status`/`closed_at`/`capital_used`) | ⭐⭐ | frontend F3 | ⏳ next |
+| **P9** | `Trade` CRUD (atomic fills; `order_group_id` multi-leg; server computes `cash_flow`; action↔kind validated — see §6④) | ⭐⭐⭐ | frontend F4 | — |
+| **P10** | `WheelCycleMeta` + `PmccCycleMeta` (1:1 Position extensions) | ⭐ | strategy-specific views | — |
+| **P11** | `TradePlan` event-stream (append revision / list / current) | ⭐⭐ | forex plan UI | — |
+| **P12** | Derived read layer (services): `days_open`, `pnl_realized` on close, `pnl_total`, `roi`; unrealized deferred | ⭐⭐⭐ | dashboards / charts (F5) | — |
+| **PX** | External Integrations Tracer Bullet (stocks via OpenFIGI lookup, forex local seed, DB cache table, feature-flagged, graceful degrade) — see §4.PX | ⭐⭐ | typeahead + autofill in F2/F3; lays the reusable integrations seam | — (opportunistic) |
 
 > Phase numbers continue the `mvp-implementation-plan` lineage (Phase 0–5). Phase 5
 > (Docker) is still pending and slots in flexibly — see §5.
 
-### P6 — Instrument (base + extensions)
+### P6 — Instrument (base + extensions) ✅ done (2026-05-24)
 
 - **Goal.** A typed API to create and look up tradeable instruments across all three
   MVP kinds (`stock`, `option`, `forex`), with the class-table-inheritance pattern
@@ -98,36 +99,14 @@ Instrument (NO user_id; global ─┘
     invariant cannot be violated; payload carries `base_currency`/`quote_currency`/`pip_size`.
   - **Validation = format only** in the core (currency `^[A-Z]{3}$`, non-empty symbol,
     `strike>0`, valid `expiry`, enum membership). Factual validation (is this a real ticker)
-    is the P6.x layer.
-- **Open decisions.** Ownership & dedup confirmed (§6①). Remaining: see P6.x sub-decisions.
+    is the **PX** layer (see §4.PX).
+- **Settled decisions.** Ownership & dedup (§6①). External factual validation
+  / enrichment was promoted out of P6 into the standalone **PX — External
+  Integrations Tracer Bullet** (§4.PX) on 2026-05-26 — it has no phase
+  blocking it and blocks no phase, so it can land any time without disturbing
+  the P8 → P12 sequence.
 
-### P6.x — External instrument validation (first external-API integration; optional, non-blocking)
-
-- **Why it matters beyond Instrument.** This is the project's *first* external-API
-  integration, done deliberately as a tracer bullet to establish two reusable seams that
-  every later integration (broker fills, FX rates, market quotes) needs:
-  - **① external API access** — a backend `integrations/` module, API key in `config.py`
-    (`.env`), an async `httpx` client, timeout + graceful degrade; **never raises into the
-    write path**.
-  - **② external data storage/cache** — a persistence pattern so repeated lookups don't
-    re-hit the provider. *Lean:* a DB-backed cache table `(provider, query) → payload +
-    fetched_at` with TTL (note data-model §6 dislikes JSON-heavy columns → prefer
-    structured columns or accept a small cache-only JSON column). Alternative: in-memory TTL.
-- **User-facing behavior.** Backend `GET /instruments/lookup?q=` powers frontend typeahead
-  + "did you mean AAPL?" hints and create-time enrichment (autofill exchange/currency).
-  Manual entry + format validation stays the always-works core; the lookup layer degrades
-  silently when the provider is unconfigured/down/empty. **Never blocks** instrument creation.
-- **Scope by kind.** Stocks: validate/enrich via a free provider. Forex: seed a local list
-  of common pairs (no external call). Options: skip external; validate only the underlying
-  via the stock path.
-- **Open sub-decisions.** (a) provider — *lean OpenFIGI* (free, official-ish, symbol→
-  security/exchange mapping); Finnhub / FMP as alternatives. (b) cache mechanism — DB table
-  vs in-memory TTL (*lean DB table*, to actually establish the storage seam). (c) feature
-  flag + key in `config.py`/`.env`.
-- **Sequencing.** Ships **after** P6 core, so provider selection/flakiness never blocks the
-  Instrument foundation.
-
-### P7 — StrategyConfig
+### P7 — StrategyConfig ✅ done (2026-05-24)
 
 - **Goal.** Per-user strategy-level config (exposure caps). Nearly a copy of `Account`,
   minus soft-delete, plus the `(user_id, strategy_type)` uniqueness constraint.
@@ -137,20 +116,73 @@ Instrument (NO user_id; global ─┘
 ### P8 — Position
 
 - **Goal.** The universal strategy-instance aggregate, owner-scoped like `Account`.
-- **Scope.** Create with `account_id` + `primary_instrument_id` + `strategy_type`;
-  `currency` derived from the instrument (not user-provided, data-model §6). List/filter
-  by `status` and `strategy_type`. Update notes/manual snapshots. Soft-delete or hard?
-  (TBD with §6②.)
-- **Open decisions.** Manual vs trade-derived `opened_at`/`status`/`closed_at` (§6②).
+- **Model (settled §6②):** *Trade-led, hybrid-derive.* The frontend F4 flow is
+  "record a Trade → attach to an existing Position or create a new one inline",
+  so a Position is always born with a first Trade. Backend reflects this:
+  - **`opened_at`** is required at create time and **must equal the first Trade's
+    `executed_at`** (the F4 inline-create flow supplies it). Backend treats it as
+    a normal field; there is no NULL "awaiting first trade" interim state.
+  - **`status`**, **`closed_at`**, **`capital_used`**, **`max_risk_at_open`**,
+    **`max_reward_at_open`**, **`notes`** are user-supplied / user-managed.
+    Defaults: `status="open"`, the rest `NULL`.
+  - **`pnl_realized`** is frozen by the server on the `open→closed` transition
+    (PATCH) as `SUM(trade.cash_flow)` for the position. While open it stays NULL.
+  - **`currency`** is derived from `primary_instrument.currency` (data-model §6);
+    the client never sends it.
+  - Auto close-detection (e.g., net qty → 0 implies closed) is **deferred**.
+    Reserve a `services/positions.py` seam so a future detector can be added
+    without changing the API.
+- **Scope.**
+  - `POST /positions` — owner-scoped create. Required: `account_id`,
+    `primary_instrument_id`, `strategy_type`, `opened_at`. Optional manual:
+    `capital_used`, `max_risk_at_open`, `max_reward_at_open`, `notes`. Server
+    sets `status="open"`, derives `currency` from the instrument.
+  - `GET /positions` — list, filterable by `status` and `strategy_type`,
+    ordered by `opened_at DESC`.
+  - `GET /positions/{id}` — fetch one; 404 across users.
+  - `PATCH /positions/{id}` — partial update of manual fields, **plus** the
+    `status` transition `open → closed` (server freezes `pnl_realized` +
+    `closed_at` in the same call). `account_id`, `primary_instrument_id`,
+    `strategy_type`, `opened_at`, `currency`, `pnl_realized` are immutable
+    via PATCH.
+  - `DELETE /positions/{id}` — **hard delete only when no `Trade` rows exist**
+    for the position (cascade rules would otherwise corrupt history). With
+    trades attached, return 409. Soft-delete deliberately not introduced.
+- **Out of scope for P8.** Cap enforcement against `StrategyConfig.max_exposure`
+  (deferred to a services layer); trade aggregation derived reads (`days_open`,
+  `pnl_unrealized`); auto close-detector.
 
 ### P9 — Trade
 
 - **Goal.** Record atomic broker-level fills under a Position; the data entry workhorse.
-- **Scope.** Create (single, and multi-row sharing one `order_group_id` for IC/assignment
-  pairs); list by position; update/delete. Ownership flows through `position.user_id`;
-  `account_id` denormalized to match the position.
-- **Open decisions.** Validation depth — action↔kind consistency, integer option qty,
-  server-computed vs client-supplied `cash_flow` (§6④).
+- **Scope.** Create (single, and multi-row sharing one `order_group_id` for IC /
+  assignment / exercise per data-model §4.5.2); list by position; update / delete.
+  Ownership flows through `position.user_id`; `account_id` denormalized to match
+  the position (server-enforced, not client-supplied).
+- **Validation (settled §6④).**
+  - `action ↔ instrument.kind` consistency — `bto/sto/btc/stc` ⇒ option; `buy/sell`
+    ⇒ stock/forex. Reject 422.
+  - `quantity > 0` always; **integer required for options**; stock / forex allow
+    fractional (matches fractional shares + forex micro-lots).
+  - `price > 0` always (per-unit fill price; sign lives in `cash_flow`/`action`).
+  - `commission >= 0`, `fees >= 0`. Both are unsigned costs; server deducts them
+    in the `cash_flow` formula.
+  - **`cash_flow` is server-computed** (not accepted from the client):
+    ```
+    cash_flow = sign(action) × price × quantity × multiplier
+                − commission − fees
+    where sign(action) = -1 for buy/bto/btc,
+                        +1 for sell/sto/stc,
+          multiplier   = OptionContract.multiplier for options,
+                       = 1 otherwise.
+    ```
+    The Trade create schema does not include `cash_flow`. Servers single-source-of-truth
+    avoids client / server formula drift and broker-API spoofing concerns.
+- **`order_group_id` semantics.** Optional. When present, all rows in the same
+  POST are validated together and share that UUID; ungrouped trades have NULL.
+  The endpoint accepts either a single object or an array (atomic multi-leg
+  submission). Pattern detection (Assignment / Exercise / IC-open) lives in the
+  frontend display layer (data-model §4.5.2).
 
 ### P10 — Strategy-meta extensions
 
@@ -196,45 +228,111 @@ These are not in the dependency chain but must not be lost:
   only gap is the CI gate above. After each backend phase that changes schemas,
   re-run `npm run codegen` and commit the diff.
 
-## 6. Open design decisions (resolve per-phase, before coding it)
+## 6. Design decisions
 
-Carried forward from planning discussion. My leanings are noted but every item is **OPEN**
-pending sign-off.
+All four of the project-spanning decisions are now **settled**. Recorded here so future
+phases share the same vocabulary; the per-phase detail plans implement them.
 
-1. **Instrument ownership & dedup** (blocks P6). `Instrument` has no `user_id` → global
-   shared reference data. To settle: who may create; whether to "get-or-create" /
-   dedup on `(kind, symbol, exchange, currency)` for stocks and on
-   `(underlying, opt_type, strike, expiry, multiplier)` for options; whether
-   update/delete of a globally-referenced instrument is allowed. **Settled:** open
-   create+get/search to any authenticated user, get-or-create dedup on natural key,
-   no update/delete (instruments are referenced by other users' positions). External
-   factual validation/enrichment is the non-blocking **P6.x** slice (in MVP), not a hard
-   write-time dependency.
-2. **Position creation semantics** (blocks P8). MVP manual `opened_at`/`status`/
-   `closed_at`/`capital_used` with an explicit "close" action, **vs** auto-derived from
-   the position's trades. *Lean:* MVP manual; auto-derivation moves to P12.
-3. **How much computation in MVP** (shapes P8/P9/P12). Store realized PnL / `days_open`
-   manually on the row, **vs** compute them on read in P12. *Lean:* keep the row
-   honest (only what the user/broker supplies) and compute derived values in P12;
-   freeze `pnl_realized` only at the close transition.
-4. **Trade validation depth** (blocks P9). Enforce action↔instrument-kind consistency
-   (`bto/sto/btc/stc` ⇒ option; `buy/sell` ⇒ stock/forex)? Integer quantity for options?
-   `cash_flow` server-computed from `action+price+qty+commission+fees`, or trusted from
-   the client (data-model says the broker reports it directly)? *Lean:* enforce
-   action↔kind + integer option qty; accept client `cash_flow` but validate its sign
-   against the action.
+1. **Instrument ownership & dedup** (was blocking P6). **Settled in P6
+   (2026-05-24):** `Instrument` has no `user_id` → global shared reference data.
+   Any authenticated user can create + get + search. **Get-or-create dedup** on
+   natural keys (stocks `(kind, symbol, exchange, currency)`; options
+   `(underlying, opt_type, strike, expiry, multiplier)`). **No update/delete** —
+   instruments are referenced across users' positions. External factual
+   validation/enrichment is the non-blocking **PX** phase (renamed from P6.x),
+   not a write-time dependency.
+
+2. **Position creation semantics** (was blocking P8). **Settled 2026-05-26:**
+   *Trade-led with hybrid derive.* Position is always born alongside a first Trade
+   (F4's inline-create flow). `opened_at` is supplied by the client at create
+   time and **must equal the first Trade's `executed_at`** (no NULL interim
+   state). `status` / `closed_at` / `capital_used` / `max_risk_at_open` /
+   `max_reward_at_open` / `notes` are user-managed; server sets
+   `status="open"` by default and freezes `pnl_realized` + `closed_at` on the
+   explicit PATCH `open→closed` transition. Auto close-detection (net-qty → 0
+   ⇒ closed) is deferred; a `services/positions.py` seam is reserved for a
+   future detector.
+
+3. **How much computation in MVP** (shapes P8/P9/P12). **Settled 2026-05-26:**
+   - **Stored**: `pnl_realized` (frozen at close), `cash_flow` per Trade
+     (server-computed at Trade create — see §4 / §6④).
+   - **Derived on read in P12**: `days_open`, `pnl_total`, `roi_on_capital`,
+     `result` (win/loss). No "denormalized for speed" duplication.
+   - **Deferred**: `pnl_unrealized`, `annualized_return` — need a market quote
+     source not in MVP.
+
+4. **Trade validation depth** (was blocking P9). **Settled 2026-05-26:**
+   - `action ↔ instrument.kind` consistency enforced (422 on mismatch).
+   - `quantity > 0` always; integer required for option trades; fractional
+     allowed for stock / forex.
+   - `price > 0` always (per-unit fill price; sign lives in cash flow).
+   - `commission >= 0`, `fees >= 0` (unsigned costs).
+   - **`cash_flow` is server-computed** from
+     `sign(action) × price × quantity × multiplier − commission − fees`;
+     the Create schema does not accept it. Single source of truth → no
+     client/server formula drift, no broker-API spoofing risk.
+
+## 4.PX — External Integrations Tracer Bullet (standalone phase, opportunistic)
+
+> Originally tracked as "P6.x". Promoted to a standalone phase **PX** on
+> 2026-05-26 — it has no phase blocking it and blocks no phase, so the numeric
+> stream P8 → P12 is now strictly sequential. Slot PX in whenever convenient.
+
+- **Why it matters beyond Instrument.** This is the project's *first* external-API
+  integration, done deliberately as a tracer bullet to establish two reusable seams
+  that every later integration (broker fills, FX rates, market quotes) needs:
+  - **① external API access** — a backend `integrations/` module, API key in
+    `config.py` (`.env`), an async `httpx` client, timeout + graceful degrade;
+    **never raises into the write path**.
+  - **② external data storage/cache** — a persistence pattern so repeated lookups
+    don't re-hit the provider. *Lean:* a DB-backed cache table
+    `(provider, query) → payload + fetched_at` with TTL. Alternative: in-memory TTL.
+- **User-facing behavior.** Backend `GET /instruments/lookup?q=` powers frontend
+  typeahead + "did you mean AAPL?" hints and create-time enrichment (autofill
+  exchange/currency). Manual entry + format validation stays the always-works
+  core; the lookup layer degrades silently when the provider is unconfigured/down/empty.
+  **Never blocks** instrument creation.
+- **Scope by kind.** Stocks: validate/enrich via a free provider (lean
+  **OpenFIGI**). Forex: seed a local list of common pairs (no external call).
+  Options: skip external; validate only the underlying via the stock path.
+- **Sub-decisions to settle when PX is scheduled.** (a) provider — *lean
+  OpenFIGI* (free, official-ish, symbol→security/exchange mapping); Finnhub /
+  FMP as alternatives. (b) cache mechanism — DB table vs in-memory TTL (*lean
+  DB table*, to actually establish the storage seam). (c) feature flag + key
+  layout in `config.py`/`.env`.
+- **Sequencing.** No phase is blocked; this slot is opportunistic. If PX lands
+  during F3 or later, the frontend `InstrumentPicker` and `InstrumentForm`
+  gain typeahead + autofill without code changes to other phases (it just
+  populates new behavior behind the same API surface).
 
 ## 7. After this roadmap
 
-1. **Resume frontend F2** (Position UI) once P6 + P8 land; F3 (Trade entry) after P9.
-2. **F4 dashboards/charts** consume the P12 derived layer.
-3. **Postgres parity & deployment** — Phase 5 Docker + verify the migration against
-   Postgres before any production use (mvp-implementation-plan §9).
+1. **Frontend F3** (Position list / detail / edit — *no inline create*; create
+   lives inside F4 per the Trade-led model) once P8 + P10 + P11 land. **F4**
+   (Trade entry with inline Position-create) after P9.
+2. **F5 dashboards/charts** consume the P12 derived layer.
+3. **Postgres parity & deployment** — backend Phase 5 Docker (F6) + verify the
+   migration against Postgres before any production use (mvp-implementation-plan §9).
+4. **PX** can land any time it's convenient — typeahead + autofill light up in
+   F2/F3 automatically once the backend lookup endpoint exists.
 
 ---
 
 ## Changelog
 
+- **v0.3 (2026-05-26)** — Decisions ②③④ all settled.
+  ② Position is **Trade-led**: `opened_at` supplied at create-time as the first
+  Trade's `executed_at`; `status`/`closed_at`/`capital_used` manual; `pnl_realized`
+  frozen on PATCH `open→closed`; auto close-detector deferred behind a `services/`
+  seam. ③ Stored = `pnl_realized` + `cash_flow`; derived in P12 = `days_open`,
+  `pnl_total`, `roi`. ④ Trade validation: action↔kind enforced, option qty
+  integer, stock/forex qty fractional, `price > 0`, `cash_flow` **server-computed
+  only** (Create schema rejects client value). Renumbered `P6.x` → standalone
+  **PX — External Integrations Tracer Bullet** (§4.PX, opportunistic, blocks
+  nothing). P8/P9 narrative sections rewritten under the settled rules.
+- **v0.2 (2026-05-26)** — Mark P6 and P7 as done (shipped 2026-05-24). Decision ①
+  (Instrument ownership/dedup) settled in P6. Backend test suite: 127 passing
+  (`pytest` + `ruff` + `mypy --strict` green).
 - **v0.1 (2026-05-21)** — Initial macro roadmap. Phase 6–12 ordering + scope, starting
   from Instrument; cross-cutting CI/Docker tracking; four open design decisions. Detailed
   per-phase task/test breakdowns deferred to follow-up iterations.

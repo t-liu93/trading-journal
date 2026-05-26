@@ -57,20 +57,21 @@ Instrument（无 user_id；全局 ───┘
 
 ## 4. 阶段路线图
 
-| 阶段 | 实体 / 范围 | 风险 | 解锁 |
-|---|---|---|---|
-| **P6** | `Instrument` + `OptionContract` + `ForexPair`（create / get / list / search；update/delete 受限——见 §6①） | ⭐⭐⭐ | 一切；前端 instrument 选择器 |
-| **P7** | `StrategyConfig` CRUD（`(user_id, strategy_type)` 唯一，upsert 风格） | ⭐ | 策略设置 UI |
-| **P8** | `Position` CRUD（owner-scoped；MVP 手填字段——见 §6②） | ⭐⭐ | 前端 F2 |
-| **P9** | `Trade` CRUD（Position 下的原子成交；`order_group_id` 多腿） | ⭐⭐⭐ | 前端 F3 |
-| **P10** | `WheelCycleMeta` + `PmccCycleMeta`（1:1 Position 扩展） | ⭐ | 策略专属视图 |
-| **P11** | `TradePlan` 事件流（append revision / list / current） | ⭐⭐ | 外汇计划 UI |
-| **P12** | 派生读取层（services）：`days_open`、close 时冻结 `pnl_realized`、`pnl_total`、`roi`；unrealized 延后 | ⭐⭐⭐ | 仪表盘 / 图表（F4） |
+| 阶段 | 实体 / 范围 | 风险 | 解锁 | 状态 |
+|---|---|---|---|---|
+| **P6** | `Instrument` + `OptionContract` + `ForexPair`（create / get / list / search；update/delete 受限——见 §6①） | ⭐⭐⭐ | 一切；前端 instrument 选择器 | ✅ 已完成（2026-05-24） |
+| **P7** | `StrategyConfig` CRUD（`(user_id, strategy_type)` 唯一，upsert 风格） | ⭐ | 策略设置 UI | ✅ 已完成（2026-05-24） |
+| **P8** | `Position` CRUD（owner-scoped；Trade-led — 见 §6②；`status`/`closed_at`/`capital_used` 手填） | ⭐⭐ | 前端 F3 | ⏳ 下一步 |
+| **P9** | `Trade` CRUD（原子成交；`order_group_id` 多腿；服务端算 `cash_flow`；action↔kind 校验 — 见 §6④） | ⭐⭐⭐ | 前端 F4 | — |
+| **P10** | `WheelCycleMeta` + `PmccCycleMeta`（1:1 Position 扩展） | ⭐ | 策略专属视图 | — |
+| **P11** | `TradePlan` 事件流（append revision / list / current） | ⭐⭐ | 外汇计划 UI | — |
+| **P12** | 派生读取层（services）：`days_open`、close 时冻结 `pnl_realized`、`pnl_total`、`roi`；unrealized 延后 | ⭐⭐⭐ | 仪表盘 / 图表（F5） | — |
+| **PX** | 外部集成 Tracer Bullet（股票走 OpenFIGI lookup、forex 本地 seed、DB 缓存表、feature flag、优雅降级）— 见 §4.PX | ⭐⭐ | F2/F3 的 typeahead + 回填；立外部集成接缝 | —（机会主义） |
 
 > 阶段编号延续 `mvp-implementation-plan` 谱系（Phase 0–5）。Phase 5（Docker）仍待办，
 > 位置灵活——见 §5。
 
-### P6 — Instrument（base + 扩展）
+### P6 — Instrument（base + 扩展）✅ 已完成（2026-05-24）
 
 - **目标。** 提供带类型的 API，跨三种 MVP 工具类型（`stock`、`option`、`forex`）
   创建和查找可交易工具，把类表继承范式（base `Instrument` + 1:1 `OptionContract`
@@ -88,29 +89,12 @@ Instrument（无 user_id；全局 ───┘
   - **外汇**由 `ForexPair.quote_currency` 派生 `Instrument.currency`，使 §4.3 不变量无法被
     违反；payload 带 `base_currency`/`quote_currency`/`pip_size`。
   - **核心只做格式校验**（currency `^[A-Z]{3}$`、symbol 非空、`strike>0`、合法 `expiry`、
-    枚举成员）。事实性校验（是不是真实代码）属于 P6.x 层。
-- **未决决策。** 所有权与去重已定（§6①）。其余见 P6.x 子决策。
+    枚举成员）。事实性校验（是不是真实代码）属于 **PX** 层（见 §4.PX）。
+- **已定决策。** 所有权与去重（§6①）。事实性校验/补全在 2026-05-26 从 P6 中拆出，
+  改名 **PX — 外部集成 Tracer Bullet**（§4.PX），独立、机会主义、不阻塞任何 phase，
+  也不被任何 phase 阻塞，所以不再打断 P8 → P12 的顺序。
 
-### P6.x — 外部 instrument 校验（项目首个外部 API 集成；可选、非阻塞）
-
-- **超出 Instrument 的意义。** 这是项目*第一次*外部 API 集成，刻意当作 tracer bullet，
-  立好后续每次集成（broker 成交、FX 汇率、行情）都要复用的两条接缝：
-  - **① 外部 API 访问** —— 后端 `integrations/` 模块、key 进 `config.py`（`.env`）、异步
-    `httpx` 客户端、超时 + 优雅降级；**绝不把异常抛进写入路径**。
-  - **② 外部数据存储/缓存** —— 重复 lookup 不反复打第三方的持久化范式。*倾向：* DB 缓存表
-    `(provider, query) → payload + fetched_at` 带 TTL（注意 data-model §6 不喜欢 JSON 重列
-    → 优先结构化列，或接受一个仅缓存用的小 JSON 列）。备选：内存 TTL。
-- **用户侧行为。** 后端 `GET /instruments/lookup?q=` 驱动前端 typeahead + "是不是想输
-  AAPL?" 提示与创建时回填（exchange/currency）。手填 + 格式校验始终是 always-works 核心；
-  provider 未配置/挂掉/查空时 lookup 层静默降级。**绝不阻塞** instrument 创建。
-- **按类型范围。** 股票：经免费 provider 校验/回填。外汇：本地 seed 主流货币对（不走外部）。
-  期权：跳过外部，仅经股票路径校验底层。
-- **开放子决策。** (a) provider —— *倾向 OpenFIGI*（免费、偏官方、代码→证券/交易所映射）；
-  Finnhub / FMP 备选。(b) 缓存机制 —— DB 表 vs 内存 TTL（*倾向 DB 表*，真正立起存储接缝）。
-  (c) feature flag + key 进 `config.py`/`.env`。
-- **排序。** 排在 **P6 核心之后**，使 provider 选型/不稳定永不阻塞 Instrument 地基。
-
-### P7 — StrategyConfig
+### P7 — StrategyConfig ✅ 已完成（2026-05-24）
 
 - **目标。** 每用户的策略级配置（敞口上限）。几乎是 `Account` 的复制，去掉软删除，
   加上 `(user_id, strategy_type)` 唯一约束。
@@ -120,19 +104,67 @@ Instrument（无 user_id；全局 ───┘
 ### P8 — Position
 
 - **目标。** 通用策略实例聚合，像 `Account` 一样 owner-scoped。
-- **范围。** 用 `account_id` + `primary_instrument_id` + `strategy_type` 创建；`currency`
-  从 instrument 派生（非用户提供，data-model §6）。按 `status` 和 `strategy_type` 列表/筛选。
-  更新 notes / 手填快照。软删除还是硬删除？（随 §6② 定。）
-- **未决决策。** `opened_at`/`status`/`closed_at` 手填 vs 从 trade 派生（§6②）。
+- **模型（§6② 已定）：** *Trade-led，混合派生。* 前端 F4 的流程是"先录一条 Trade
+  → 选择挂到已有 Position 或内联新建一个"，所以 Position 一定与首笔 Trade 同时
+  诞生。后端如下反映：
+  - **`opened_at`** 在创建时必填，**且必须等于首笔 Trade 的 `executed_at`**
+    （F4 的内联创建流程负责传）。后端把它当普通字段；不存在"等首笔 Trade"的
+    NULL 中间态。
+  - **`status`**、**`closed_at`**、**`capital_used`**、**`max_risk_at_open`**、
+    **`max_reward_at_open`**、**`notes`** 由用户手填/管理。默认值：
+    `status="open"`，其余 `NULL`。
+  - **`pnl_realized`** 由服务端在 PATCH `open→closed` 转换时冻结为该 position
+    的 `SUM(trade.cash_flow)`；保持 open 期间为 NULL。
+  - **`currency`** 由 `primary_instrument.currency` 派生（data-model §6）；
+    客户端不传。
+  - 自动 close 检测（净 qty → 0 即视为关闭）**延后**。预留
+    `services/positions.py` 接缝，未来检测器可加而不破 API。
+- **范围。**
+  - `POST /positions` — owner-scoped 创建。必填：`account_id`、
+    `primary_instrument_id`、`strategy_type`、`opened_at`。可选手填：
+    `capital_used`、`max_risk_at_open`、`max_reward_at_open`、`notes`。服务端
+    设置 `status="open"`、从 instrument 派生 `currency`。
+  - `GET /positions` — 列表，可按 `status` 与 `strategy_type` 过滤，按
+    `opened_at DESC` 排序。
+  - `GET /positions/{id}` — 取单条；跨用户 404。
+  - `PATCH /positions/{id}` — 部分更新手填字段，**外加** `status` 的
+    `open → closed` 转换（服务端在同一调用里冻结 `pnl_realized` + `closed_at`）。
+    `account_id`、`primary_instrument_id`、`strategy_type`、`opened_at`、
+    `currency`、`pnl_realized` 在 PATCH 中不可变。
+  - `DELETE /positions/{id}` — **仅当该 position 下没有 Trade 时**才允许硬删除
+    （否则会破坏历史）。已有 trade 则返回 409。刻意不引入软删除。
+- **不在 P8 范围。** 对 `StrategyConfig.max_exposure` 的下单时强制（推后到 services
+  层）；trade 聚合派生读取（`days_open`、`pnl_unrealized`）；自动 close 检测。
 
 ### P9 — Trade
 
 - **目标。** 在 Position 下记录原子的 broker 级成交；数据录入主力。
-- **范围。** 创建（单条，以及共享一个 `order_group_id` 的多条，用于 IC / assignment 配对）；
-  按 position 列表；update/delete。所有权经 `position.user_id` 传导；`account_id`
-  反范式化以匹配 position。
-- **未决决策。** 校验深度——action↔kind 一致性、期权 quantity 整数、`cash_flow`
-  服务端计算 vs 客户端传入（§6④）。
+- **范围。** 创建（单条，以及共享一个 `order_group_id` 的多条，用于 IC /
+  assignment / exercise，对应 data-model §4.5.2）；按 position 列表；update / delete。
+  所有权经 `position.user_id` 传导；`account_id` 反范式化以匹配 position
+  （服务端强制，不接受客户端传入）。
+- **校验（§6④ 已定）。**
+  - `action ↔ instrument.kind` 一致 — `bto/sto/btc/stc` ⇒ option；`buy/sell` ⇒
+    stock/forex。不一致返回 422。
+  - `quantity > 0` 始终成立；**期权必须为正整数**；股票 / 外汇允许小数（覆盖
+    fractional shares + 外汇 micro-lot）。
+  - `price > 0` 始终成立（每单位成交价；符号交给 `cash_flow`/`action`）。
+  - `commission >= 0`、`fees >= 0`。都是无符号成本；服务端在 `cash_flow`
+    公式中扣除它们。
+  - **`cash_flow` 由服务端计算**（不接受客户端传值）：
+    ```
+    cash_flow = sign(action) × price × quantity × multiplier
+                − commission − fees
+    其中 sign(action) = -1（buy/bto/btc）；
+                       +1（sell/sto/stc）；
+        multiplier   = option 取 OptionContract.multiplier，
+                       其他 = 1。
+    ```
+    Trade 创建 schema 中**没有** `cash_flow` 字段。服务端单一真理源，避免
+    客户端/服务端公式漂移，也防 broker-API spoofing。
+- **`order_group_id` 语义。** 可选。给出时，同一 POST 的所有行一起校验、共用此
+  UUID；未分组的 trade 为 NULL。端点同时接受单个对象或数组（原子多腿提交）。
+  模式识别（Assignment / Exercise / IC-open）放在前端展示层（data-model §4.5.2）。
 
 ### P10 — Strategy-meta 扩展
 
@@ -172,39 +204,93 @@ Instrument（无 user_id；全局 ───┘
   已提交的 `frontend/src/api/schema.d.ts`、README 工作流都已就位。唯一缺口是上面的
   CI 门禁。每个改动 schema 的后端阶段之后，重跑 `npm run codegen` 并提交 diff。
 
-## 6. 未决设计决策（在各自阶段动工前敲定）
+## 6. 设计决策
 
-承接规划讨论。已注明我的倾向，但每一项在拍板前都是**未决**。
+四项跨阶段决策全部**已定**。记录在此让后续 phase 共享同一套词汇；具体落实在各 phase 详细 plan。
 
-1. **Instrument 所有权与去重**（卡 P6）。`Instrument` 无 `user_id` → 全局共享参考数据。
-   待定：谁能创建；是否对股票按 `(kind, symbol, exchange, currency)`、对期权按
-   `(underlying, opt_type, strike, expiry, multiplier)` 做 "get-or-create" / 去重；
-   是否允许 update/delete 被全局引用的 instrument。**已定：** 对任意已认证用户开放
-   create+get/search，按自然键 get-or-create 去重，无 update/delete（instrument 会被其他
-   用户的 position 引用）。外部事实性校验/补全是非阻塞的 **P6.x** 切片（进 MVP），
-   不是写入时的硬依赖。
-2. **Position 创建语义**（卡 P8）。MVP 手填 `opened_at`/`status`/`closed_at`/`capital_used`
-   并提供显式 "close" 动作，**还是**从该 position 的 trade 自动派生。*倾向：* MVP 手填；
-   自动派生挪到 P12。
-3. **MVP 算多少**（影响 P8/P9/P12）。把已实现 PnL / `days_open` 手存在行上，**还是**在
-   P12 读时计算。*倾向：* 行只存诚实数据（用户/broker 提供的部分），派生值在 P12 计算；
-   `pnl_realized` 仅在 close 转换时冻结。
-4. **Trade 校验深度**（卡 P9）。是否强制 action↔instrument-kind 一致
-   （`bto/sto/btc/stc` ⇒ 期权；`buy/sell` ⇒ 股票/外汇）？期权 quantity 整数？`cash_flow`
-   由服务端从 `action+price+qty+commission+fees` 计算，还是信任客户端传入（data-model
-   说 broker 直接报告它）？*倾向：* 强制 action↔kind + 期权整数 qty；接受客户端
-   `cash_flow` 但校验其符号与 action 一致。
+1. **Instrument 所有权与去重**（曾卡 P6）。**P6 内已定（2026-05-24）：**
+   `Instrument` 无 `user_id` → 全局共享参考数据。任意已认证用户可 create + get +
+   search。按自然键 **get-or-create 去重**（股票 `(kind, symbol, exchange, currency)`；
+   期权 `(underlying, opt_type, strike, expiry, multiplier)`）。**无 update/delete** ——
+   instrument 会跨用户被 position 引用。外部事实校验/补全是非阻塞的 **PX** phase
+   （由原 P6.x 改名），不是写入时硬依赖。
+
+2. **Position 创建语义**（曾卡 P8）。**2026-05-26 已定：** *Trade-led 混合派生。*
+   Position 一定与首笔 Trade 同时诞生（F4 内联创建流程）。`opened_at` 在创建时由
+   客户端传入，**必须等于首笔 Trade 的 `executed_at`**（无 NULL 中间态）。
+   `status` / `closed_at` / `capital_used` / `max_risk_at_open` /
+   `max_reward_at_open` / `notes` 由用户管理；服务端默认 `status="open"`，在显式
+   PATCH `open→closed` 转换时冻结 `pnl_realized` + `closed_at`。自动 close 检测
+   （净 qty → 0 ⇒ closed）延后；预留 `services/positions.py` 接缝供未来添加检测器。
+
+3. **MVP 算多少**（影响 P8/P9/P12）。**2026-05-26 已定：**
+   - **存盘**：`pnl_realized`（close 时冻结）、每条 Trade 的 `cash_flow`
+     （Trade 创建时服务端计算 —— 见 §4 / §6④）。
+   - **P12 读时派生**：`days_open`、`pnl_total`、`roi_on_capital`、`result`
+     （win/loss）。不做"为速度反范式化"的重复存储。
+   - **延后**：`pnl_unrealized`、`annualized_return` —— 需要行情源，不在 MVP。
+
+4. **Trade 校验深度**（曾卡 P9）。**2026-05-26 已定：**
+   - `action ↔ instrument.kind` 一致（不一致 422）。
+   - `quantity > 0` 始终成立；期权必须正整数；股票 / 外汇允许小数。
+   - `price > 0` 始终成立（每单位成交价；符号交给 cash flow）。
+   - `commission >= 0`、`fees >= 0`（无符号成本）。
+   - **`cash_flow` 服务端计算**：
+     `sign(action) × price × quantity × multiplier − commission − fees`；
+     创建 schema 不接受它。单一真理源 → 没有客户端 / 服务端公式漂移、不被
+     broker-API spoofing。
+
+## 4.PX — 外部集成 Tracer Bullet（独立阶段，机会主义）
+
+> 原 "P6.x"。2026-05-26 提升为独立阶段 **PX** —— 它没有前序依赖、也不卡任何阶段，
+> 所以数字流 P8 → P12 现在是严格顺序的。PX 什么时候有空什么时候插入。
+
+- **超出 Instrument 的意义。** 这是项目*第一次*外部 API 集成，刻意当作 tracer
+  bullet，立好后续每次集成（broker 成交、FX 汇率、行情）都要复用的两条接缝：
+  - **① 外部 API 访问** —— 后端 `integrations/` 模块、key 进 `config.py`（`.env`）、
+    异步 `httpx` 客户端、超时 + 优雅降级；**绝不把异常抛进写入路径**。
+  - **② 外部数据存储/缓存** —— 重复 lookup 不反复打第三方的持久化范式。*倾向：*
+    DB 缓存表 `(provider, query) → payload + fetched_at` 带 TTL。备选：内存 TTL。
+- **用户侧行为。** 后端 `GET /instruments/lookup?q=` 驱动前端 typeahead + "是不是
+  想输 AAPL?" 提示与创建时回填（exchange/currency）。手填 + 格式校验始终是
+  always-works 核心；provider 未配置/挂掉/查空时 lookup 层静默降级。**绝不阻塞**
+  instrument 创建。
+- **按类型范围。** 股票：经免费 provider 校验/回填（lean **OpenFIGI**）。外汇：本地
+  seed 主流货币对（不走外部）。期权：跳过外部，仅经股票路径校验底层。
+- **排期 PX 时再敲的子决策。** (a) provider —— *lean OpenFIGI*（免费、偏官方、
+  代码→证券/交易所映射）；Finnhub / FMP 备选。(b) 缓存机制 —— DB 表 vs 内存 TTL
+  （*倾向 DB 表*，真正立起存储接缝）。(c) feature flag + key 在 `config.py`/`.env`
+  里的布局。
+- **排序。** 无任何 phase 被它阻塞；插入时机是机会主义。如果 PX 在 F3 或之后才
+  落地，前端 `InstrumentPicker` 与 `InstrumentForm` 会在不改其他 phase 代码的情况
+  下自动获得 typeahead + 回填（同一个 API 表面下行为升级）。
 
 ## 7. 路线图之后
 
-1. **恢复前端 F2**（Position UI）——P6 + P8 落地后；F3（Trade 录入）在 P9 之后。
-2. **F4 仪表盘/图表**消费 P12 派生层。
-3. **Postgres 对齐与部署**——Phase 5 Docker + 在任何生产使用前对 Postgres 验证迁移
-   （mvp-implementation-plan §9）。
+1. **前端 F3**（Position 列表 / 详情 / 编辑 —— *没有* 内联创建入口，create
+   按 Trade-led 模型移到 F4）—— P8 + P10 + P11 落地后。**F4**（Trade 录入 +
+   内联 Position 创建）在 P9 之后。
+2. **F5 仪表盘/图表**消费 P12 派生层。
+3. **Postgres 对齐与部署**——后端 Phase 5 Docker（F6）+ 在任何生产使用前对
+   Postgres 验证迁移（mvp-implementation-plan §9）。
+4. **PX** 可在任意方便时机落地 —— typeahead + 回填会在后端 lookup 端点上线后
+   自动在 F2/F3 中点亮。
 
 ---
 
 ## 变更日志
 
+- **v0.3（2026-05-26）** — 决策②③④全部 settle。
+  ② Position 改为 **Trade-led**：`opened_at` 在创建时由客户端传入（= 首笔 Trade
+  的 `executed_at`）；`status`/`closed_at`/`capital_used` 手填；PATCH `open→closed`
+  时服务端冻结 `pnl_realized`；自动 close 检测延后，预留 `services/` 接缝。
+  ③ 存盘 = `pnl_realized` + `cash_flow`；P12 派生 = `days_open`、`pnl_total`、`roi`。
+  ④ Trade 校验：action↔kind 强制、期权 qty 整数、stock/forex qty 小数、
+  `price > 0`、`cash_flow` **仅服务端计算**（Create schema 不接受客户端值）。
+  原 `P6.x` → 独立 **PX — 外部集成 Tracer Bullet**（§4.PX，机会主义、不阻塞任何
+  phase）。P8/P9 叙述章节按已定规则重写。
+- **v0.2（2026-05-26）** — 把 P6 和 P7 标为已完成（2026-05-24 交付）。决策①
+  （Instrument 所有权/去重）在 P6 内 settle。后端测试套件：127 条全绿
+  （`pytest` + `ruff` + `mypy --strict`）。
 - **v0.1（2026-05-21）** — 初版宏观路线图。Phase 6–12 顺序 + 范围，从 Instrument 起步；
   横切 CI/Docker 追踪；四项未决设计决策。各阶段详细任务/测试拆分留待后续迭代。
