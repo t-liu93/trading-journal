@@ -14,7 +14,15 @@ stay at the root (FastAPI manages them; consumers expect them there).
 
 from fastapi import APIRouter, FastAPI
 
-from trading_journal.api import accounts, health, instruments, positions, strategy_configs, trades
+from trading_journal.api import (
+    accounts,
+    health,
+    instruments,
+    positions,
+    strategy_configs,
+    strategy_meta,
+    trades,
+)
 from trading_journal.auth.backend import auth_backend, fastapi_users
 from trading_journal.schemas.user import UserCreate, UserRead, UserUpdate
 
@@ -58,6 +66,9 @@ def create_app() -> FastAPI:
     api.include_router(positions.router)
     # Domain: Trade CRUD under /api/trades (P9).
     api.include_router(trades.router)
+    # Domain: strategy-meta extensions under /api/positions/{pid}/wheel-meta
+    # and /api/positions/{pid}/pmcc-meta (P10).
+    api.include_router(strategy_meta.router)
 
     app.include_router(api)
     return app

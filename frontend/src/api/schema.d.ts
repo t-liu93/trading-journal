@@ -292,6 +292,46 @@ export interface paths {
         patch: operations["update_trade_api_trades__trade_id__patch"];
         trace?: never;
     };
+    "/api/positions/{position_id}/wheel-meta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Wheel Meta */
+        get: operations["get_wheel_meta_api_positions__position_id__wheel_meta_get"];
+        put?: never;
+        /** Create Wheel Meta */
+        post: operations["create_wheel_meta_api_positions__position_id__wheel_meta_post"];
+        /** Delete Wheel Meta */
+        delete: operations["delete_wheel_meta_api_positions__position_id__wheel_meta_delete"];
+        options?: never;
+        head?: never;
+        /** Update Wheel Meta */
+        patch: operations["update_wheel_meta_api_positions__position_id__wheel_meta_patch"];
+        trace?: never;
+    };
+    "/api/positions/{position_id}/pmcc-meta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pmcc Meta */
+        get: operations["get_pmcc_meta_api_positions__position_id__pmcc_meta_get"];
+        put?: never;
+        /** Create Pmcc Meta */
+        post: operations["create_pmcc_meta_api_positions__position_id__pmcc_meta_post"];
+        /** Delete Pmcc Meta */
+        delete: operations["delete_pmcc_meta_api_positions__position_id__pmcc_meta_delete"];
+        options?: never;
+        head?: never;
+        /** Update Pmcc Meta */
+        patch: operations["update_pmcc_meta_api_positions__position_id__pmcc_meta_patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -414,6 +454,11 @@ export interface components {
             /** Contract Size */
             contract_size: string | null;
         };
+        /**
+         * FundingSource
+         * @enum {string}
+         */
+        FundingSource: "cash" | "mixed" | "margin";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -504,6 +549,35 @@ export interface components {
          * @enum {string}
          */
         OptionStyle: "american" | "european";
+        /** PmccMetaCreate */
+        PmccMetaCreate: {
+            /**
+             * Leap Instrument Id
+             * Format: uuid
+             */
+            leap_instrument_id: string;
+        };
+        /** PmccMetaRead */
+        PmccMetaRead: {
+            /**
+             * Position Id
+             * Format: uuid
+             */
+            position_id: string;
+            /**
+             * Leap Instrument Id
+             * Format: uuid
+             */
+            leap_instrument_id: string;
+        };
+        /**
+         * PmccMetaUpdate
+         * @description Partial update — ``leap_instrument_id`` is the only field.
+         */
+        PmccMetaUpdate: {
+            /** Leap Instrument Id */
+            leap_instrument_id?: string | null;
+        };
         /** PositionCreate */
         PositionCreate: {
             /**
@@ -849,6 +923,44 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WheelMetaCreate */
+        WheelMetaCreate: {
+            funding_source: components["schemas"]["FundingSource"];
+            /** Loan Amount */
+            loan_amount?: number | string | null;
+            /** Interest Rate Apr */
+            interest_rate_apr?: number | string | null;
+            /** Interest Accrued */
+            interest_accrued?: number | string | null;
+        };
+        /** WheelMetaRead */
+        WheelMetaRead: {
+            /**
+             * Position Id
+             * Format: uuid
+             */
+            position_id: string;
+            funding_source: components["schemas"]["FundingSource"];
+            /** Loan Amount */
+            loan_amount: string | null;
+            /** Interest Rate Apr */
+            interest_rate_apr: string | null;
+            /** Interest Accrued */
+            interest_accrued: string | null;
+        };
+        /**
+         * WheelMetaUpdate
+         * @description Partial update; all fields optional. Numeric fields stay ``ge=0``.
+         */
+        WheelMetaUpdate: {
+            funding_source?: components["schemas"]["FundingSource"] | null;
+            /** Loan Amount */
+            loan_amount?: number | string | null;
+            /** Interest Rate Apr */
+            interest_rate_apr?: number | string | null;
+            /** Interest Accrued */
+            interest_accrued?: number | string | null;
         };
     };
     responses: never;
@@ -1979,6 +2091,266 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TradeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_wheel_meta_api_positions__position_id__wheel_meta_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WheelMetaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_wheel_meta_api_positions__position_id__wheel_meta_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WheelMetaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WheelMetaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_wheel_meta_api_positions__position_id__wheel_meta_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_wheel_meta_api_positions__position_id__wheel_meta_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WheelMetaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WheelMetaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pmcc_meta_api_positions__position_id__pmcc_meta_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PmccMetaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_pmcc_meta_api_positions__position_id__pmcc_meta_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PmccMetaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PmccMetaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_pmcc_meta_api_positions__position_id__pmcc_meta_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_pmcc_meta_api_positions__position_id__pmcc_meta_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PmccMetaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PmccMetaRead"];
                 };
             };
             /** @description Validation Error */
