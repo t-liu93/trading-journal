@@ -9,7 +9,7 @@ Key design choices:
   - PATCH with ``status: "closed"`` triggers ``freeze_pnl_realized`` which
     sums all attached Trade ``cash_flow`` rows.
   - DELETE is a hard delete that only succeeds when the position has zero
-    attached Trade rows.
+    attached Trade rows and zero TradePlan revisions.
 """
 
 import uuid
@@ -26,6 +26,7 @@ from trading_journal.models.account import Account
 from trading_journal.models.instrument import Instrument
 from trading_journal.models.position import Position
 from trading_journal.models.trade import Trade
+from trading_journal.models.trade_plan import TradePlan
 from trading_journal.models.user import User
 from trading_journal.schemas.position import PositionCreate, PositionRead, PositionUpdate
 from trading_journal.services.positions import freeze_pnl_realized
@@ -215,6 +216,20 @@ async def delete_position(
             detail=(
                 "position has attached trades and cannot be deleted; "
                 "trades are retained for audit even if archived"
+            ),
+        )
+
+    plan_count = (
+        await session.execute(
+            select(TradePlan.id).where(TradePlan.position_id == position.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    if plan_count is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "position has attached plan revisions and cannot be deleted; "
+                "trade plans are append-only and permanently retained"
             ),
         )
 

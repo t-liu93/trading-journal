@@ -332,6 +332,58 @@ export interface paths {
         patch: operations["update_pmcc_meta_api_positions__position_id__pmcc_meta_patch"];
         trace?: never;
     };
+    "/api/positions/{position_id}/trade-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Trade Plans */
+        get: operations["list_trade_plans_api_positions__position_id__trade_plans_get"];
+        put?: never;
+        /** Create Trade Plan */
+        post: operations["create_trade_plan_api_positions__position_id__trade_plans_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/positions/{position_id}/trade-plans/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Current Trade Plan */
+        get: operations["get_current_trade_plan_api_positions__position_id__trade_plans_current_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/positions/{position_id}/trade-plans/{revision_no}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Trade Plan By Revision */
+        get: operations["get_trade_plan_by_revision_api_positions__position_id__trade_plans__revision_no__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -782,6 +834,63 @@ export interface components {
             order_group_id?: string | null;
             /** Notes */
             notes?: string | null;
+        };
+        /** TradePlanCreate */
+        TradePlanCreate: {
+            /**
+             * Effective At
+             * Format: date-time
+             */
+            effective_at: string;
+            /** Planned Entry */
+            planned_entry?: number | string | null;
+            /** Planned Stop Loss */
+            planned_stop_loss?: number | string | null;
+            /** Planned Take Profit */
+            planned_take_profit?: number | string | null;
+            /** Target Rr */
+            target_rr?: number | string | null;
+            /** Thesis */
+            thesis?: string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** TradePlanRead */
+        TradePlanRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Position Id
+             * Format: uuid
+             */
+            position_id: string;
+            /** Revision No */
+            revision_no: number;
+            /**
+             * Effective At
+             * Format: date-time
+             */
+            effective_at: string;
+            /** Planned Entry */
+            planned_entry: string | null;
+            /** Planned Stop Loss */
+            planned_stop_loss: string | null;
+            /** Planned Take Profit */
+            planned_take_profit: string | null;
+            /** Target Rr */
+            target_rr: string | null;
+            /** Thesis */
+            thesis: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** TradeRead */
         TradeRead: {
@@ -2351,6 +2460,135 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PmccMetaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_trade_plans_api_positions__position_id__trade_plans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradePlanRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_trade_plan_api_positions__position_id__trade_plans_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TradePlanCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradePlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_current_trade_plan_api_positions__position_id__trade_plans_current_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradePlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_trade_plan_by_revision_api_positions__position_id__trade_plans__revision_no__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+                revision_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradePlanRead"];
                 };
             };
             /** @description Validation Error */

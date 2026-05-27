@@ -21,6 +21,7 @@ from trading_journal.api import (
     positions,
     strategy_configs,
     strategy_meta,
+    trade_plans,
     trades,
 )
 from trading_journal.auth.backend import auth_backend, fastapi_users
@@ -69,6 +70,8 @@ def create_app() -> FastAPI:
     # Domain: strategy-meta extensions under /api/positions/{pid}/wheel-meta
     # and /api/positions/{pid}/pmcc-meta (P10).
     api.include_router(strategy_meta.router)
+    # Domain: TradePlan event stream under /api/positions/{pid}/trade-plans (P11).
+    api.include_router(trade_plans.router)
 
     app.include_router(api)
     return app
