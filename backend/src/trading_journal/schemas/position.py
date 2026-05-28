@@ -49,6 +49,7 @@ class PositionRead(BaseModel):
     max_risk_at_open: Decimal | None
     max_reward_at_open: Decimal | None
     pnl_realized: Decimal | None
+    net_cash_flow: Decimal
     currency: str
     notes: str | None
     created_at: datetime

@@ -10,9 +10,13 @@ Key design choices:
     sums all attached Trade ``cash_flow`` rows.
   - DELETE is a hard delete that only succeeds when the position has zero
     attached Trade rows and zero TradePlan revisions.
+  - P12: ``net_cash_flow`` is derived at read time and injected into every
+    PositionRead response.
 """
 
 import uuid
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -29,9 +33,27 @@ from trading_journal.models.trade import Trade
 from trading_journal.models.trade_plan import TradePlan
 from trading_journal.models.user import User
 from trading_journal.schemas.position import PositionCreate, PositionRead, PositionUpdate
-from trading_journal.services.positions import freeze_pnl_realized
+from trading_journal.services.positions import compute_net_cash_flows, freeze_pnl_realized
 
 router = APIRouter(prefix="/positions", tags=["positions"])
+
+
+def _to_utc(dt: datetime) -> datetime:
+    """Normalize a timezone-aware datetime to UTC (strip tzinfo).
+
+    SQLite/aiosqlite does not preserve timezone offsets, so we normalize
+    before storing to ensure consistent month bucketing in aggregation queries.
+    """
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(UTC).replace(tzinfo=None)
+    return dt
+
+
+def _position_to_read(pos: Position, net_cash_flow: Decimal) -> PositionRead:
+    """Convert a Position ORM object to PositionRead with the derived net_cash_flow."""
+    row = {c.key: getattr(pos, c.key) for c in type(pos).__table__.columns}
+    row["net_cash_flow"] = net_cash_flow
+    return PositionRead.model_validate(row)
 
 
 async def _get_owned_position(
@@ -78,7 +100,7 @@ async def create_position(
     payload: PositionCreate,
     user: Annotated[User, Depends(current_active_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
-) -> Position:
+) -> PositionRead:
     await _resolve_account(session, user, payload.account_id)
     instrument = await _resolve_instrument(session, payload.primary_instrument_id)
 
@@ -88,7 +110,7 @@ async def create_position(
         primary_instrument_id=payload.primary_instrument_id,
         strategy_type=payload.strategy_type,
         status=PositionStatus.OPEN,
-        opened_at=payload.opened_at,
+        opened_at=_to_utc(payload.opened_at),
         capital_used=payload.capital_used,
         max_risk_at_open=payload.max_risk_at_open,
         max_reward_at_open=payload.max_reward_at_open,
@@ -98,7 +120,7 @@ async def create_position(
     session.add(position)
     await session.commit()
     await session.refresh(position)
-    return position
+    return _position_to_read(position, Decimal("0"))
 
 
 @router.get("", response_model=list[PositionRead])
@@ -107,7 +129,7 @@ async def list_positions(
     session: Annotated[AsyncSession, Depends(get_session)],
     status: PositionStatus | None = None,
     strategy_type: StrategyType | None = None,
-) -> list[Position]:
+) -> list[PositionRead]:
     stmt = (
         select(Position)
         .where(Position.user_id == user.id)
@@ -118,7 +140,10 @@ async def list_positions(
     if strategy_type is not None:
         stmt = stmt.where(Position.strategy_type == strategy_type)
     result = await session.execute(stmt)
-    return list(result.scalars().all())
+    positions = list(result.scalars().all())
+
+    ncf_map = await compute_net_cash_flows(session, [p.id for p in positions])
+    return [_position_to_read(p, ncf_map.get(p.id, Decimal("0"))) for p in positions]
 
 
 @router.get("/{position_id}", response_model=PositionRead)
@@ -126,8 +151,10 @@ async def get_position(
     position_id: uuid.UUID,
     user: Annotated[User, Depends(current_active_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
-) -> Position:
-    return await _get_owned_position(session, user, position_id)
+) -> PositionRead:
+    position = await _get_owned_position(session, user, position_id)
+    ncf_map = await compute_net_cash_flows(session, [position.id])
+    return _position_to_read(position, ncf_map.get(position.id, Decimal("0")))
 
 
 @router.patch("/{position_id}", response_model=PositionRead)
@@ -136,7 +163,7 @@ async def update_position(
     payload: PositionUpdate,
     user: Annotated[User, Depends(current_active_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
-) -> Position:
+) -> PositionRead:
     position = await _get_owned_position(session, user, position_id)
     data = payload.model_dump(exclude_unset=True)
 
@@ -181,6 +208,9 @@ async def update_position(
         and position.status != PositionStatus.CLOSED
     )
 
+    if "closed_at" in data and data["closed_at"] is not None:
+        data["closed_at"] = _to_utc(data["closed_at"])
+
     for field, value in data.items():
         setattr(position, field, value)
 
@@ -194,7 +224,8 @@ async def update_position(
 
     await session.commit()
     await session.refresh(position)
-    return position
+    ncf_map = await compute_net_cash_flows(session, [position.id])
+    return _position_to_read(position, ncf_map.get(position.id, Decimal("0")))
 
 
 @router.delete("/{position_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -19,9 +19,8 @@ from decimal import Decimal
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import insert, select
+from sqlalchemy import insert
 
-from trading_journal.models.position import Position
 from trading_journal.models.trade_plan import TradePlan
 from trading_journal.services.trade_plans import allocate_next_revision_no
 

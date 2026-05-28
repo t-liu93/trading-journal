@@ -16,6 +16,7 @@ from fastapi import APIRouter, FastAPI
 
 from trading_journal.api import (
     accounts,
+    dashboard,
     health,
     instruments,
     positions,
@@ -72,6 +73,8 @@ def create_app() -> FastAPI:
     api.include_router(strategy_meta.router)
     # Domain: TradePlan event stream under /api/positions/{pid}/trade-plans (P11).
     api.include_router(trade_plans.router)
+    # Domain: Dashboard summary under /api/dashboard/summary (P12).
+    api.include_router(dashboard.router)
 
     app.include_router(api)
     return app

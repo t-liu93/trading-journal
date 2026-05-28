@@ -384,6 +384,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Dashboard Summary */
+        get: operations["get_dashboard_summary_api_dashboard_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -470,6 +487,29 @@ export interface components {
              */
             client_secret?: string | null;
         };
+        /** ClosedSummary */
+        ClosedSummary: {
+            /** Count */
+            count: number;
+            /** Win Rate */
+            win_rate: string | null;
+            /** Per Currency Pnl */
+            per_currency_pnl: components["schemas"]["CurrencyAmount"][];
+            /** Monthly Pnl */
+            monthly_pnl: components["schemas"]["MonthCurrencyAmount"][];
+        };
+        /** CurrencyAmount */
+        CurrencyAmount: {
+            /** Currency */
+            currency: string;
+            /** Amount */
+            amount: string;
+        };
+        /** DashboardSummary */
+        DashboardSummary: {
+            closed: components["schemas"]["ClosedSummary"];
+            open: components["schemas"]["OpenSummary"];
+        };
         /** ErrorModel */
         ErrorModel: {
             /** Detail */
@@ -542,6 +582,22 @@ export interface components {
             created_at: string;
             option?: components["schemas"]["OptionContractRead"] | null;
             forex?: components["schemas"]["ForexPairRead"] | null;
+        };
+        /** MonthCurrencyAmount */
+        MonthCurrencyAmount: {
+            /** Month */
+            month: string;
+            /** Currency */
+            currency: string;
+            /** Amount */
+            amount: string;
+        };
+        /** OpenSummary */
+        OpenSummary: {
+            /** Count */
+            count: number;
+            /** Per Currency Net Cash Flow */
+            per_currency_net_cash_flow: components["schemas"]["CurrencyAmount"][];
         };
         /**
          * OptType
@@ -696,6 +752,8 @@ export interface components {
             max_reward_at_open: string | null;
             /** Pnl Realized */
             pnl_realized: string | null;
+            /** Net Cash Flow */
+            net_cash_flow: string;
             /** Currency */
             currency: string;
             /** Notes */
@@ -2598,6 +2656,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dashboard_summary_api_dashboard_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummary"];
                 };
             };
         };

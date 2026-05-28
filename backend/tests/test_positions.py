@@ -874,3 +874,262 @@ async def test_requires_auth(client: AsyncClient, method: str, path: str) -> Non
         } if method in {"POST", "PATCH"} else None,
     )
     assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# P12: net_cash_flow
+# ---------------------------------------------------------------------------
+
+
+async def _p12_seed_trade(
+    client: AsyncClient,
+    position_id: str,
+    instrument_id: str,
+    *,
+    action: str = "buy",
+    quantity: str = "10",
+    price: str = "50",
+) -> dict:
+    """Create a single trade via the P9 API. cash_flow is server-computed."""
+    body = {
+        "position_id": position_id,
+        "instrument_id": instrument_id,
+        "action": action,
+        "quantity": quantity,
+        "price": price,
+        "commission": "0",
+        "fees": "0",
+        "executed_at": NOW.isoformat(),
+    }
+    resp = await client.post("/api/trades", json=body)
+    assert resp.status_code == 201, resp.text
+    return resp.json()[0]
+
+
+async def test_net_cash_flow_zero_when_no_trades(
+    auth_client: AsyncClient,
+) -> None:
+    """Newly-created position has net_cash_flow == 0 in list + detail."""
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    await _seed_position(auth_client, acct["id"], instr["id"])
+
+    # list
+    list_resp = await auth_client.get("/api/positions")
+    assert list_resp.status_code == 200
+    data = list_resp.json()
+    assert len(data) == 1
+    assert Decimal(data[0]["net_cash_flow"]) == Decimal("0")
+
+    # detail
+    detail_resp = await auth_client.get(f"/api/positions/{data[0]['id']}")
+    assert detail_resp.status_code == 200
+    assert Decimal(detail_resp.json()["net_cash_flow"]) == Decimal("0")
+
+
+async def test_net_cash_flow_sums_non_archived_trades(
+    auth_client: AsyncClient,
+) -> None:
+    """3 trades with known values; net_cash_flow matches the sum."""
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos = await _seed_position(auth_client, acct["id"], instr["id"])
+
+    t1 = await _p12_seed_trade(
+        auth_client, pos["id"], instr["id"],
+        action="buy", quantity="10", price="50",
+    )
+    t2 = await _p12_seed_trade(
+        auth_client, pos["id"], instr["id"],
+        action="sell", quantity="5", price="41",
+    )
+    t3 = await _p12_seed_trade(
+        auth_client, pos["id"], instr["id"],
+        action="buy", quantity="2", price="50",
+    )
+
+    expected = (
+        Decimal(t1["cash_flow"])
+        + Decimal(t2["cash_flow"])
+        + Decimal(t3["cash_flow"])
+    )
+
+    list_data = (await auth_client.get("/api/positions")).json()
+    assert Decimal(list_data[0]["net_cash_flow"]) == expected
+
+    detail_data = (
+        await auth_client.get(f"/api/positions/{pos['id']}")
+    ).json()
+    assert Decimal(detail_data["net_cash_flow"]) == expected
+
+
+async def test_net_cash_flow_excludes_archived_trades(
+    auth_client: AsyncClient,
+) -> None:
+    """Soft-delete one trade; net_cash_flow drops by that trade's cash_flow."""
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos = await _seed_position(auth_client, acct["id"], instr["id"])
+
+    t1 = await _p12_seed_trade(
+        auth_client, pos["id"], instr["id"],
+        action="buy", quantity="10", price="30",
+    )
+    t2 = await _p12_seed_trade(
+        auth_client, pos["id"], instr["id"],
+        action="sell", quantity="10", price="20",
+    )
+
+    # Archive t1
+    del_resp = await auth_client.delete(f"/api/trades/{t1['id']}")
+    assert del_resp.status_code == 204
+
+    detail = (
+        await auth_client.get(f"/api/positions/{pos['id']}")
+    ).json()
+    assert Decimal(detail["net_cash_flow"]) == Decimal(t2["cash_flow"])
+
+
+async def test_net_cash_flow_isolated_per_position(
+    auth_client: AsyncClient,
+) -> None:
+    """Two positions with separate trades; sums don't bleed across."""
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos1 = await _seed_position(auth_client, acct["id"], instr["id"])
+    pos2 = await _seed_position(auth_client, acct["id"], instr["id"])
+
+    t1a = await _p12_seed_trade(
+        auth_client, pos1["id"], instr["id"],
+        action="buy", quantity="10", price="10",
+    )
+    t1b = await _p12_seed_trade(
+        auth_client, pos1["id"], instr["id"],
+        action="sell", quantity="10", price="20",
+    )
+    t2a = await _p12_seed_trade(
+        auth_client, pos2["id"], instr["id"],
+        action="buy", quantity="5", price="100",
+    )
+
+    expected1 = Decimal(t1a["cash_flow"]) + Decimal(t1b["cash_flow"])
+    expected2 = Decimal(t2a["cash_flow"])
+
+    d1 = (
+        await auth_client.get(f"/api/positions/{pos1['id']}")
+    ).json()
+    d2 = (
+        await auth_client.get(f"/api/positions/{pos2['id']}")
+    ).json()
+
+    assert Decimal(d1["net_cash_flow"]) == expected1
+    assert Decimal(d2["net_cash_flow"]) == expected2
+
+
+async def test_net_cash_flow_closed_matches_pnl_realized(
+    auth_client: AsyncClient,
+) -> None:
+    """After closing, net_cash_flow == pnl_realized."""
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos = await _seed_position(auth_client, acct["id"], instr["id"])
+
+    await _p12_seed_trade(
+        auth_client, pos["id"], instr["id"],
+        action="buy", quantity="10", price="40",
+    )
+    await _p12_seed_trade(
+        auth_client, pos["id"], instr["id"],
+        action="sell", quantity="10", price="50",
+    )
+
+    close_resp = await auth_client.patch(
+        f"/api/positions/{pos['id']}",
+        json={"status": "closed", "closed_at": "2026-06-15T20:00:00Z"},
+    )
+    assert close_resp.status_code == 200
+    data = close_resp.json()
+    assert Decimal(data["net_cash_flow"]) == Decimal(data["pnl_realized"])
+
+
+async def test_archived_before_close_preserves_invariant(
+    auth_client: AsyncClient,
+) -> None:
+    """Archive a trade, then close position → pnl_realized == net_cash_flow."""
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos = await _seed_position(auth_client, acct["id"], instr["id"])
+
+    t1 = await _p12_seed_trade(
+        auth_client, pos["id"], instr["id"],
+        action="sell", quantity="10", price="10",
+    )
+    t2 = await _p12_seed_trade(
+        auth_client, pos["id"], instr["id"],
+        action="buy", quantity="4", price="10",
+    )
+
+    # Archive t1 before closing
+    await auth_client.delete(f"/api/trades/{t1['id']}")
+
+    close_resp = await auth_client.patch(
+        f"/api/positions/{pos['id']}",
+        json={"status": "closed", "closed_at": "2026-06-15T20:00:00Z"},
+    )
+    assert close_resp.status_code == 200
+    data = close_resp.json()
+    # Both pnl_realized and net_cash_flow should equal t2's cash_flow only
+    assert Decimal(data["pnl_realized"]) == Decimal(t2["cash_flow"])
+    assert Decimal(data["net_cash_flow"]) == Decimal(t2["cash_flow"])
+
+
+async def test_net_cash_flow_list_endpoint_does_one_query_per_request(
+    auth_client: AsyncClient,
+    db_engine,
+) -> None:
+    """5 positions × 3 trades: list endpoint issues one SUM-GROUP-BY, not N."""
+    from sqlalchemy import event
+
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+
+    positions = []
+    for _ in range(5):
+        p = await _seed_position(auth_client, acct["id"], instr["id"])
+        positions.append(p)
+
+    expected_per_pos: dict[str, Decimal] = {}
+    for p in positions:
+        total = Decimal("0")
+        for _ in range(3):
+            t = await _p12_seed_trade(
+                auth_client, p["id"], instr["id"],
+                action="buy", quantity="1", price="10",
+            )
+            total += Decimal(t["cash_flow"])
+        expected_per_pos[p["id"]] = total
+
+    # Hook the sync_engine to count SUM-GROUP-BY queries.
+    sum_group_queries: list[str] = []
+
+    @event.listens_for(db_engine.sync_engine, "before_cursor_execute")
+    def _capture(
+        conn, cursor, statement, params, context, executemany,
+    ) -> None:
+        upper = statement.upper()
+        if "SUM" in upper and "GROUP BY" in upper:
+            sum_group_queries.append(statement)
+
+    try:
+        resp = await auth_client.get("/api/positions")
+    finally:
+        event.remove(
+            db_engine.sync_engine, "before_cursor_execute", _capture,
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 5
+    for item in data:
+        assert Decimal(item["net_cash_flow"]) == expected_per_pos[item["id"]]
+    assert len(sum_group_queries) == 1
