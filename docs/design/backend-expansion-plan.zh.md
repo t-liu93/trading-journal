@@ -8,6 +8,10 @@
 > [data-model.zh.md](./data-model.zh.md) 以及前端各计划。本文档**固定阶段顺序与范围**；
 > 每个阶段的详细任务/测试拆分留到后续迭代（每阶段一节或一份短文档，体例参照
 > [frontend-implementation-plan-f1.zh.md](./frontend-implementation-plan-f1.zh.md)）。
+>
+> **V1 release plan：** 本路线图中属于 V1 范围的切片整合在
+> [v1-release-plan.zh.md](./v1-release-plan.zh.md)（V1 北极星文档）。V1 范围或
+> 横切决策变更时，本宏观文档与 V1 plan 应在同一次变更里一起更新。
 
 ## 1. 当前位置
 
@@ -61,11 +65,11 @@ Instrument（无 user_id；全局 ───┘
 |---|---|---|---|---|
 | **P6** | `Instrument` + `OptionContract` + `ForexPair`（create / get / list / search；update/delete 受限——见 §6①） | ⭐⭐⭐ | 一切；前端 instrument 选择器 | ✅ 已完成（2026-05-24） |
 | **P7** | `StrategyConfig` CRUD（`(user_id, strategy_type)` 唯一，upsert 风格） | ⭐ | 策略设置 UI | ✅ 已完成（2026-05-24） |
-| **P8** | `Position` CRUD（owner-scoped；Trade-led — 见 §6②；`status`/`closed_at`/`capital_used` 手填） | ⭐⭐ | 前端 F3 | ⏳ 下一步 |
-| **P9** | `Trade` CRUD（原子成交；`order_group_id` 多腿；服务端算 `cash_flow`；action↔kind 校验 — 见 §6④） | ⭐⭐⭐ | 前端 F4 | — |
-| **P10** | `WheelCycleMeta` + `PmccCycleMeta`（1:1 Position 扩展） | ⭐ | 策略专属视图 | — |
-| **P11** | `TradePlan` 事件流（append revision / list / current） | ⭐⭐ | 外汇计划 UI | — |
-| **P12** | 派生读取层（services）：`days_open`、close 时冻结 `pnl_realized`、`pnl_total`、`roi`；unrealized 延后 | ⭐⭐⭐ | 仪表盘 / 图表（F5） | — |
+| **P8** | `Position` CRUD（owner-scoped；Trade-led — 见 §6②；`status`/`closed_at`/`capital_used` 手填） | ⭐⭐ | 前端 F3 | ✅ 已完成（2026-05-26） |
+| **P9** | `Trade` CRUD（原子成交；`order_group_id` 多腿；服务端算 `cash_flow`；action↔kind 校验 — 见 §6④） | ⭐⭐⭐ | 前端 F4 | ✅ 已完成（2026-05-26） |
+| **P10** | `WheelCycleMeta` + `PmccCycleMeta`（1:1 Position 扩展） | ⭐ | 策略专属视图 | ✅ 已完成（2026-05-27） |
+| **P11** | `TradePlan` 事件流（append revision / list / current） | ⭐⭐ | 外汇计划 UI | ✅ 已完成（2026-05-27） |
+| **P12** | 派生读取层（services）：`days_open`、close 时冻结 `pnl_realized`、`pnl_total`、`roi`；unrealized 延后 | ⭐⭐⭐ | 仪表盘 / 图表（F5） | ⏳ 下一步 |
 | **PX** | 外部集成 Tracer Bullet（股票走 OpenFIGI lookup、forex 本地 seed、DB 缓存表、feature flag、优雅降级）— 见 §4.PX | ⭐⭐ | F2/F3 的 typeahead + 回填；立外部集成接缝 | —（机会主义） |
 
 > 阶段编号延续 `mvp-implementation-plan` 谱系（Phase 0–5）。Phase 5（Docker）仍待办，
@@ -101,7 +105,7 @@ Instrument（无 user_id；全局 ───┘
 - **范围。** create/upsert、按 strategy 查询、list、update、delete。顺序灵活——P6 之后
   任何时候都能做（甚至可作为热身提前做）。
 
-### P8 — Position
+### P8 — Position ✅ 已完成（2026-05-26）
 
 - **目标。** 通用策略实例聚合，像 `Account` 一样 owner-scoped。
 - **模型（§6② 已定）：** *Trade-led，混合派生。* 前端 F4 的流程是"先录一条 Trade
@@ -136,7 +140,7 @@ Instrument（无 user_id；全局 ───┘
 - **不在 P8 范围。** 对 `StrategyConfig.max_exposure` 的下单时强制（推后到 services
   层）；trade 聚合派生读取（`days_open`、`pnl_unrealized`）；自动 close 检测。
 
-### P9 — Trade
+### P9 — Trade ✅ 已完成（2026-05-26）
 
 - **目标。** 在 Position 下记录原子的 broker 级成交；数据录入主力。
 - **范围。** 创建（单条，以及共享一个 `order_group_id` 的多条，用于 IC /
@@ -166,19 +170,19 @@ Instrument（无 user_id；全局 ───┘
   UUID；未分组的 trade 为 NULL。端点同时接受单个对象或数组（原子多腿提交）。
   模式识别（Assignment / Exercise / IC-open）放在前端展示层（data-model §4.5.2）。
 
-### P10 — Strategy-meta 扩展
+### P10 — Strategy-meta 扩展 ✅ 已完成（2026-05-27）
 
 - **目标。** 1:1 Position 扩展，存放策略专属快照/配置（`WheelCycleMeta`：资金/借款/利息；
   `PmccCycleMeta`：`leap_instrument_id`）。
 - **范围。** 绑定到某 Position 的 create/get/update；仅对匹配的 `strategy_type` 有意义。
 
-### P11 — TradePlan 事件流
+### P11 — TradePlan 事件流 ✅ 已完成（2026-05-27）
 
 - **目标。** 每个 Position 的只追加计划修订；查询"当前计划"。
 - **范围。** 追加修订（每 position 自增 `revision_no`）、列出历史、取当前
   （`MAX(revision_no)`）。历史修订不可 update/delete（data-model §4.6）。
 
-### P12 — 派生读取层
+### P12 — 派生读取层 ⏳ 下一步
 
 - **目标。** 让日志真正有用的数字，读时从 `Trade` 行计算
   （data-model §4.4 "Derived — NOT stored"）。
@@ -280,6 +284,16 @@ Instrument（无 user_id；全局 ───┘
 
 ## 变更日志
 
+- **v0.5（2026-05-27）** — P8 / P9 / P10 / P11 全部在 `refactoring/rebuild` 上交付。
+  P8 引入 `services/positions.py`（Trade-led、手填 status、服务端冻结 `pnl_realized`）。
+  P9 引入 `services/trades.py`（原子成交、服务端算 `cash_flow`、`order_group_id`
+  多腿、`Trade.archived_at` 软删）。P10 引入 `services/strategy_meta.py`（嵌套
+  `/positions/{pid}/wheel-meta` 与 `.../pmcc-meta` 共 8 个端点）。P11 引入
+  `services/trade_plans.py`，严格 append-only 事件流（4 个端点、服务端分配
+  `revision_no`、无 PATCH/DELETE）。状态表翻篇：P8 → P9 → P10 → P11 全部 ✅；
+  **P12 现在是 ⏳ 下一步**。V1 release plan（[v1-release-plan.zh.md](./v1-release-plan.zh.md)）
+  整合 V1 切片，并把 P12 范围细化为「单仓位派生前端算、后端 P12 只交付列表聚合 +
+  dashboard 端点」。后端测试套件：**347 条全绿**；`ruff` + `mypy --strict` clean。
 - **v0.4（2026-05-26）** — P9 Trade CRUD 交付。§6④ 修正：
   `price > 0` → `price >= 0`，以兼容 data-model §4.5.2 中合法使用
   `price=0` 的 worthless-expire / assignment 场景。后端测试套件：272 条全绿。

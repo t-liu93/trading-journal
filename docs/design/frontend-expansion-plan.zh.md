@@ -14,6 +14,10 @@
 > [frontend-implementation-plan-f2.zh.md](./frontend-implementation-plan-f2.zh.md)
 > （F2 详细 — 本次重订下的首份）。各 F-phase 的详细文档以
 > `frontend-implementation-plan-fN.zh.md` 形式落地（每 phase 一份）。
+>
+> **V1 release plan：** 本路线图中属于 V1 范围的切片整合在
+> [v1-release-plan.zh.md](./v1-release-plan.zh.md)（V1 北极星文档）。V1 范围或
+> 横切决策变更时，本宏观文档与 V1 plan 应在同一次变更里一起更新。
 
 ## 1. 当前状态
 

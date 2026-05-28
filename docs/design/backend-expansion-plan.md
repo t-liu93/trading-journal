@@ -9,6 +9,11 @@
 > **phase ordering and scope**; the detailed per-phase task/test breakdowns land in
 > follow-up iterations (one short section or doc per phase, like
 > [frontend-implementation-plan-f1.md](./frontend-implementation-plan-f1.md)).
+>
+> **V1 release plan:** The V1-cut subset of this roadmap is consolidated in
+> [v1-release-plan.md](./v1-release-plan.md) (the V1 north star). When V1 scope
+> or cross-cutting decisions change, update both this macro and the V1 plan in
+> the same change.
 
 ## 1. Where we are
 
@@ -68,11 +73,11 @@ Instrument (NO user_id; global ─┘
 |---|---|---|---|---|
 | **P6** | `Instrument` + `OptionContract` + `ForexPair` (create / get / list / search; update/delete restricted — see §6①) | ⭐⭐⭐ | everything; frontend instrument picker | ✅ done (2026-05-24) |
 | **P7** | `StrategyConfig` CRUD (`(user_id, strategy_type)` unique, upsert-style) | ⭐ | strategy settings UI | ✅ done (2026-05-24) |
-| **P8** | `Position` CRUD (owner-scoped; Trade-led — see §6②; manual `status`/`closed_at`/`capital_used`) | ⭐⭐ | frontend F3 | ⏳ next |
-| **P9** | `Trade` CRUD (atomic fills; `order_group_id` multi-leg; server computes `cash_flow`; action↔kind validated — see §6④) | ⭐⭐⭐ | frontend F4 | — |
-| **P10** | `WheelCycleMeta` + `PmccCycleMeta` (1:1 Position extensions) | ⭐ | strategy-specific views | — |
-| **P11** | `TradePlan` event-stream (append revision / list / current) | ⭐⭐ | forex plan UI | — |
-| **P12** | Derived read layer (services): `days_open`, `pnl_realized` on close, `pnl_total`, `roi`; unrealized deferred | ⭐⭐⭐ | dashboards / charts (F5) | — |
+| **P8** | `Position` CRUD (owner-scoped; Trade-led — see §6②; manual `status`/`closed_at`/`capital_used`) | ⭐⭐ | frontend F3 | ✅ done (2026-05-26) |
+| **P9** | `Trade` CRUD (atomic fills; `order_group_id` multi-leg; server computes `cash_flow`; action↔kind validated — see §6④) | ⭐⭐⭐ | frontend F4 | ✅ done (2026-05-26) |
+| **P10** | `WheelCycleMeta` + `PmccCycleMeta` (1:1 Position extensions) | ⭐ | strategy-specific views | ✅ done (2026-05-27) |
+| **P11** | `TradePlan` event-stream (append revision / list / current) | ⭐⭐ | forex plan UI | ✅ done (2026-05-27) |
+| **P12** | Derived read layer (services): `days_open`, `pnl_realized` on close, `pnl_total`, `roi`; unrealized deferred | ⭐⭐⭐ | dashboards / charts (F5) | ⏳ next |
 | **PX** | External Integrations Tracer Bullet (stocks via OpenFIGI lookup, forex local seed, DB cache table, feature-flagged, graceful degrade) — see §4.PX | ⭐⭐ | typeahead + autofill in F2/F3; lays the reusable integrations seam | — (opportunistic) |
 
 > Phase numbers continue the `mvp-implementation-plan` lineage (Phase 0–5). Phase 5
@@ -113,7 +118,7 @@ Instrument (NO user_id; global ─┘
 - **Scope.** Create/upsert, get-by-strategy, list, update, delete. Order-flexible — can
   ship anytime after P6 (or even before, as a warm-up).
 
-### P8 — Position
+### P8 — Position ✅ done (2026-05-26)
 
 - **Goal.** The universal strategy-instance aggregate, owner-scoped like `Account`.
 - **Model (settled §6②):** *Trade-led, hybrid-derive.* The frontend F4 flow is
@@ -152,7 +157,7 @@ Instrument (NO user_id; global ─┘
   (deferred to a services layer); trade aggregation derived reads (`days_open`,
   `pnl_unrealized`); auto close-detector.
 
-### P9 — Trade
+### P9 — Trade ✅ done (2026-05-26)
 
 - **Goal.** Record atomic broker-level fills under a Position; the data entry workhorse.
 - **Scope.** Create (single, and multi-row sharing one `order_group_id` for IC /
@@ -184,21 +189,21 @@ Instrument (NO user_id; global ─┘
   submission). Pattern detection (Assignment / Exercise / IC-open) lives in the
   frontend display layer (data-model §4.5.2).
 
-### P10 — Strategy-meta extensions
+### P10 — Strategy-meta extensions ✅ done (2026-05-27)
 
 - **Goal.** 1:1 Position extensions holding strategy-specific snapshot/config
   (`WheelCycleMeta`: funding/loan/interest; `PmccCycleMeta`: `leap_instrument_id`).
 - **Scope.** Create/get/update tied to a Position; only meaningful for the matching
   `strategy_type`.
 
-### P11 — TradePlan event stream
+### P11 — TradePlan event stream ✅ done (2026-05-27)
 
 - **Goal.** Append-only plan revisions per Position; query "current plan".
 - **Scope.** Append revision (auto-increment `revision_no` per position), list history,
   get current (`MAX(revision_no)`). No update/delete of historical revisions
   (data-model §4.6).
 
-### P12 — Derived read layer
+### P12 — Derived read layer ⏳ next
 
 - **Goal.** The numbers that make a journal useful, computed at read time from `Trade`
   rows (data-model §4.4 "Derived — NOT stored").
@@ -322,6 +327,19 @@ phases share the same vocabulary; the per-phase detail plans implement them.
 
 ## Changelog
 
+- **v0.5 (2026-05-27)** — P8 / P9 / P10 / P11 all shipped on `refactoring/rebuild`.
+  P8 introduced `services/positions.py` (Trade-led, manual status, server-frozen
+  `pnl_realized`). P9 introduced `services/trades.py` (atomic fills, server-computed
+  `cash_flow`, multi-leg via `order_group_id`, soft-delete via `Trade.archived_at`).
+  P10 introduced `services/strategy_meta.py` (8 endpoints across nested
+  `/positions/{pid}/wheel-meta` and `.../pmcc-meta`). P11 introduced
+  `services/trade_plans.py` with strictly append-only event stream (4 endpoints,
+  server-allocated `revision_no`, no PATCH/DELETE). Status table flips: P8 → P9 →
+  P10 → P11 all ✅ done; **P12 is now ⏳ next**. V1 release plan
+  ([v1-release-plan.md](./v1-release-plan.md)) consolidates the V1 cut and the
+  P12 scope refinement (per-position derived computed in frontend; backend P12
+  delivers list aggregate + dashboard endpoints only). Backend test suite: **347
+  passing**; `ruff` + `mypy --strict` clean.
 - **v0.4 (2026-05-26)** — P9 Trade CRUD shipped. §6④ amended:
   `price > 0` → `price >= 0` to honor data-model §4.5.2 worthless-expire /
   assignment flows that legitimately use `price=0`. Backend test suite: 272

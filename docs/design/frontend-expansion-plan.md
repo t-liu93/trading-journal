@@ -13,6 +13,11 @@
 > [frontend-implementation-plan-f2.md](./frontend-implementation-plan-f2.md) (F2 detailed —
 > first plan written under this revision). Detailed per-F-phase docs land in
 > `frontend-implementation-plan-fN.md` (one per F-phase).
+>
+> **V1 release plan:** The V1-cut subset of this roadmap is consolidated in
+> [v1-release-plan.md](./v1-release-plan.md) (the V1 north star). When V1 scope
+> or cross-cutting decisions change, update both this macro and the V1 plan in
+> the same change.
 
 ## 1. Where we are
 
