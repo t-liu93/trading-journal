@@ -23,6 +23,10 @@ const menuOptions = computed<MenuOption[]>(() => [
     label: () => h(RouterLink, { to: { name: 'accounts' } }, () => 'Accounts'),
   },
   {
+    key: 'positions',
+    label: () => h(RouterLink, { to: { name: 'positions' } }, () => 'Positions'),
+  },
+  {
     key: 'instruments',
     label: () => h(RouterLink, { to: { name: 'instruments' } }, () => 'Instruments'),
   },
@@ -32,7 +36,11 @@ const menuOptions = computed<MenuOption[]>(() => [
   },
 ])
 
-const activeKey = computed(() => (route.name as string | undefined) ?? '')
+const activeKey = computed(() => {
+  const name = (route.name as string | undefined) ?? ''
+  if (name === 'position-detail') return 'positions'
+  return name
+})
 
 async function handleLogout(): Promise<void> {
   try {

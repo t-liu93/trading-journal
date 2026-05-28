@@ -5,15 +5,17 @@ import AuthenticatedLayout from '../components/AuthenticatedLayout.vue'
 import { useAccounts } from '../composables/useAccounts'
 import { useInstruments } from '../composables/useInstruments'
 import { useStrategyConfigs } from '../composables/useStrategyConfigs'
+import { usePositions } from '../composables/usePositions'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const { accounts, loading: accountsLoading, error: accountsError, refresh: refreshAccounts } = useAccounts()
 const { instruments, loading: instrumentsLoading, error: instrumentsError, refresh: refreshInstruments } = useInstruments()
 const { configs, loading: configsLoading, error: configsError, refresh: refreshConfigs } = useStrategyConfigs()
+const { positions, loading: positionsLoading, error: positionsError, refresh: refreshPositions } = usePositions()
 
 onMounted(async () => {
-  await Promise.all([refreshAccounts(), refreshInstruments(), refreshConfigs()])
+  await Promise.all([refreshAccounts(), refreshInstruments(), refreshConfigs(), refreshPositions()])
 })
 </script>
 
@@ -38,6 +40,26 @@ onMounted(async () => {
             <div style="margin-top: 0.75rem;">
               <RouterLink :to="{ name: 'accounts' }" class="card-link">
                 Manage accounts →
+              </RouterLink>
+            </div>
+          </template>
+        </n-card>
+      </n-grid-item>
+
+      <n-grid-item span="3 m:1">
+        <n-card title="Positions" hoverable>
+          <n-skeleton v-if="positionsLoading" text :repeat="2" />
+          <template v-else>
+            <p class="metric" :class="{ 'metric-error': positionsError }">
+              {{ positionsError ? '?' : positions.length }}
+            </p>
+            <n-text v-if="positionsError" depth="3" style="font-size: 0.85rem; color: var(--n-color-error, #d03050);">
+              Couldn't load positions: {{ positionsError }}
+            </n-text>
+            <n-text v-else depth="3" style="font-size: 0.85rem;">open positions</n-text>
+            <div style="margin-top: 0.75rem;">
+              <RouterLink :to="{ name: 'positions' }" class="card-link">
+                Browse positions →
               </RouterLink>
             </div>
           </template>
@@ -81,17 +103,6 @@ onMounted(async () => {
               </RouterLink>
             </div>
           </template>
-        </n-card>
-      </n-grid-item>
-
-      <n-grid-item span="3 m:1">
-        <n-card title="Positions (Phase F3)" class="card-disabled">
-          <n-text depth="3">Coming in Phase F3.</n-text>
-          <div style="margin-top: 0.75rem;">
-            <n-text depth="3" style="font-size: 0.85rem;">
-              Wheel, iron condor, PMCC, spot — all your in-flight strategies will live here.
-            </n-text>
-          </div>
         </n-card>
       </n-grid-item>
 

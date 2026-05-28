@@ -4,6 +4,7 @@ import { type FormInst, type FormRules, useMessage } from 'naive-ui'
 import {
   instrumentsApi,
   type Instrument,
+  type InstrumentKind,
   type StockCreate,
   type OptionCreate,
   type ForexCreate,
@@ -13,6 +14,8 @@ import { ApiError } from '../api/types'
 
 const props = defineProps<{
   show: boolean
+  initialKind?: InstrumentKind
+  initialSymbol?: string
 }>()
 
 const emit = defineEmits<{
@@ -165,7 +168,17 @@ function resetModels() {
 watch(() => props.show, (visible) => {
   if (visible) {
     resetModels()
-    activeKind.value = 'stock'
+    if (props.initialKind) {
+      activeKind.value = props.initialKind as KindKey
+    } else {
+      activeKind.value = 'stock'
+    }
+    if (props.initialSymbol) {
+      const sym = props.initialSymbol
+      if (activeKind.value === 'stock') stockModel.value.symbol = sym
+      else if (activeKind.value === 'option') optionModel.value.underlying_symbol = sym
+      else forexModel.value.symbol = sym
+    }
   }
 })
 

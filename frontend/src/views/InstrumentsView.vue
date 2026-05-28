@@ -41,6 +41,10 @@ function kindTagColor(kind: InstrumentKind): 'success' | 'warning' | 'info' {
 
 const columns = computed<DataTableColumns<Instrument>>(() => [
   {
+    type: 'expand',
+    renderExpand: (row) => renderExpandContent(row),
+  },
+  {
     title: 'Kind',
     key: 'kind',
     width: 100,
@@ -57,9 +61,17 @@ const columns = computed<DataTableColumns<Instrument>>(() => [
   },
 ])
 
-function renderExpand(row: Instrument) {
+function renderExpandContent(row: Instrument) {
+  const idRow = [
+    h(NText, { depth: 3 }, () => 'ID:'),
+    h('span', { style: 'font-family: monospace; font-size: 0.8rem;' }, row.id),
+  ]
   if (row.kind === 'stock') {
-    return h(NText, { depth: 3 }, () => 'No additional fields for stock instruments.')
+    return h(
+      'div',
+      { style: 'display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; padding: 0.5rem 0;' },
+      idRow,
+    )
   }
   if (row.kind === 'option' && row.option) {
     const o = row.option
@@ -67,6 +79,7 @@ function renderExpand(row: Instrument) {
       'div',
       { style: 'display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; padding: 0.5rem 0;' },
       [
+        ...idRow,
         h(NText, { depth: 3 }, () => 'Type:'), h('span', {}, o.opt_type),
         h(NText, { depth: 3 }, () => 'Strike:'), h('span', {}, o.strike),
         h(NText, { depth: 3 }, () => 'Expiry:'), h('span', {}, o.expiry),
@@ -81,6 +94,7 @@ function renderExpand(row: Instrument) {
       'div',
       { style: 'display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; padding: 0.5rem 0;' },
       [
+        ...idRow,
         h(NText, { depth: 3 }, () => 'Base:'), h('span', {}, f.base_currency),
         h(NText, { depth: 3 }, () => 'Quote:'), h('span', {}, f.quote_currency),
         h(NText, { depth: 3 }, () => 'Pip Size:'), h('span', {}, f.pip_size),
@@ -88,7 +102,11 @@ function renderExpand(row: Instrument) {
       ],
     )
   }
-  return null
+  return h(
+    'div',
+    { style: 'display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; padding: 0.5rem 0;' },
+    idRow,
+  )
 }
 </script>
 
@@ -121,11 +139,11 @@ function renderExpand(row: Instrument) {
       :data="instruments"
       :loading="loading"
       :row-key="(row: Instrument) => row.id"
-      :render-expand="renderExpand"
       size="small"
     >
       <template #empty>
-        <n-empty description="No instruments yet — create one to get started.">
+        <n-empty v-if="query || kindFilter" description="No instruments match your search." />
+        <n-empty v-else description="No instruments yet — create one to get started.">
           <template #extra>
             <n-button type="primary" @click="openCreate">+ Create your first instrument</n-button>
           </template>
