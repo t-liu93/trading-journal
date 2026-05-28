@@ -2,8 +2,10 @@
 
 **Language:** English | [中文](./backend-expansion-plan-p12.zh.md)
 
-> Status: **DRAFT v0.1** (2026-05-27). Detailed build plan for **P12** from
-> the macro roadmap [backend-expansion-plan.md](./backend-expansion-plan.md).
+> Status: **DONE v0.2** (2026-05-28) — shipped on `refactoring/rebuild` (commit
+> `6af39f0`, 406 backend tests passing, `ruff` + `mypy --strict` clean). Detailed
+> build plan for **P12** from the macro roadmap
+> [backend-expansion-plan.md](./backend-expansion-plan.md).
 > Self-contained — an implementer can execute it directly. Companions:
 > [v1-release-plan.md](./v1-release-plan.md) (V1 cut + cross-cutting decisions),
 > [data-model.md §4.4 / §6](./data-model.md#44-position-universal-strategy-instance)
@@ -614,6 +616,13 @@ V1.x extensions, if/when needed:
 
 ## Changelog
 
+- **v0.2 (2026-05-28)** — Shipped on `refactoring/rebuild` (commit `6af39f0`).
+  P12.1 + P12.2 both delivered as planned; **18 new tests** in
+  `tests/test_dashboard.py` (13) + `tests/test_positions.py` (5 added);
+  total suite **406 passing** (up from 347 post-P11). No deviations from
+  the v0.1 plan: schemas, services, routers, and codegen all match the
+  spec. `frontend/src/api/schema.d.ts` regenerated and committed. Status
+  flipped from DRAFT → DONE.
 - **v0.1 (2026-05-27)** — Initial P12 detailed plan. Five sub-decisions
   settled: (1) two separate fields (`pnl_realized` frozen-on-close vs
   derived `net_cash_flow`); (2) `net_cash_flow` is API-only, never

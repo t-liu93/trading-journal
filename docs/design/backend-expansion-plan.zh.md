@@ -69,7 +69,7 @@ Instrument（无 user_id；全局 ───┘
 | **P9** | `Trade` CRUD（原子成交；`order_group_id` 多腿；服务端算 `cash_flow`；action↔kind 校验 — 见 §6④） | ⭐⭐⭐ | 前端 F4 | ✅ 已完成（2026-05-26） |
 | **P10** | `WheelCycleMeta` + `PmccCycleMeta`（1:1 Position 扩展） | ⭐ | 策略专属视图 | ✅ 已完成（2026-05-27） |
 | **P11** | `TradePlan` 事件流（append revision / list / current） | ⭐⭐ | 外汇计划 UI | ✅ 已完成（2026-05-27） |
-| **P12** | 派生读取层（services）：`days_open`、close 时冻结 `pnl_realized`、`pnl_total`、`roi`；unrealized 延后 | ⭐⭐⭐ | 仪表盘 / 图表（F5） | ⏳ 下一步 |
+| **P12** | 派生读取层（services）：列表/详情中的 `net_cash_flow` + `GET /dashboard/summary`；unrealized 延后 | ⭐⭐⭐ | 仪表盘 / 图表（F5） | ✅ 已完成（2026-05-28） |
 | **PX** | 外部集成 Tracer Bullet（股票走 OpenFIGI lookup、forex 本地 seed、DB 缓存表、feature flag、优雅降级）— 见 §4.PX | ⭐⭐ | F2/F3 的 typeahead + 回填；立外部集成接缝 | —（机会主义） |
 
 > 阶段编号延续 `mvp-implementation-plan` 谱系（Phase 0–5）。Phase 5（Docker）仍待办，
@@ -182,14 +182,21 @@ Instrument（无 user_id；全局 ───┘
 - **范围。** 追加修订（每 position 自增 `revision_no`）、列出历史、取当前
   （`MAX(revision_no)`）。历史修订不可 update/delete（data-model §4.6）。
 
-### P12 — 派生读取层 ⏳ 下一步
+### P12 — 派生读取层 ✅ 已完成（2026-05-28）
 
 - **目标。** 让日志真正有用的数字，读时从 `Trade` 行计算
   （data-model §4.4 "Derived — NOT stored"）。
-- **范围（MVP 可行）。** `days_open`、已实现 PnL（对 `cash_flow` 求和），并在
-  status→`closed` 转换时把 `pnl_realized` 冻结到行上；`roi_on_capital`。很可能用一个
-  `services/` 模块保持路由精简。
+- **已交付。** 在 `GET /positions` 与 `GET /positions/{id}` 响应中加入
+  per-position `net_cash_flow` 字段（按 position_id `SUM(trade.cash_flow) GROUP BY`，
+  排除 archived trade，永远存在 —— 无 trade 时返回 `Decimal("0")`）。新增
+  `GET /api/dashboard/summary` 端点，返回 `ClosedSummary`（count、win_rate、
+  per-currency PnL、按 (月, 货币) 的 monthly PnL）+ `OpenSummary`（count、
+  per-currency net_cash_flow）。owner-scoped；无新 DB 迁移，全部派生。复用
+  `services/positions.py` 加批量 `compute_net_cash_flows`；新增
+  `services/dashboard.py`，含 `compute_summary(session, user_id)`。
 - **延后。** `pnl_unrealized`、`pnl_total`、`annualized_return`——需要行情源（不在 MVP）。
+  单仓位 `days_open` / `roi_on_capital` / `result` 按 V1 release plan 决策 5 在前端计算。
+  FX 换算与更细分端点（`/per-currency`、`/monthly-pnl` 等）延后到 V1.x。
 
 ## 5. 横切 & 延后交付物（已登记追踪）
 
@@ -284,6 +291,16 @@ Instrument（无 user_id；全局 ───┘
 
 ## 变更日志
 
+- **v0.6（2026-05-28）** — P12 派生读取层在 `refactoring/rebuild` 上交付。P12.1
+  在 `PositionRead`（list + detail）加入 `net_cash_flow: Decimal`，由批量的
+  `services/positions.compute_net_cash_flows` 驱动（单次请求一条 SUM-GROUP-BY，
+  无 N+1）。P12.2 新增 `GET /api/dashboard/summary`，返回 per-currency 已平 P/L
+  + 月度桶 + win_rate + per-currency 持仓 net_cash_flow 快照。新文件：
+  `schemas/dashboard.py`、`services/dashboard.py`、`api/dashboard.py`、
+  `tests/test_dashboard.py`（13 条）。`tests/test_positions.py` 扩充 `net_cash_flow`
+  覆盖。`frontend/src/api/schema.d.ts` 已重新生成。后端测试套件：**406 条全绿**
+  （之前 347）；`ruff` + `mypy --strict` clean。V1 后端切片至此全部完成；剩余
+  V1 工作为前端 F3 → F4 → F5 → F6。PX 仍属机会主义。
 - **v0.5（2026-05-27）** — P8 / P9 / P10 / P11 全部在 `refactoring/rebuild` 上交付。
   P8 引入 `services/positions.py`（Trade-led、手填 status、服务端冻结 `pnl_realized`）。
   P9 引入 `services/trades.py`（原子成交、服务端算 `cash_flow`、`order_group_id`

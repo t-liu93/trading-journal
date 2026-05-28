@@ -21,10 +21,11 @@
 
 ## 1. Where we are
 
-Frontend F0 (auth scaffold) and F1 (Account CRUD UI) shipped on `refactoring/rebuild`.
-Backend P6 (Instrument CRUD for stock/option/forex) just shipped (92 backend tests
-green). Backend P7–P12 not yet started; see
-[backend-expansion-plan.md §4](./backend-expansion-plan.md#4-phase-roadmap).
+Frontend F0 (auth scaffold), F1 (Account CRUD UI), and F2 (Instrument + StrategyConfig
+UI) shipped on `refactoring/rebuild`. **Backend is V1-complete** — P6 through P12
+all shipped (406 backend tests green; `ruff` + `mypy --strict` clean); see
+[backend-expansion-plan.md §4](./backend-expansion-plan.md#4-phase-roadmap). The
+remaining V1 work is **entirely frontend**: F3 → F4 → F5 → F6.
 
 **Sequencing decision (revised v0.2):** backend leads, frontend follows in the same
 iteration — **but the F-phase granularity has been coarsened** so each F-phase
@@ -62,9 +63,9 @@ UI iteration than micro-stepped F2.x slices would.
 | F-phase | Backend gate | UI deliverable | Status |
 |---|---|---|---|
 | **F2** | [P6](./backend-expansion-plan.md#p6--instrument-base--extensions) ✅ + [P7](./backend-expansion-plan.md#p7--strategyconfig) ✅ | `InstrumentPicker` component + `/instruments` browse page + `/settings/strategies` page | ✅ done (2026-05-26) |
-| **F3** | [P8](./backend-expansion-plan.md#p8--position) + [P10](./backend-expansion-plan.md#p10--strategy-meta-extensions) + [P11](./backend-expansion-plan.md#p11--tradeplan-event-stream) | Position list + create/edit + detail page (with strategy-meta tabs and Plan tab) | ⏳ next (after P8/P10/P11) |
-| **F4** | [P9](./backend-expansion-plan.md#p9--trade) | Trade entry (multi-leg `order_group_id` UX) + Position-detail trade log | — |
-| **F5** | [P12](./backend-expansion-plan.md#p12--derived-read-layer) | Dashboards: per-currency PnL + open/closed positions + charts | — |
+| **F3** | [P8](./backend-expansion-plan.md#p8--position) ✅ + [P10](./backend-expansion-plan.md#p10--strategy-meta-extensions) ✅ + [P11](./backend-expansion-plan.md#p11--tradeplan-event-stream) ✅ + [P12.1](./backend-expansion-plan.md#p12--derived-read-layer) ✅ (list `net_cash_flow`) | Position list + create/edit + detail page (with strategy-meta tabs and Plan tab) | ⏳ next (all gates ready) |
+| **F4** | [P9](./backend-expansion-plan.md#p9--trade) ✅ | Trade entry (multi-leg `order_group_id` UX) + Position-detail trade log | — (gate ready) |
+| **F5** | [P12.2](./backend-expansion-plan.md#p12--derived-read-layer) ✅ (`/api/dashboard/summary`) | Dashboards: per-currency PnL + open/closed positions + monthly PnL chart | — (gate ready) |
 | **F6** | [Backend Phase 5](./mvp-implementation-plan.md#phase-5--docker-single-container-deployment) | Single-container Docker production build wiring (FastAPI serves `frontend/dist`) | — |
 
 [P6.x — external instrument validation](./backend-expansion-plan.md#p6x--external-instrument-validation-first-external-api-integration-optional-non-blocking)
@@ -233,6 +234,7 @@ Each item is **OPEN** pending sign-off. My leanings noted.
 
 ## Changelog
 
+- **v0.4 (2026-05-28)** — All backend gates for F3 + F4 + F5 are now green (P8/P10/P11 ✅, P9 ✅, P12 ✅; 406 backend tests passing). §1 "Where we are" rewritten to reflect "V1-complete backend; remaining work entirely frontend". §3 mapping table flips F3/F4/F5 rows from "—" to "gate ready". Detail plans `frontend-implementation-plan-f3.md` / `-f4.md` / `-f5.md` (+ each `.zh.md`) drafted in the same iteration. Open decision ③ (chart lib) settled at the V1 layer to `vue-echarts`; F5 detail plan still does the side-by-side write-up.
 - **v0.3 (2026-05-26)** — Mark F2 as done. Delivered `InstrumentPicker` (typeahead,
   reusable for F3/F4), `InstrumentForm` (stock/option/forex tabs with get-or-create
   UX), `/instruments` browse page, `/settings/strategies` page (PATCH-aware,

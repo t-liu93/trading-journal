@@ -21,9 +21,9 @@ This document is the **single source of truth for V1**:
 
 When a V1 scope or decision changes, all three are updated in the same change. The macro docs hold the long-term horizon; this doc holds the V1 cut. After V1 ships, the macros are archived and this becomes the record.
 
-## 2. Where we are (2026-05-27)
+## 2. Where we are (2026-05-28)
 
-**Backend (347 tests passing; `ruff` + `mypy --strict` clean):**
+**Backend (406 tests passing; `ruff` + `mypy --strict` clean) — V1 backend cut complete:**
 
 - Auth — FastAPI Users cookie + DB sessions
 - Account CRUD ([mvp-implementation-plan.md Phase 4](./mvp-implementation-plan.md#phase-4--account-crud-the-vertical-slice))
@@ -33,6 +33,7 @@ When a V1 scope or decision changes, all three are updated in the same change. T
 - P9 Trade (server-computed `cash_flow`, multi-leg via `order_group_id`, `archived_at` soft-delete)
 - P10 Strategy-meta (`/positions/{pid}/wheel-meta` + `.../pmcc-meta`)
 - P11 TradePlan (append-only event stream, server-allocated `revision_no`)
+- P12 Derived read layer — per-position `net_cash_flow` on list/detail + `GET /api/dashboard/summary`
 
 **Frontend (`vue-tsc` + `vite build` clean; `schema.d.ts` fresh):**
 
@@ -40,7 +41,7 @@ When a V1 scope or decision changes, all three are updated in the same change. T
 - F1 Account CRUD UI
 - F2 `InstrumentPicker` (select-only typeahead) + `InstrumentForm` + `/instruments` browse + `/settings/strategies`
 
-**Not yet built:** P12 (backend derived read layer), F3 (Position UI), F4 (Trade entry UI), F5 (Dashboard), F6 (Docker single-container).
+**Not yet built:** F3 (Position UI), F4 (Trade entry UI), F5 (Dashboard), F6 (Docker single-container). The remaining V1 work is **entirely frontend**.
 
 ## 3. V1 cut
 
@@ -48,7 +49,7 @@ When a V1 scope or decision changes, all three are updated in the same change. T
 
 | Phase | Deliverable | Macro reference |
 |---|---|---|
-| **P12** | Position list PnL column (SQL aggregate) + dashboard aggregate endpoints | [backend-expansion-plan.md §P12](./backend-expansion-plan.md#p12--derived-read-layer) |
+| **P12** ✅ | Position list `net_cash_flow` + `GET /api/dashboard/summary` (per-currency PnL, monthly buckets, win_rate, open snapshot) | [backend-expansion-plan.md §P12](./backend-expansion-plan.md#p12--derived-read-layer) |
 | **F3** | Position list / create / edit / detail page (Overview / Meta / Plan / Trades tabs); `InstrumentPicker` gains `allowCreate` | [frontend-expansion-plan.md §F3](./frontend-expansion-plan.md#f3--position-crud--detail-page-with-strategy-meta-tabs--plan-tab) |
 | **F4** | Trade entry UI (Custom multi-leg primary); Position-detail Trades tab grouped by `order_group_id` | [frontend-expansion-plan.md §F4](./frontend-expansion-plan.md#f4--trade-entry) |
 | **F5** | Dashboard — per-currency PnL cards + open/closed tables + one chart (monthly realized PnL bars) | [frontend-expansion-plan.md §F5](./frontend-expansion-plan.md#f5--dashboards--charts) |
@@ -122,45 +123,42 @@ Split based on data-fetch shape and dataset size:
 ## 5. Sequencing and dependency graph
 
 ```
-Backend already done:  P6 → P7 → P8 → P9 → P10 → P11 ✅
+Backend already done:  P6 → P7 → P8 → P9 → P10 → P11 → P12 ✅
 Frontend already done: F0 → F1 → F2 ✅
 
-V1 remaining:
+V1 remaining (frontend-only):
 
-P12.1 (list PnL aggregate) ──┐
-                              ├──> F3 ──> F4 ──┐
-                              │                  ├──> F5 ──> F6
-P12.2 (dashboard endpoints) ──┘                  │
-                                                  └─ (F5 depends on P12.2)
+F3 ──> F4 ──> F5 ──> F6
 ```
 
-**Default execution order** (recommended): **P12 → F3 → F4 → F5 → F6**, with P12 done as one phase containing both sub-deliverables. The two P12 sub-deliverables share SQL helpers, so splitting them would duplicate work.
+**Default execution order** (recommended): **F3 → F4 → F5 → F6**. F3 ships Position list (consumes P12's `net_cash_flow`) + create/edit + detail page with Overview/Meta/Plan/Trades tabs (Trades tab is a placeholder until F4). F4 wires the trade entry modal and turns the Trades tab live. F5 consumes `GET /api/dashboard/summary`. F6 packages the lot in a single container.
 
-**Alternative considered**: lead with F3 then F4 (frontend debug loops are longer; F3/F4 don't strictly depend on P12 since single-position derived is computed in frontend per Decision 5). Discussed and reverted on 2026-05-27 — user opted to land P12 first so frontend phases can hit a complete API surface.
+**Alternative considered**: lead with F4 then F3 (Trade-led model means Position is born with a first Trade; doing F4 first would let F3 always have real positions to display). Discussed on 2026-05-26 and reverted — F3 ships the Position list/detail surface that F4's entry modal docks into, so the natural order is F3 first with a read-only Trades tab placeholder, then F4 makes it interactive.
 
 ## 6. Per-phase scope summary
 
 Detailed plans live in their own `*-pN.md` / `*-fN.md` files (one EN + one ZH per phase, sub-phases as sections inside the same doc). The summaries here are the V1 cut only — they refine, but do not supersede, the macro docs.
 
-### 6.1 P12 — Backend derived read layer
+### 6.1 P12 — Backend derived read layer ✅ done (2026-05-28)
 
 - **Macro reference:** [backend-expansion-plan.md §P12](./backend-expansion-plan.md#p12--derived-read-layer)
-- **Detail plan:** `backend-expansion-plan-p12.md` (+ `.zh.md`) — to be written
+- **Detail plan:** [backend-expansion-plan-p12.md](./backend-expansion-plan-p12.md) (+ [.zh.md](./backend-expansion-plan-p12.zh.md)) — done
 
-**V1 scope.**
+**Shipped V1 scope.**
 
-- **P12.1 — Position list enhancement.** `GET /positions` response gains a `current_pnl` field (name finalised in detail plan) sourced from a SQL `SUM(trade.cash_flow) GROUP BY position_id`. For open positions this is running realized PnL; for closed positions this surfaces the frozen `pnl_realized` on the row. Behind `?include_derived=true` flag or always-on is a sub-decision settled in the detail plan.
-- **P12.2 — Dashboard aggregate endpoints** under `/dashboard/*` (or `/stats/*` — name settled in detail plan):
-  - Per-currency PnL summary (open + closed split).
-  - Win rate over closed positions: `count(pnl_realized > 0) / count(*)`.
-  - Monthly realized PnL buckets per currency (for the F5 chart).
-  - Open / closed position counts.
+- **P12.1 — Position list enhancement.** `GET /positions` and `GET /positions/{id}` responses always include `net_cash_flow: Decimal` (one batched `SUM(trade.cash_flow) GROUP BY position_id`, archived trades excluded). For open positions this is the running realized PnL signal; for closed positions it equals the frozen `pnl_realized` (mathematically). Zero when no trades exist.
+- **P12.2 — Dashboard aggregate endpoint** `GET /api/dashboard/summary`, owner-scoped, returns:
+  - `closed.count`, `closed.win_rate` (`Decimal | None`), `closed.per_currency_pnl[]`, `closed.monthly_pnl[]` (per `(month, currency)`).
+  - `open.count`, `open.per_currency_net_cash_flow[]`.
+  - All currency arrays sorted alphabetically; monthly array sorted by `(month ASC, currency ASC)`.
 
-**Explicitly out of V1 P12:**
+**Explicitly out of V1 P12 (deferred to V1.x):**
 
 - Single-position derived endpoint — frontend computes (Decision 5).
 - `pnl_unrealized` / `pnl_total` with market quotes — no quote provider in V1.
 - FX-converted aggregates — no `FxRate` table in V1.
+- Granular endpoints (`/per-currency`, `/monthly-pnl`, `/win-rate`, `/counts`) — subsumed by the single summary endpoint; split only if a future view needs partial fetches.
+- Date-range filtering / strategy-type filtering on the summary.
 
 ### 6.2 F3 — Position UI
 
@@ -310,6 +308,7 @@ V1.x candidates in rough priority order:
 
 ## Changelog
 
+- **v0.2 (2026-05-28)** — P12 backend derived read layer shipped (406 tests passing). §2 "Where we are" updated; §3 V1 cut row for P12 ticked; §5 sequencing graph collapsed to the frontend-only remainder (F3 → F4 → F5 → F6); §6.1 rewritten as a shipped record with field names finalised (`net_cash_flow` on list/detail + single `GET /api/dashboard/summary`). Detail plan link in §6.1 now resolves. Frontend detail plans (`frontend-implementation-plan-f3.md`, `-f4.md`, `-f5.md` + `.zh.md` each) drafted in the same iteration.
 - **v0.1 (2026-05-27)** — Initial V1 release plan. Consolidates the V1 cut from `backend-expansion-plan.md` and `frontend-expansion-plan.md`. Five cross-cutting decisions settled:
   1. `InstrumentPicker` get-or-create + `allowCreate` prop; option flow is two-step (underlying then attrs).
   2. F4 Custom multi-leg primary; named flows deferred to F4 detail plan.

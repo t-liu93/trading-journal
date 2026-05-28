@@ -21,9 +21,9 @@
 
 V1 范围或决策变更时，三份文档在同一次改动里一起更新。Macro 文档承载长期视野，本份承载 V1 切片。V1 上线后 macro 归档，本份成为记录。
 
-## 2. 当前状态（2026-05-27）
+## 2. 当前状态（2026-05-28）
 
-**Backend**（347 tests pass；`ruff` + `mypy --strict` 全 clean）：
+**Backend**（406 tests pass；`ruff` + `mypy --strict` 全 clean）—— V1 后端切片至此**全部完成**：
 
 - 鉴权 —— FastAPI Users cookie + DB session
 - Account CRUD（[mvp-implementation-plan.zh.md Phase 4](./mvp-implementation-plan.zh.md)）
@@ -33,6 +33,7 @@ V1 范围或决策变更时，三份文档在同一次改动里一起更新。Ma
 - P9 Trade（server-computed `cash_flow`、多腿 `order_group_id`、`archived_at` 软删）
 - P10 策略元数据（`/positions/{pid}/wheel-meta` 与 `.../pmcc-meta`）
 - P11 TradePlan（append-only 事件流，server 分配 `revision_no`）
+- P12 派生读层 —— Position 列表/详情中的 `net_cash_flow` + `GET /api/dashboard/summary`
 
 **Frontend**（`vue-tsc` + `vite build` 全 clean；`schema.d.ts` 与后端对得上）：
 
@@ -40,7 +41,7 @@ V1 范围或决策变更时，三份文档在同一次改动里一起更新。Ma
 - F1 Account CRUD UI
 - F2 `InstrumentPicker`（select-only typeahead）+ `InstrumentForm` + `/instruments` 浏览页 + `/settings/strategies`
 
-**尚未实现：** P12（后端派生读层）、F3（Position UI）、F4（Trade 录入 UI）、F5（Dashboard）、F6（单容器 Docker）。
+**尚未实现：** F3（Position UI）、F4（Trade 录入 UI）、F5（Dashboard）、F6（单容器 Docker）。剩余 V1 工作**全部是前端**。
 
 ## 3. V1 切片
 
@@ -48,7 +49,7 @@ V1 范围或决策变更时，三份文档在同一次改动里一起更新。Ma
 
 | Phase | 交付内容 | Macro 引用 |
 |---|---|---|
-| **P12** | Position 列表 PnL 列（SQL 聚合）+ dashboard 聚合端点 | [backend-expansion-plan.zh.md §P12](./backend-expansion-plan.zh.md) |
+| **P12** ✅ | Position 列表 `net_cash_flow` + `GET /api/dashboard/summary`（per-currency PnL、月度桶、win_rate、open 快照） | [backend-expansion-plan.zh.md §P12](./backend-expansion-plan.zh.md) |
 | **F3** | Position 列表 / 创建 / 编辑 / 详情页（Overview / Meta / Plan / Trades 四 tab）；`InstrumentPicker` 加上 `allowCreate` | [frontend-expansion-plan.zh.md §F3](./frontend-expansion-plan.zh.md) |
 | **F4** | Trade 录入 UI（Custom multi-leg 为主）；Position 详情页 Trades tab 按 `order_group_id` 分组展示 | [frontend-expansion-plan.zh.md §F4](./frontend-expansion-plan.zh.md) |
 | **F5** | Dashboard —— per-currency PnL 卡片 + open/closed 仓位表 + 1 张图（按月已实现 PnL 柱状） | [frontend-expansion-plan.zh.md §F5](./frontend-expansion-plan.zh.md) |
@@ -122,45 +123,42 @@ V1 维持 [P8 现状](./backend-expansion-plan.zh.md)：
 ## 5. 执行顺序与依赖图
 
 ```
-后端已完成： P6 → P7 → P8 → P9 → P10 → P11 ✅
+后端已完成： P6 → P7 → P8 → P9 → P10 → P11 → P12 ✅
 前端已完成： F0 → F1 → F2 ✅
 
-V1 剩余：
+V1 剩余（纯前端）：
 
-P12.1（列表 PnL 聚合） ──┐
-                          ├──> F3 ──> F4 ──┐
-                          │                  ├──> F5 ──> F6
-P12.2（dashboard 端点） ──┘                  │
-                                              └─（F5 依赖 P12.2）
+F3 ──> F4 ──> F5 ──> F6
 ```
 
-**推荐执行顺序：** **P12 → F3 → F4 → F5 → F6**，P12 作为一个 phase 一次性完成两个子交付物。P12 的两块共享 SQL helper，拆开做会重复工。
+**推荐执行顺序：** **F3 → F4 → F5 → F6**。F3 出 Position 列表（消费 P12 的 `net_cash_flow`）+ 创建/编辑 + 详情页（Overview/Meta/Plan/Trades 四 tab；Trades tab 在 F4 落地前是占位）。F4 接上录入 modal，把 Trades tab 变可交互。F5 消费 `GET /api/dashboard/summary`。F6 把整套打成单容器。
 
-**曾考虑的备选：** 前端 F3 → F4 先行（前端调试回路更长；F3/F4 因决策 5 不严格依赖 P12）。2026-05-27 讨论后回退 —— 用户选择先把 P12 落地，让前端 phase 一开始就拿到完整 API 表面。
+**曾考虑的备选：** 先 F4 后 F3（Trade-led 模型下 Position 与首笔 Trade 同生，先做 F4 能让 F3 永远有真实仓位可显示）。2026-05-26 讨论后回退 —— F3 提供的 Position 列表/详情是 F4 录入 modal 的码头，所以自然顺序是 F3 在前（Trades tab 先以占位 + 只读形态出货），再 F4 让它可交互。
 
 ## 6. 各 phase 范围摘要
 
 详细 plan 在各自的 `*-pN.md` / `*-fN.md` 文件里（每个 phase 一份 EN + 一份 ZH，子阶段作为同一份文档内的章节）。这里的摘要仅是 V1 切片 —— 是对 macro 的细化，不是替代。
 
-### 6.1 P12 —— 后端派生读层
+### 6.1 P12 —— 后端派生读层 ✅ 已完成（2026-05-28）
 
 - **Macro 引用：** [backend-expansion-plan.zh.md §P12](./backend-expansion-plan.zh.md)
-- **Detail plan：** `backend-expansion-plan-p12.md`（+ `.zh.md`）—— 待写
+- **Detail plan：** [backend-expansion-plan-p12.md](./backend-expansion-plan-p12.md)（+ [.zh.md](./backend-expansion-plan-p12.zh.md)）—— 已完成
 
-**V1 范围。**
+**已交付 V1 范围。**
 
-- **P12.1 —— Position 列表增强。** `GET /positions` 响应增加一个 `current_pnl` 字段（最终命名在 detail plan 里定），来源是 SQL `SUM(trade.cash_flow) GROUP BY position_id`。Open 仓位是滚动已实现 PnL；closed 仓位返回该行上冻结的 `pnl_realized`。是默认带还是 `?include_derived=true` 后再带 —— detail plan 里定。
-- **P12.2 —— Dashboard 聚合端点**（路径 `/dashboard/*` 或 `/stats/*`，最终命名 detail plan 里定）：
-  - Per-currency PnL 总结（open / closed 分开）。
-  - 已平仓胜率：`count(pnl_realized > 0) / count(*)`。
-  - 按月 per-currency 已实现 PnL bucket（供 F5 图使用）。
-  - Open / closed 仓位计数。
+- **P12.1 —— Position 列表增强。** `GET /positions` 与 `GET /positions/{id}` 响应永远包含 `net_cash_flow: Decimal`（一次性批量 `SUM(trade.cash_flow) GROUP BY position_id`，排除 archived trade）。Open 仓位是滚动已实现 PnL 信号；closed 仓位等于行上冻结的 `pnl_realized`（数学上一致）。无 trade 时为零。
+- **P12.2 —— Dashboard 聚合端点** `GET /api/dashboard/summary`，owner-scoped，返回：
+  - `closed.count`、`closed.win_rate`（`Decimal | None`）、`closed.per_currency_pnl[]`、`closed.monthly_pnl[]`（按 `(month, currency)`）。
+  - `open.count`、`open.per_currency_net_cash_flow[]`。
+  - 所有 currency 数组按字母排序；monthly 数组按 `(month ASC, currency ASC)` 排。
 
-**显式不在 V1 P12 范围：**
+**显式不在 V1 P12 范围（推迟到 V1.x）：**
 
 - 单仓位派生端点 —— 前端算（决策 5）。
 - 行情驱动的 `pnl_unrealized` / `pnl_total` —— V1 没行情源。
 - FX 换算后的聚合 —— V1 没 `FxRate` 表。
+- 更细分端点（`/per-currency`、`/monthly-pnl`、`/win-rate`、`/counts`）—— 已并入单个 summary 端点；将来有视图需要部分取数再拆。
+- summary 端点上的日期范围 / 策略类型 filter。
 
 ### 6.2 F3 —— Position UI
 
@@ -310,6 +308,7 @@ V1.x 候选粗略优先级排序：
 
 ## Changelog
 
+- **v0.2（2026-05-28）** —— P12 后端派生读层交付（406 条测试全绿）。§2「当前状态」更新；§3 V1 切片表中 P12 行打勾；§5 执行顺序图压缩为剩余的纯前端段（F3 → F4 → F5 → F6）；§6.1 改写为已交付记录，字段名定稿（列表/详情上的 `net_cash_flow` + 单个 `GET /api/dashboard/summary`）。§6.1 中 detail plan 链接已可解析。同一轮迭代里起草的前端 detail plan（`frontend-implementation-plan-f3.md`、`-f4.md`、`-f5.md` 及各自 `.zh.md`）。
 - **v0.1 (2026-05-27)** —— 初版 V1 release plan。整合 `backend-expansion-plan.md` 与 `frontend-expansion-plan.md` 在 V1 范围内的内容。5 条横切决策敲定：
   1. `InstrumentPicker` get-or-create + `allowCreate` prop；期权走两步式（先 underlying 再属性）。
   2. F4 Custom multi-leg 为主；named flows 推迟到 F4 detail plan 决定。

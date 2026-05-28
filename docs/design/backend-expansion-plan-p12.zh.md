@@ -2,8 +2,9 @@
 
 **Language:** [English](./backend-expansion-plan-p12.md) | 中文
 
-> 状态：**DRAFT v0.1**（2026-05-27）。宏观路线图 [backend-expansion-plan.zh.md](./backend-expansion-plan.zh.md)
-> 中 **P12** 的详细建设计划。自洽 —— 实现者可直接执行。配套：
+> 状态：**DONE v0.2**（2026-05-28）—— 已在 `refactoring/rebuild` 上交付（commit
+> `6af39f0`，后端 406 条测试全绿，`ruff` + `mypy --strict` clean）。宏观路线图
+> [backend-expansion-plan.zh.md](./backend-expansion-plan.zh.md) 中 **P12** 的详细建设计划。自洽 —— 实现者可直接执行。配套：
 > [v1-release-plan.zh.md](./v1-release-plan.zh.md)（V1 切片 + 横切决策）、
 > [data-model.zh.md §4.4 / §6](./data-model.zh.md#44-position-universal-strategy-instance)
 > （币种放置、"派生 — 不存盘" 划分），以及 P12 在其之上扩展的 P8/P9 service
@@ -559,6 +560,11 @@ V1.x 扩展，需要时再做：
 
 ## 变更日志
 
+- **v0.2（2026-05-28）** —— 已在 `refactoring/rebuild` 上交付（commit `6af39f0`）。
+  P12.1 + P12.2 按计划全部落地；新增 **18 条测试**（`tests/test_dashboard.py` 13 条
+  + `tests/test_positions.py` 新增 5 条）；测试套件总计 **406 条全绿**（P11 后是 347）。
+  与 v0.1 plan 无偏离：schema、service、router、codegen 全部按 spec。
+  `frontend/src/api/schema.d.ts` 已重新生成并提交。状态由 DRAFT 翻 DONE。
 - **v0.1（2026-05-27）** —— P12 详细 plan 初版。5 条子决策已定：
   (1) 两个分开字段（`pnl_realized` 关仓冻结 vs 派生 `net_cash_flow`）；
   (2) `net_cash_flow` 仅 API、不存盘；(3) list/detail 始终带（无 opt-in

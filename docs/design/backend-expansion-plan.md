@@ -77,7 +77,7 @@ Instrument (NO user_id; global ─┘
 | **P9** | `Trade` CRUD (atomic fills; `order_group_id` multi-leg; server computes `cash_flow`; action↔kind validated — see §6④) | ⭐⭐⭐ | frontend F4 | ✅ done (2026-05-26) |
 | **P10** | `WheelCycleMeta` + `PmccCycleMeta` (1:1 Position extensions) | ⭐ | strategy-specific views | ✅ done (2026-05-27) |
 | **P11** | `TradePlan` event-stream (append revision / list / current) | ⭐⭐ | forex plan UI | ✅ done (2026-05-27) |
-| **P12** | Derived read layer (services): `days_open`, `pnl_realized` on close, `pnl_total`, `roi`; unrealized deferred | ⭐⭐⭐ | dashboards / charts (F5) | ⏳ next |
+| **P12** | Derived read layer (services): per-position `net_cash_flow` on list/detail + `GET /dashboard/summary`; unrealized deferred | ⭐⭐⭐ | dashboards / charts (F5) | ✅ done (2026-05-28) |
 | **PX** | External Integrations Tracer Bullet (stocks via OpenFIGI lookup, forex local seed, DB cache table, feature-flagged, graceful degrade) — see §4.PX | ⭐⭐ | typeahead + autofill in F2/F3; lays the reusable integrations seam | — (opportunistic) |
 
 > Phase numbers continue the `mvp-implementation-plan` lineage (Phase 0–5). Phase 5
@@ -203,15 +203,22 @@ Instrument (NO user_id; global ─┘
   get current (`MAX(revision_no)`). No update/delete of historical revisions
   (data-model §4.6).
 
-### P12 — Derived read layer ⏳ next
+### P12 — Derived read layer ✅ done (2026-05-28)
 
 - **Goal.** The numbers that make a journal useful, computed at read time from `Trade`
   rows (data-model §4.4 "Derived — NOT stored").
-- **Scope (MVP-feasible).** `days_open`, realized PnL (sum of `cash_flow`), and on the
-  status→`closed` transition freeze `pnl_realized` onto the row; `roi_on_capital`.
-  Likely a `services/` module to keep routers thin.
+- **Delivered.** Per-position `net_cash_flow` field added to `GET /positions` and
+  `GET /positions/{id}` (SUM(trade.cash_flow) GROUP BY, archived trades excluded,
+  always present — `Decimal("0")` when no trades). New
+  `GET /api/dashboard/summary` endpoint returns `ClosedSummary` (count, win_rate,
+  per-currency PnL, monthly per-(month, currency) PnL) + `OpenSummary` (count,
+  per-currency net_cash_flow). Owner-scoped. No DB migration — all values derived.
+  Reused `services/positions.py` for the batched `compute_net_cash_flows` helper;
+  introduced `services/dashboard.py` with `compute_summary(session, user_id)`.
 - **Deferred.** `pnl_unrealized`, `pnl_total`, `annualized_return` — need a market quote
-  source (not in MVP).
+  source (not in MVP). Per-position `days_open` / `roi_on_capital` / `result` computed
+  in frontend per V1 release plan Decision 5. FX conversion and granular endpoints
+  (`/per-currency`, `/monthly-pnl`, etc.) deferred to V1.x.
 
 ## 5. Cross-cutting & deferred deliverables (tracked)
 
@@ -327,6 +334,17 @@ phases share the same vocabulary; the per-phase detail plans implement them.
 
 ## Changelog
 
+- **v0.6 (2026-05-28)** — P12 derived read layer shipped on `refactoring/rebuild`. P12.1
+  added `net_cash_flow: Decimal` to `PositionRead` (list + detail), powered by
+  batched `services/positions.compute_net_cash_flows` (one SUM-GROUP-BY per request,
+  no N+1). P12.2 added `GET /api/dashboard/summary` returning per-currency closed
+  P/L + monthly buckets + win_rate + per-currency open net_cash_flow snapshot.
+  New files: `schemas/dashboard.py`, `services/dashboard.py`, `api/dashboard.py`,
+  `tests/test_dashboard.py` (13 tests). `tests/test_positions.py` extended with
+  `net_cash_flow` coverage. `frontend/src/api/schema.d.ts` regenerated. Backend test
+  suite: **406 passing** (was 347); `ruff` + `mypy --strict` clean. V1 backend cut
+  is now complete; remaining V1 work is frontend F3 → F4 → F5 → F6. PX still
+  opportunistic.
 - **v0.5 (2026-05-27)** — P8 / P9 / P10 / P11 all shipped on `refactoring/rebuild`.
   P8 introduced `services/positions.py` (Trade-led, manual status, server-frozen
   `pnl_realized`). P9 introduced `services/trades.py` (atomic fills, server-computed
