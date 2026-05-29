@@ -2,12 +2,19 @@ import { ref, watch } from 'vue'
 import { type Position, type PositionStatus, type StrategyType, positionsApi } from '../api/positions'
 import { ApiError } from '../api/types'
 
-export function usePositions() {
+interface UsePositionsOptions {
+  /** Initial status filter. Empty string means "all". Default: 'open'. */
+  status?: PositionStatus | ''
+  /** Initial strategy type filter. Empty string means "all". Default: ''. */
+  strategyType?: StrategyType | ''
+}
+
+export function usePositions(options?: UsePositionsOptions) {
   const positions = ref<Position[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
-  const statusFilter = ref<PositionStatus | ''>('open')
-  const strategyTypeFilter = ref<StrategyType | ''>('')
+  const statusFilter = ref<PositionStatus | ''>(options?.status ?? 'open')
+  const strategyTypeFilter = ref<StrategyType | ''>(options?.strategyType ?? '')
   let refreshSeq = 0
 
   async function refresh(): Promise<void> {

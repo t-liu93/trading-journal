@@ -1,158 +1,118 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
 import AuthenticatedLayout from '../components/AuthenticatedLayout.vue'
-import { useAccounts } from '../composables/useAccounts'
-import { useInstruments } from '../composables/useInstruments'
-import { useStrategyConfigs } from '../composables/useStrategyConfigs'
+import PerCurrencyCard from '../components/PerCurrencyCard.vue'
+import DashboardWinRateGauge from '../components/DashboardWinRateGauge.vue'
+import MonthlyPnlChart from '../components/MonthlyPnlChart.vue'
+import OpenPositionsTable from '../components/OpenPositionsTable.vue'
+import ClosedPositionsTable from '../components/ClosedPositionsTable.vue'
+import { useDashboard } from '../composables/useDashboard'
 import { usePositions } from '../composables/usePositions'
-import { useAuthStore } from '../stores/auth'
+import { type Instrument, instrumentsApi } from '../api/instruments'
 
-const auth = useAuthStore()
-const { accounts, loading: accountsLoading, error: accountsError, refresh: refreshAccounts } = useAccounts()
-const { instruments, loading: instrumentsLoading, error: instrumentsError, refresh: refreshInstruments } = useInstruments()
-const { configs, loading: configsLoading, error: configsError, refresh: refreshConfigs } = useStrategyConfigs()
-const { positions, loading: positionsLoading, error: positionsError, refresh: refreshPositions } = usePositions()
+const { summary, loading: summaryLoading, error: summaryError, refresh: refreshSummary } = useDashboard()
+const { positions, loading: positionsLoading, error: positionsError, refresh: refreshPositions } = usePositions({ status: '' })
+const instrumentMap = ref<Record<string, Instrument>>({})
+const instrumentsError = ref<string | null>(null)
+
+const localError = ref<string | null>(null)
+
+// Surface the first error from either summary or positions
+watch([summaryError, positionsError], ([sErr, pErr]) => {
+  localError.value = sErr ?? pErr ?? null
+})
+
+function dismissError() {
+  localError.value = null
+}
+
+const openPositions = computed(() => positions.value.filter(p => p.status === 'open'))
+const closedPositions = computed(() => positions.value.filter(p => p.status === 'closed'))
+
+const loading = computed(() => summaryLoading.value || positionsLoading.value)
+
+async function loadInstruments() {
+  try {
+    const list = await instrumentsApi.list({ limit: 200 })
+    const map: Record<string, Instrument> = {}
+    for (const inst of list) map[inst.id] = inst
+    instrumentMap.value = map
+    instrumentsError.value = null
+  } catch {
+    instrumentsError.value = 'Failed to load instrument names'
+  }
+}
 
 onMounted(async () => {
-  await Promise.all([refreshAccounts(), refreshInstruments(), refreshConfigs(), refreshPositions()])
+  await Promise.all([refreshSummary(), refreshPositions(), loadInstruments()])
 })
 </script>
 
 <template>
   <AuthenticatedLayout>
-    <n-h1 style="margin-top: 0;">
-      Welcome<span v-if="auth.user">, {{ auth.user.email }}</span>
-    </n-h1>
+    <n-page-header title="Dashboard" />
 
-    <n-grid :cols="3" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
-      <n-grid-item span="3 m:1">
-        <n-card title="Your accounts" hoverable>
-          <n-skeleton v-if="accountsLoading" text :repeat="2" />
-          <template v-else>
-            <p class="metric" :class="{ 'metric-error': accountsError }">
-              {{ accountsError ? '?' : accounts.length }}
-            </p>
-            <n-text v-if="accountsError" depth="3" style="font-size: 0.85rem; color: var(--n-color-error, #d03050);">
-              Couldn't load accounts: {{ accountsError }}
-            </n-text>
-            <n-text v-else depth="3" style="font-size: 0.85rem;">active accounts</n-text>
-            <div style="margin-top: 0.75rem;">
-              <RouterLink :to="{ name: 'accounts' }" class="card-link">
-                Manage accounts →
-              </RouterLink>
-            </div>
-          </template>
-        </n-card>
-      </n-grid-item>
+    <n-alert
+      v-if="localError"
+      type="error"
+      :title="localError"
+      closable
+      style="margin-bottom: 1rem;"
+      @close="dismissError"
+    />
 
-      <n-grid-item span="3 m:1">
-        <n-card title="Positions" hoverable>
-          <n-skeleton v-if="positionsLoading" text :repeat="2" />
-          <template v-else>
-            <p class="metric" :class="{ 'metric-error': positionsError }">
-              {{ positionsError ? '?' : positions.length }}
-            </p>
-            <n-text v-if="positionsError" depth="3" style="font-size: 0.85rem; color: var(--n-color-error, #d03050);">
-              Couldn't load positions: {{ positionsError }}
-            </n-text>
-            <n-text v-else depth="3" style="font-size: 0.85rem;">open positions</n-text>
-            <div style="margin-top: 0.75rem;">
-              <RouterLink :to="{ name: 'positions' }" class="card-link">
-                Browse positions →
-              </RouterLink>
-            </div>
-          </template>
-        </n-card>
-      </n-grid-item>
+    <n-spin :show="loading">
+      <!-- Summary strip -->
+      <n-grid v-if="summary" :cols="6" :x-gap="12" :y-gap="12">
+        <n-gi>
+          <DashboardWinRateGauge :winRate="summary.closed.win_rate" />
+        </n-gi>
+        <n-gi>
+          <n-card size="small">
+            <n-statistic label="Open positions" :value="summary.open.count" />
+          </n-card>
+        </n-gi>
+        <n-gi>
+          <n-card size="small">
+            <n-statistic label="Closed positions" :value="summary.closed.count" />
+          </n-card>
+        </n-gi>
+      </n-grid>
 
-      <n-grid-item span="3 m:1">
-        <n-card title="Instruments" hoverable>
-          <n-skeleton v-if="instrumentsLoading" text :repeat="2" />
-          <template v-else>
-            <p class="metric" :class="{ 'metric-error': instrumentsError }">
-              {{ instrumentsError ? '?' : instruments.length }}
-            </p>
-            <n-text v-if="instrumentsError" depth="3" style="font-size: 0.85rem; color: var(--n-color-error, #d03050);">
-              Couldn't load instruments: {{ instrumentsError }}
-            </n-text>
-            <n-text v-else depth="3" style="font-size: 0.85rem;">instruments in catalog</n-text>
-            <div style="margin-top: 0.75rem;">
-              <RouterLink :to="{ name: 'instruments' }" class="card-link">
-                Browse instruments →
-              </RouterLink>
-            </div>
-          </template>
-        </n-card>
-      </n-grid-item>
+      <!-- Per-currency cards -->
+      <n-grid v-if="summary" :cols="4" :x-gap="12" :y-gap="12" style="margin-top: 16px">
+        <n-gi v-for="row in summary.closed.per_currency_pnl" :key="`closed-${row.currency}`">
+          <PerCurrencyCard label="Realized P/L (closed)" :currency="row.currency" :amount="row.amount" />
+        </n-gi>
+        <n-gi v-for="row in summary.open.per_currency_net_cash_flow" :key="`open-${row.currency}`">
+          <PerCurrencyCard label="Net Cash Flow (open)" :currency="row.currency" :amount="row.amount" />
+        </n-gi>
+      </n-grid>
 
-      <n-grid-item span="3 m:1">
-        <n-card title="Strategy caps" hoverable>
-          <n-skeleton v-if="configsLoading" text :repeat="2" />
-          <template v-else>
-            <p class="metric" :class="{ 'metric-error': configsError }">
-              {{ configsError ? '?' : configs.length }}
-            </p>
-            <n-text v-if="configsError" depth="3" style="font-size: 0.85rem; color: var(--n-color-error, #d03050);">
-              Couldn't load configs: {{ configsError }}
-            </n-text>
-            <n-text v-else depth="3" style="font-size: 0.85rem;">{{ configs.length }} of 5 strategies configured</n-text>
-            <div style="margin-top: 0.75rem;">
-              <RouterLink :to="{ name: 'settings-strategies' }" class="card-link">
-                Manage strategy caps →
-              </RouterLink>
-            </div>
-          </template>
-        </n-card>
-      </n-grid-item>
+      <!-- Chart -->
+      <div style="margin-top: 24px">
+        <MonthlyPnlChart v-if="summary" :rows="summary.closed.monthly_pnl" />
+      </div>
 
-      <n-grid-item span="3 m:1">
-        <n-card title="Trades" hoverable>
-          <n-text depth="3">Trade entry is available inside each Position.</n-text>
-          <div style="margin-top: 0.75rem;">
-            <RouterLink :to="{ name: 'positions' }" class="card-link">
-              Browse positions →
-            </RouterLink>
-          </div>
-        </n-card>
-      </n-grid-item>
-
-      <n-grid-item span="3 m:1">
-        <n-card title="Dashboards (Phase F5)" class="card-disabled">
-          <n-text depth="3">Coming in Phase F5.</n-text>
-          <div style="margin-top: 0.75rem;">
-            <n-text depth="3" style="font-size: 0.85rem;">
-              PnL dashboards, charts, and analytics.
-            </n-text>
-          </div>
-        </n-card>
-      </n-grid-item>
-    </n-grid>
+      <!-- Tables — shared data source from parent -->
+      <n-grid :cols="1" :y-gap="16" style="margin-top: 24px">
+        <n-gi>
+          <OpenPositionsTable
+            :positions="openPositions"
+            :instrument-map="instrumentMap"
+            :instruments-error="instrumentsError"
+            :positions-error="positionsError"
+          />
+        </n-gi>
+        <n-gi>
+          <ClosedPositionsTable
+            :positions="closedPositions"
+            :instrument-map="instrumentMap"
+            :instruments-error="instrumentsError"
+            :positions-error="positionsError"
+          />
+        </n-gi>
+      </n-grid>
+    </n-spin>
   </AuthenticatedLayout>
 </template>
-
-<style scoped>
-.metric {
-  font-size: 2.25rem;
-  font-weight: 500;
-  margin: 0;
-  line-height: 1.1;
-}
-.metric-error {
-  color: var(--n-color-error, #d03050);
-}
-.card-link {
-  color: var(--n-color-primary, #18a058);
-  text-decoration: none;
-  font-weight: 500;
-}
-.card-link:hover {
-  text-decoration: underline;
-}
-.card-disabled {
-  opacity: 0.55;
-}
-.card-disabled :deep(.n-card-header__main) {
-  color: var(--n-text-color-3, rgba(0, 0, 0, 0.38));
-}
-</style>
