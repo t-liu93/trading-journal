@@ -107,12 +107,12 @@ onMounted(async () => {
       </n-grid-item>
 
       <n-grid-item span="3 m:1">
-        <n-card title="Trades (Phase F4)" class="card-disabled">
-          <n-text depth="3">Coming in Phase F4.</n-text>
+        <n-card title="Trades" hoverable>
+          <n-text depth="3">Trade entry is available inside each Position.</n-text>
           <div style="margin-top: 0.75rem;">
-            <n-text depth="3" style="font-size: 0.85rem;">
-              Atomic broker fills, multi-leg entries, assignment / exercise pairs.
-            </n-text>
+            <RouterLink :to="{ name: 'positions' }" class="card-link">
+              Browse positions →
+            </RouterLink>
           </div>
         </n-card>
       </n-grid-item>

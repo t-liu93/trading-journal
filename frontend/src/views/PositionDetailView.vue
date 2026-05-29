@@ -9,7 +9,8 @@ import WheelMetaForm from '../components/WheelMetaForm.vue'
 import PmccMetaForm from '../components/PmccMetaForm.vue'
 import TradePlanList from '../components/TradePlanList.vue'
 import TradePlanForm from '../components/TradePlanForm.vue'
-import PositionTradesPlaceholder from '../components/PositionTradesPlaceholder.vue'
+import PositionTradesTab from '../components/PositionTradesTab.vue'
+import TradeEntryModal from '../components/TradeEntryModal.vue'
 import { usePosition } from '../composables/usePosition'
 import { instrumentsApi, type Instrument } from '../api/instruments'
 import { ApiError } from '../api/types'
@@ -30,10 +31,12 @@ const { position, loading, error, refresh, close, remove } = usePosition(positio
 
 const instrument = ref<Instrument | null>(null)
 const showEditModal = ref(false)
+const showAddTradeModal = ref(false)
 const activeTab = ref((route.query.tab as string) || 'overview')
 const tradePlanListRef = ref<InstanceType<typeof TradePlanList> | null>(null)
 const planLoaded = ref(false)
 const planStartExpanded = ref(false)
+const tradesTabRef = ref<InstanceType<typeof PositionTradesTab> | null>(null)
 
 function handlePlanLoaded(isEmpty: boolean) {
   planStartExpanded.value = isEmpty
@@ -113,6 +116,19 @@ function handlePlanSaved() {
   tradePlanListRef.value?.refresh()
 }
 
+function handleTradeSaved() {
+  showAddTradeModal.value = false
+  void refresh()
+  // Refresh trades tab if it's mounted
+  if (tradesTabRef.value) {
+    void tradesTabRef.value.refresh()
+  }
+}
+
+function handleTradesTabSaved() {
+  void refresh()
+}
+
 async function refreshWithInstrument() {
   await refresh()
   if (position.value) {
@@ -158,6 +174,7 @@ onMounted(() => { void refreshWithInstrument() })
               </n-text>
             </div>
             <div style="display: flex; gap: 0.5rem;">
+              <n-button secondary :disabled="position.status !== 'open'" @click="showAddTradeModal = true">+ Add trade</n-button>
               <n-button @click="showEditModal = true">Edit</n-button>
               <n-popconfirm
                 v-if="position.status === 'open'"
@@ -250,9 +267,17 @@ onMounted(() => { void refreshWithInstrument() })
             </div>
           </n-tab-pane>
 
-          <!-- Trades tab (F3 placeholder) -->
+          <!-- Trades tab -->
           <n-tab-pane name="trades" tab="Trades">
-            <PositionTradesPlaceholder :position-id="positionId" :key="'tr-' + positionId" />
+            <PositionTradesTab
+              ref="tradesTabRef"
+              :position-id="positionId"
+              :account-id="position.account_id"
+              :currency="position.currency"
+              :readonly="position.status !== 'open'"
+              :key="'tr-' + positionId"
+              @trade-saved="handleTradesTabSaved"
+            />
           </n-tab-pane>
         </n-tabs>
 
@@ -262,6 +287,15 @@ onMounted(() => { void refreshWithInstrument() })
           :position-id="positionId"
           :initial="position"
           @saved="handleEditSaved"
+        />
+
+        <!-- Standalone TradeEntryModal for "+ Add trade" -->
+        <TradeEntryModal
+          v-model:show="showAddTradeModal"
+          :position-id="positionId"
+          :account-id="position.account_id"
+          :currency="position.currency"
+          @saved="handleTradeSaved"
         />
       </template>
 

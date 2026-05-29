@@ -1,26 +1,10 @@
 import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { type Position, type PositionUpdate, positionsApi } from '../api/positions'
+import { type Trade, tradesApi } from '../api/trades'
 import { ApiError } from '../api/types'
-import { http } from '../api/http'
 
-export interface Trade {
-  id: string
-  position_id: string
-  account_id: string
-  instrument_id: string
-  action: string
-  quantity: string
-  price: string
-  commission: string
-  fees: string
-  cash_flow: string
-  executed_at: string
-  order_group_id: string | null
-  broker_trade_id: string | null
-  notes: string | null
-  archived_at: string | null
-}
+export type { Trade }
 
 export function usePosition(positionId: Ref<string>) {
   const position = ref<Position | null>(null)
@@ -36,7 +20,7 @@ export function usePosition(positionId: Ref<string>) {
     try {
       const [pos, tradeList] = await Promise.all([
         positionsApi.get(positionId.value),
-        http.get(`/api/trades?position_id=${positionId.value}`) as Promise<Trade[]>,
+        tradesApi.list({ position_id: positionId.value }),
       ])
       if (seq === refreshSeq) {
         position.value = pos

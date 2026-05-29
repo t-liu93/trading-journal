@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { type FormInst, type FormRules, useMessage } from 'naive-ui'
-import { useRoute } from 'vue-router'
 import { type Position, type PositionCreate, type PositionUpdate, type StrategyType, positionsApi } from '../api/positions'
 import { type Account, accountsApi } from '../api/accounts'
 import { type Instrument, instrumentsApi } from '../api/instruments'
+import { tradesApi } from '../api/trades'
 import InstrumentPicker from './InstrumentPicker.vue'
-import PositionFirstTradePlaceholder from './PositionFirstTradePlaceholder.vue'
+import TradeEntryModal from './TradeEntryModal.vue'
 import { ApiError } from '../api/types'
-
-const route = useRoute()
-const isLegacy = computed(() => route.query.legacy === 'true')
 
 const props = defineProps<{
   show: boolean
@@ -27,6 +24,10 @@ const emit = defineEmits<{
 const message = useMessage()
 const formRef = ref<FormInst | null>(null)
 const submitting = ref(false)
+const tradeEntryRef = ref<InstanceType<typeof TradeEntryModal> | null>(null)
+// Full Position object saved when Position POST succeeds but Trade POST fails.
+// Allows retry without a second GET, and prevents duplicate Position creation.
+const orphanPosition = ref<Position | null>(null)
 
 const accounts = ref<Account[]>([])
 const selectedInstrument = ref<Instrument | null>(null)
@@ -67,15 +68,18 @@ const accountOptions = computed(() =>
 
 const currencyLabel = computed(() => selectedInstrument.value?.currency ?? '')
 
+const isOrphanRetry = computed(() => !!orphanPosition.value)
+
 const createRules: FormRules = {
   account_id: [{ required: true, message: 'Account is required' }],
   primary_instrument_id: [{ required: true, message: 'Instrument is required' }],
   strategy_type: [{ required: true, message: 'Strategy is required' }],
-  opened_at: [{ required: true, message: 'Opened at is required', type: 'number' }],
 }
 
 watch(() => props.show, async (visible) => {
   if (!visible) return
+
+  orphanPosition.value = null
 
   if (props.mode === 'edit' && props.initial) {
     model.value = {
@@ -96,7 +100,7 @@ watch(() => props.show, async (visible) => {
       account_id: null,
       primary_instrument_id: null,
       strategy_type: null,
-      opened_at: Date.now(),
+      opened_at: null,
       capital_used: null,
       max_risk_at_open: null,
       max_reward_at_open: null,
@@ -122,6 +126,11 @@ async function handleInstrumentSelect(id: string | null) {
 }
 
 function handleClose() {
+  // If orphan position exists, emit saved without a position so parent refreshes list
+  if (orphanPosition.value) {
+    orphanPosition.value = null
+    emit('saved')
+  }
   emit('update:show', false)
 }
 
@@ -135,19 +144,67 @@ async function handleSubmit() {
   submitting.value = true
   try {
     if (props.mode === 'create') {
-      const payload: PositionCreate = {
-        account_id: model.value.account_id!,
-        primary_instrument_id: model.value.primary_instrument_id!,
-        strategy_type: model.value.strategy_type!,
-        opened_at: new Date(model.value.opened_at!).toISOString(),
+      // Atomic Position+Trade flow (F4)
+      const rows = tradeEntryRef.value?.getRows() ?? []
+      if (rows.length === 0) {
+        message.error('At least one Trade is required to create a Position.')
+        submitting.value = false
+        return
       }
-      if (model.value.capital_used !== null) payload.capital_used = model.value.capital_used
-      if (model.value.max_risk_at_open !== null) payload.max_risk_at_open = model.value.max_risk_at_open
-      if (model.value.max_reward_at_open !== null) payload.max_reward_at_open = model.value.max_reward_at_open
-      if (model.value.notes) payload.notes = model.value.notes
+      if (!tradeEntryRef.value?.validate()) {
+        submitting.value = false
+        return
+      }
 
-      const position = await positionsApi.create(payload)
-      message.success('Position created — attach first Trade via Trades tab (F4)')
+      // If we have an orphan from a previous failed attempt, reuse it
+      let position: Position
+
+      if (!orphanPosition.value) {
+        // 1. derive opened_at from the earliest row's executed_at
+        const opened_at = rows
+          .map(r => r.executed_at)
+          .sort()[0]
+
+        // 2. create position
+        const payload: PositionCreate = {
+          account_id: model.value.account_id!,
+          primary_instrument_id: model.value.primary_instrument_id!,
+          strategy_type: model.value.strategy_type!,
+          opened_at,
+        }
+        if (model.value.capital_used !== null) payload.capital_used = model.value.capital_used
+        if (model.value.max_risk_at_open !== null) payload.max_risk_at_open = model.value.max_risk_at_open
+        if (model.value.max_reward_at_open !== null) payload.max_reward_at_open = model.value.max_reward_at_open
+        if (model.value.notes) payload.notes = model.value.notes
+
+        position = await positionsApi.create(payload)
+      } else {
+        position = orphanPosition.value
+      }
+
+      // 3. create trade(s)
+      const tradesPayload = rows.map(r => ({ ...r, position_id: position.id }))
+      try {
+        if (tradesPayload.length === 1) {
+          await tradesApi.create(tradesPayload[0])
+        } else {
+          await tradesApi.createMany(tradesPayload)
+        }
+      } catch (e) {
+        // Save full position object so retry can reuse it without a GET
+        orphanPosition.value = position
+        message.error(
+          `Position created (id=${position.id}) but Trade(s) failed: ` +
+          `${e instanceof ApiError ? e.message : 'unknown error'}. ` +
+          `You can retry — trades will be posted to the same position.`,
+        )
+        submitting.value = false
+        return
+      }
+
+      // Trade(s) created successfully — only NOW clear orphan state
+      orphanPosition.value = null
+      message.success('Position and Trade(s) created')
       emit('saved', position)
     } else {
       const payload: PositionUpdate = {}
@@ -186,12 +243,16 @@ async function handleSubmit() {
     @update:show="emit('update:show', $event)"
   >
     <n-form ref="formRef" :model="model" :rules="createRules" label-placement="top">
+      <!-- Orphan retry banner -->
+      <n-alert v-if="isOrphanRetry" type="warning" style="margin-bottom: 1rem;">
+        Position was already created. Retry will only submit the Trade rows to the same position.
+      </n-alert>
       <n-form-item label="Account" path="account_id">
         <n-select
           v-model:value="model.account_id"
           :options="accountOptions"
           placeholder="Select account"
-          :disabled="mode === 'edit' || submitting"
+          :disabled="mode === 'edit' || submitting || isOrphanRetry"
         />
       </n-form-item>
 
@@ -200,7 +261,7 @@ async function handleSubmit() {
           <InstrumentPicker
             :model-value="model.primary_instrument_id"
             :allow-create="mode === 'create'"
-            :disabled="mode === 'edit' || submitting"
+            :disabled="mode === 'edit' || submitting || isOrphanRetry"
             style="flex: 1;"
             @update:model-value="handleInstrumentSelect"
           />
@@ -213,17 +274,20 @@ async function handleSubmit() {
           v-model:value="model.strategy_type"
           :options="strategyOptions"
           placeholder="Select strategy"
-          :disabled="mode === 'edit' || submitting"
+          :disabled="mode === 'edit' || submitting || isOrphanRetry"
         />
       </n-form-item>
 
-      <n-form-item label="Opened At" path="opened_at">
+      <n-form-item v-if="mode === 'edit'" label="Opened At">
         <n-date-picker
           v-model:value="model.opened_at"
           type="datetime"
           style="width: 100%;"
-          :disabled="mode === 'edit' || submitting"
+          disabled
         />
+        <n-text depth="3" style="font-size: 0.75rem; margin-left: 0.5rem;">
+          Derived from first Trade executed_at
+        </n-text>
       </n-form-item>
 
       <n-form-item label="Capital Used">
@@ -232,7 +296,7 @@ async function handleSubmit() {
           :placeholder="currencyLabel ? `${currencyLabel} amount` : 'Amount'"
           clearable
           style="width: 100%;"
-          :disabled="submitting"
+          :disabled="submitting || isOrphanRetry"
         />
       </n-form-item>
 
@@ -242,7 +306,7 @@ async function handleSubmit() {
           :placeholder="currencyLabel ? `${currencyLabel} amount` : 'Amount'"
           clearable
           style="width: 100%;"
-          :disabled="submitting"
+          :disabled="submitting || isOrphanRetry"
         />
       </n-form-item>
 
@@ -252,7 +316,7 @@ async function handleSubmit() {
           :placeholder="currencyLabel ? `${currencyLabel} amount` : 'Amount'"
           clearable
           style="width: 100%;"
-          :disabled="submitting"
+          :disabled="submitting || isOrphanRetry"
         />
       </n-form-item>
 
@@ -261,17 +325,24 @@ async function handleSubmit() {
           v-model:value="model.notes"
           type="textarea"
           :maxlength="4000"
-          :disabled="submitting"
+          :disabled="submitting || isOrphanRetry"
           placeholder="Optional notes"
         />
       </n-form-item>
 
+      <!-- First Trade inline form (create mode only) -->
       <template v-if="mode === 'create'">
         <n-divider />
         <n-h4 style="margin: 0 0 0.5rem;">First Trade</n-h4>
-        <slot name="first-trade">
-          <PositionFirstTradePlaceholder />
-        </slot>
+        <n-text depth="3" style="font-size: 0.85rem; display: block; margin-bottom: 0.5rem;">
+          opened_at will be derived from the first Trade's executed_at.
+        </n-text>
+        <TradeEntryModal
+          ref="tradeEntryRef"
+          :inline="true"
+          :account-id="model.account_id ?? ''"
+          :currency="currencyLabel"
+        />
       </template>
     </n-form>
 
@@ -282,7 +353,6 @@ async function handleSubmit() {
           type="primary"
           @click="handleSubmit"
           :loading="submitting"
-          :disabled="mode === 'create' && !isLegacy"
         >
           {{ mode === 'create' ? 'Create' : 'Save' }}
         </n-button>
