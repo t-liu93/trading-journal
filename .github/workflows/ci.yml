@@ -116,7 +116,8 @@ jobs:
         run: npm run codegen
 
       - name: Check for drift
-        run: git diff --exit-code frontend/src/api/schema.d.ts
+        working-directory: .
+        run: git diff --exit-code -- frontend/src/api/schema.d.ts
 
   # =========================================================================
   # 4.3  Frontend build — vue-tsc + vite build
