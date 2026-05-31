@@ -1,0 +1,196 @@
+name: CI / CD
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same branch / PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write       # needed by docker-image job for GHCR push
+
+# ---------------------------------------------------------------------------
+# Shared environment defaults
+# ---------------------------------------------------------------------------
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # =========================================================================
+  # 4.1  Backend quality gate — ruff, mypy --strict, pytest
+  # =========================================================================
+  backend-quality:
+    name: Backend quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff check
+        run: uv run ruff check .
+
+      - name: Mypy (strict)
+        run: uv run mypy --strict src
+
+      - name: Pytest
+        run: uv run pytest
+
+  # =========================================================================
+  # 4.2  CodeGen freshness — ensures schema.d.ts is in sync with the backend
+  # =========================================================================
+  codegen-freshness:
+    name: CodeGen freshness
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install backend dependencies
+        run: uv sync --frozen
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Alembic migrations
+        run: uv run alembic upgrade head
+
+      - name: Start backend server
+        run: |
+          uv run uvicorn trading_journal.main:app \
+            --host 127.0.0.1 --port 8000 &
+          # Wait until the health endpoint responds.
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/api/health > /dev/null 2>&1; then
+              echo "Backend is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Backend did not start in 30s" >&2
+          exit 1
+
+      - name: Regenerate schema.d.ts
+        working-directory: frontend
+        run: npm run codegen
+
+      - name: Check for drift
+        run: git diff --exit-code frontend/src/api/schema.d.ts
+
+  # =========================================================================
+  # 4.3  Frontend build — vue-tsc + vite build
+  # =========================================================================
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (vue-tsc + vite)
+        run: npm run build
+
+  # =========================================================================
+  # 4.4  Docker image — build always on PR/main; build+push on v* tags
+  # =========================================================================
+  docker-image:
+    name: Docker image
+    needs: [backend-quality]
+    runs-on: ubuntu-latest
+    # Only run on main pushes, PRs to main, or v-prefixed tags.
+    if: >
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # v1.2.3 → 1.2.3 + latest
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            # PR / branch builds get a short SHA tag for identification.
+            type=sha,prefix=pr-,format=short,enable=${{ github.event_name == 'pull_request' }}
+            type=sha,prefix=,format=short,enable=${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
