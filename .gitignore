@@ -26,9 +26,13 @@ pip-wheel-metadata/
 *.sqlite
 *.sqlite3
 
+# Docker bind-mount data dir (runtime SQLite + backups live here)
+/data/
+
 # Node.js
 node_modules/
 dist/
+.vite/
 
 # Local review notes
 review-notes/

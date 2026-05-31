@@ -12,7 +12,10 @@ API and the frontend's client-side router. ``/openapi.json`` and ``/docs``
 stay at the root (FastAPI manages them; consumers expect them there).
 """
 
-from fastapi import APIRouter, FastAPI
+from pathlib import Path
+
+from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi.responses import FileResponse
 
 from trading_journal.api import (
     accounts,
@@ -26,6 +29,7 @@ from trading_journal.api import (
     trades,
 )
 from trading_journal.auth.backend import auth_backend, fastapi_users
+from trading_journal.config import get_settings
 from trading_journal.schemas.user import UserCreate, UserRead, UserUpdate
 
 API_PREFIX = "/api"
@@ -77,6 +81,27 @@ def create_app() -> FastAPI:
     api.include_router(dashboard.router)
 
     app.include_router(api)
+
+    # Production single-container: also serve the built frontend SPA from
+    # STATIC_DIR. In dev this is unset (Vite serves the SPA on :5173 and proxies
+    # /api), so the block is skipped. Registered last — after the API router and
+    # FastAPI's own /docs + /openapi.json — so those routes always win.
+    static_dir = get_settings().static_dir
+    if static_dir and Path(static_dir).is_dir():
+        dist = Path(static_dir).resolve()
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_fallback(full_path: str) -> FileResponse:
+            # An unmatched /api/* path is a real 404, not the SPA shell.
+            if full_path.startswith("api/"):
+                raise HTTPException(status_code=404)
+            # Serve a real file only if it exists AND stays inside dist/ (guards
+            # against ../ traversal); otherwise hand back the SPA shell.
+            candidate = (dist / full_path).resolve()
+            if candidate.is_relative_to(dist) and candidate.is_file():
+                return FileResponse(candidate)
+            return FileResponse(dist / "index.html")
+
     return app
 
 

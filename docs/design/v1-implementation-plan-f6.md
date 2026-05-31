@@ -120,7 +120,8 @@ is committed, so `vite build` is self-contained.
 # --- Stage 1: frontend builder -------------------------------------------
 FROM node:22-bookworm-slim AS frontend
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json* ./
+# .npmrc (legacy-peer-deps=true) must be copied before `npm ci`.
+COPY frontend/package.json frontend/package-lock.json* frontend/.npmrc ./
 RUN npm ci
 COPY frontend/ ./
 RUN npm run build            # vue-tsc -b && vite build -> /app/frontend/dist

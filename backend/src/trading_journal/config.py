@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./dev.db"
     cookie_secret: str = "dev-only-change-me-before-anywhere-real"
     debug: bool = False
+    # Production single-container only: absolute path to the built frontend
+    # ``dist/`` that FastAPI serves at ``/``. Unset in dev (Vite serves the SPA
+    # on :5173 and proxies ``/api``); set to ``/app/static`` inside the image.
+    static_dir: str | None = None
 
     # Auth / session
     cookie_name: str = "trading_journal_session"
