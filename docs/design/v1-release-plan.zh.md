@@ -2,7 +2,7 @@
 
 **Language:** [English](./v1-release-plan.md) | 中文
 
-> 状态：**DRAFT v0.1**（2026-05-27）。`refactoring/rebuild` 分支上 trading journal 第一个可部署版本的总览范围文档。整合 [backend-expansion-plan.zh.md](./backend-expansion-plan.zh.md) 与 [frontend-expansion-plan.zh.md](./frontend-expansion-plan.zh.md) 中属于 V1 范围的内容。配套 [data-model.zh.md](./data-model.zh.md)。V1 上线后本文档保留作为 V1 记录，两份 macro 路线图归档。
+> 状态：**DRAFT v0.3**（2026-05-29）。`refactoring/rebuild` 分支上 trading journal 第一个可部署版本的总览范围文档。整合 [backend-expansion-plan.zh.md](./backend-expansion-plan.zh.md) 与 [frontend-expansion-plan.zh.md](./frontend-expansion-plan.zh.md) 中属于 V1 范围的内容。配套 [data-model.zh.md](./data-model.zh.md)。V1 上线后本文档保留作为 V1 记录，两份 macro 路线图归档。
 
 ## 1. 目的与维护约定
 
@@ -21,7 +21,7 @@
 
 V1 范围或决策变更时，三份文档在同一次改动里一起更新。Macro 文档承载长期视野，本份承载 V1 切片。V1 上线后 macro 归档，本份成为记录。
 
-## 2. 当前状态（2026-05-28）
+## 2. 当前状态（2026-05-29）
 
 **Backend**（406 tests pass；`ruff` + `mypy --strict` 全 clean）—— V1 后端切片至此**全部完成**：
 
@@ -35,13 +35,16 @@ V1 范围或决策变更时，三份文档在同一次改动里一起更新。Ma
 - P11 TradePlan（append-only 事件流，server 分配 `revision_no`）
 - P12 派生读层 —— Position 列表/详情中的 `net_cash_flow` + `GET /api/dashboard/summary`
 
-**Frontend**（`vue-tsc` + `vite build` 全 clean；`schema.d.ts` 与后端对得上）：
+**Frontend**（`vue-tsc` + `vite build` 全 clean；`schema.d.ts` 与后端对得上）—— F0–F5 已交付：
 
 - F0 鉴权脚手架 + `AuthenticatedLayout`
 - F1 Account CRUD UI
-- F2 `InstrumentPicker`（select-only typeahead）+ `InstrumentForm` + `/instruments` 浏览页 + `/settings/strategies`
+- F2 `InstrumentPicker`（typeahead）+ `InstrumentForm` + `/instruments` 浏览页 + `/settings/strategies`
+- F3 Position CRUD + 详情页（Overview / Meta / Plan / Trades 四 tab）；`InstrumentPicker` 加上 `allowCreate`（内嵌 get-or-create）
+- F4 Trade 录入 UI —— `TradeEntryModal` + `TradeLegRow` Custom multi-leg 表单（各行共享一个 `order_group_id`）+ Position 详情页 Trades tab 按 `order_group_id` 分组并打 pattern badge
+- F5 Dashboard —— per-currency PnL 卡 + open/closed 仓位表 + 按月已实现 PnL 图（`vue-echarts`）+ 胜率仪表
 
-**尚未实现：** F3（Position UI）、F4（Trade 录入 UI）、F5（Dashboard）、F6（单容器 Docker）。剩余 V1 工作**全部是前端**。
+**尚未实现：** F6（单容器 Docker）—— 唯一剩余的 V1 phase。
 
 ## 3. V1 切片
 
@@ -50,9 +53,9 @@ V1 范围或决策变更时，三份文档在同一次改动里一起更新。Ma
 | Phase | 交付内容 | Macro 引用 |
 |---|---|---|
 | **P12** ✅ | Position 列表 `net_cash_flow` + `GET /api/dashboard/summary`（per-currency PnL、月度桶、win_rate、open 快照） | [backend-expansion-plan.zh.md §P12](./backend-expansion-plan.zh.md) |
-| **F3** | Position 列表 / 创建 / 编辑 / 详情页（Overview / Meta / Plan / Trades 四 tab）；`InstrumentPicker` 加上 `allowCreate` | [frontend-expansion-plan.zh.md §F3](./frontend-expansion-plan.zh.md) |
-| **F4** | Trade 录入 UI（Custom multi-leg 为主）；Position 详情页 Trades tab 按 `order_group_id` 分组展示 | [frontend-expansion-plan.zh.md §F4](./frontend-expansion-plan.zh.md) |
-| **F5** | Dashboard —— per-currency PnL 卡片 + open/closed 仓位表 + 1 张图（按月已实现 PnL 柱状） | [frontend-expansion-plan.zh.md §F5](./frontend-expansion-plan.zh.md) |
+| **F3** ✅ | Position 列表 / 创建 / 编辑 / 详情页（Overview / Meta / Plan / Trades 四 tab）；`InstrumentPicker` 加上 `allowCreate` | [frontend-expansion-plan.zh.md §F3](./frontend-expansion-plan.zh.md) |
+| **F4** ✅ | Trade 录入 UI（Custom multi-leg 为主）；Position 详情页 Trades tab 按 `order_group_id` 分组展示 | [frontend-expansion-plan.zh.md §F4](./frontend-expansion-plan.zh.md) |
+| **F5** ✅ | Dashboard —— per-currency PnL 卡片 + open/closed 仓位表 + 1 张图（按月已实现 PnL 柱状） | [frontend-expansion-plan.zh.md §F5](./frontend-expansion-plan.zh.md) |
 | **F6** | 单容器 Docker：FastAPI 挂 `frontend/dist`、SPA fallback、SQLite volume | [frontend-expansion-plan.zh.md §F6](./frontend-expansion-plan.zh.md) + [mvp-implementation-plan.zh.md §5 Phase 5](./mvp-implementation-plan.zh.md) |
 
 ### V1.x 推迟（显式不在 V1）
@@ -124,14 +127,14 @@ V1 维持 [P8 现状](./backend-expansion-plan.zh.md)：
 
 ```
 后端已完成： P6 → P7 → P8 → P9 → P10 → P11 → P12 ✅
-前端已完成： F0 → F1 → F2 ✅
+前端已完成： F0 → F1 → F2 → F3 → F4 → F5 ✅
 
-V1 剩余（纯前端）：
+V1 剩余：
 
-F3 ──> F4 ──> F5 ──> F6
+F6（单容器 Docker）
 ```
 
-**推荐执行顺序：** **F3 → F4 → F5 → F6**。F3 出 Position 列表（消费 P12 的 `net_cash_flow`）+ 创建/编辑 + 详情页（Overview/Meta/Plan/Trades 四 tab；Trades tab 在 F4 落地前是占位）。F4 接上录入 modal，把 Trades tab 变可交互。F5 消费 `GET /api/dashboard/summary`。F6 把整套打成单容器。
+**推荐执行顺序：** **F3 → F4 → F5 → F6** —— 已按计划推进。F3 出 Position 列表（消费 P12 的 `net_cash_flow`）+ 创建/编辑 + 详情页（Overview/Meta/Plan/Trades 四 tab；Trades tab 在 F4 落地前是占位）。F4 接上录入 modal，把 Trades tab 变可交互。F5 消费 `GET /api/dashboard/summary`。**F6（唯一剩余 phase）** 把整套打成单容器。
 
 **曾考虑的备选：** 先 F4 后 F3（Trade-led 模型下 Position 与首笔 Trade 同生，先做 F4 能让 F3 永远有真实仓位可显示）。2026-05-26 讨论后回退 —— F3 提供的 Position 列表/详情是 F4 录入 modal 的码头，所以自然顺序是 F3 在前（Trades tab 先以占位 + 只读形态出货），再 F4 让它可交互。
 
@@ -160,10 +163,10 @@ F3 ──> F4 ──> F5 ──> F6
 - 更细分端点（`/per-currency`、`/monthly-pnl`、`/win-rate`、`/counts`）—— 已并入单个 summary 端点；将来有视图需要部分取数再拆。
 - summary 端点上的日期范围 / 策略类型 filter。
 
-### 6.2 F3 —— Position UI
+### 6.2 F3 —— Position UI ✅ 已完成（2026-05-28）
 
 - **Macro 引用：** [frontend-expansion-plan.zh.md §F3](./frontend-expansion-plan.zh.md)
-- **Detail plan：** `frontend-implementation-plan-f3.md`（+ `.zh.md`）—— 待写
+- **Detail plan：** [frontend-implementation-plan-f3.md](./frontend-implementation-plan-f3.md)（+ [.zh.md](./frontend-implementation-plan-f3.zh.md)）—— 已完成
 
 **V1 范围。**
 
@@ -176,10 +179,10 @@ F3 ──> F4 ──> F5 ──> F6
   - **Trades** —— 按 `order_group_id` 视觉分组的 trade 时间线列表。F4 落地前先是占位；读视图和分组逻辑在 F3 出货，录入 modal 留给 F4。
 - **Position 删除** —— 当前 409-aware 流程；UI 内联展示「has attached trades / plans」错误（不加 `archived_at`，符合决策 4）。
 
-### 6.3 F4 —— Trade 录入 UI
+### 6.3 F4 —— Trade 录入 UI ✅ 已完成（2026-05-28）
 
 - **Macro 引用：** [frontend-expansion-plan.zh.md §F4](./frontend-expansion-plan.zh.md)
-- **Detail plan：** `frontend-implementation-plan-f4.md`（+ `.zh.md`）—— 待写
+- **Detail plan：** [frontend-implementation-plan-f4.md](./frontend-implementation-plan-f4.md)（+ [.zh.md](./frontend-implementation-plan-f4.zh.md)）—— 已完成
 
 **V1 范围。**
 
@@ -200,10 +203,10 @@ F3 ──> F4 ──> F5 ──> F6
 - CSV 批量导入 / broker fill 摄入。
 - 除非 badge 识别逻辑复杂到需要，否则不写 Vitest。
 
-### 6.4 F5 —— Dashboard
+### 6.4 F5 —— Dashboard ✅ 已完成（2026-05-29）
 
 - **Macro 引用：** [frontend-expansion-plan.zh.md §F5](./frontend-expansion-plan.zh.md)
-- **Detail plan：** `frontend-implementation-plan-f5.md`（+ `.zh.md`）—— 待写
+- **Detail plan：** [frontend-implementation-plan-f5.md](./frontend-implementation-plan-f5.md)（+ [.zh.md](./frontend-implementation-plan-f5.zh.md)）—— 已完成
 
 **V1 范围。**
 
@@ -221,10 +224,10 @@ F3 ──> F4 ──> F5 ──> F6
 - 按策略 drill-down 的仪表盘。
 - 月 bucket 之外的日期范围选择器。
 
-### 6.5 F6 —— 单容器 Docker 生产部署
+### 6.5 F6 —— 单容器 Docker 生产部署 ⏳ 下一步（唯一剩余 V1 phase）
 
 - **Macro 引用：** [frontend-expansion-plan.zh.md §F6](./frontend-expansion-plan.zh.md) + [mvp-implementation-plan.zh.md §5 Phase 5](./mvp-implementation-plan.zh.md)
-- **Detail plan：** `v1-implementation-plan-f6.md`（+ `.zh.md`）—— 待写；最终文件名在 F6 plan 开始时再敲定
+- **Detail plan：** [v1-implementation-plan-f6.md](./v1-implementation-plan-f6.md)（+ [.zh.md](./v1-implementation-plan-f6.zh.md)）—— **已起草 2026-05-30**（plan-first；代码尚未落地）。该 detail plan **把 F6 拓宽**到 Docker 之外的 V1 收尾这一捆：**(A) Docker 镜像 + (B) CI/CD（GitHub Actions → GHCR）+ (C) 全功能 walkthrough 指南** —— 把 §8.1（CI gate）与 §8.3（walkthrough）一并纳入。
 
 **V1 范围。**
 
@@ -267,7 +270,7 @@ F3 ──> F4 ──> F5 ──> F6
 
 ### 8.1 CI codegen 新鲜度 gate
 
-**推荐时间槽：** 和 P12 / F3 一起 —— 下一次后端 schema 抖动。
+**时间槽：** 在 **F6.B** 交付 —— 完整 CI 设计（jobs、触发、GHCR push）见 [v1-implementation-plan-f6.zh.md §4](./v1-implementation-plan-f6.zh.md)。
 
 检查步骤：
 
@@ -290,7 +293,7 @@ V1 任何生产部署之前：
 
 ### 8.3 人工验收 walkthrough
 
-**等 V1 接近完工时再补**（按 2026-05-27 用户指示）—— 等到 F6 是最后一个未打勾的 phase 时，在本文档展开为 §8.3。届时覆盖每条主流程：注册 → account → instrument（含 picker 内嵌创建）→ position（创建 / 编辑 / 详情各 tab）→ trade（单条 + Custom multi-leg）→ dashboard（卡 / 表 / 图）。
+**等 V1 接近完工时再补**（按 2026-05-27 用户指示）—— 等到 F6 是最后一个未打勾的 phase 时，在本文档展开为 §8.3。**触发条件现已满足（2026-05-29）：** F3/F4/F5 已交付，F6 是最后一个未打勾的 phase，故本 walkthrough 应在 F6 规划时一并展开。届时覆盖每条主流程：注册 → account → instrument（含 picker 内嵌创建）→ position（创建 / 编辑 / 详情各 tab）→ trade（单条 + Custom multi-leg）→ dashboard（卡 / 表 / 图）。**现已在 F6.C 规划** —— 见 [v1-implementation-plan-f6.zh.md §5（Part C）](./v1-implementation-plan-f6.zh.md)；指南作为独立的 `docs/walkthrough.md` + `.zh.md` 出货。
 
 ## 9. V1 之后
 
@@ -308,6 +311,7 @@ V1.x 候选粗略优先级排序：
 
 ## Changelog
 
+- **v0.3（2026-05-29）** —— F3 + F4 + F5 全部交付（`vue-tsc` + `vite build` 全 clean；`schema.d.ts` 与后端对得上）。§2「当前状态」更新到 2026-05-29，列出 F3/F4/F5 交付物；「尚未实现」收缩为只剩 F6。§3 V1 切片表中 F3/F4/F5 行打勾 ✅。§5 执行顺序图压缩 —— F0–F5 已完成，F6 是唯一剩余段。§6.2/6.3/6.4 标为已完成，detail plan 链接已可解析；§6.5 F6 标为「⏳ 下一步（唯一剩余 V1 phase）」。§8.3 人工验收 walkthrough 触发条件标为已满足（F6 现在是最后一个未打勾 phase）。横切推迟项不变：CI codegen gate（§8.1）与 Vitest/Playwright（§7）仍未实现。
 - **v0.2（2026-05-28）** —— P12 后端派生读层交付（406 条测试全绿）。§2「当前状态」更新；§3 V1 切片表中 P12 行打勾；§5 执行顺序图压缩为剩余的纯前端段（F3 → F4 → F5 → F6）；§6.1 改写为已交付记录，字段名定稿（列表/详情上的 `net_cash_flow` + 单个 `GET /api/dashboard/summary`）。§6.1 中 detail plan 链接已可解析。同一轮迭代里起草的前端 detail plan（`frontend-implementation-plan-f3.md`、`-f4.md`、`-f5.md` 及各自 `.zh.md`）。
 - **v0.1 (2026-05-27)** —— 初版 V1 release plan。整合 `backend-expansion-plan.md` 与 `frontend-expansion-plan.md` 在 V1 范围内的内容。5 条横切决策敲定：
   1. `InstrumentPicker` get-or-create + `allowCreate` prop；期权走两步式（先 underlying 再属性）。

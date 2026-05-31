@@ -2,7 +2,7 @@
 
 **Language:** English | [中文](./frontend-expansion-plan.zh.md)
 
-> Status: **DRAFT v0.2** (2026-05-24). Macro roadmap for expanding the frontend
+> Status: **DRAFT v0.5** (2026-05-29). Macro roadmap for expanding the frontend
 > beyond F0 (auth scaffold) and F1 (Account CRUD UI). Pairs with
 > [backend-expansion-plan.md](./backend-expansion-plan.md) (Phase P6+) and rolls each
 > F-phase up to a small contiguous batch of backend phases, so every F-phase is
@@ -21,11 +21,13 @@
 
 ## 1. Where we are
 
-Frontend F0 (auth scaffold), F1 (Account CRUD UI), and F2 (Instrument + StrategyConfig
-UI) shipped on `refactoring/rebuild`. **Backend is V1-complete** — P6 through P12
-all shipped (406 backend tests green; `ruff` + `mypy --strict` clean); see
-[backend-expansion-plan.md §4](./backend-expansion-plan.md#4-phase-roadmap). The
-remaining V1 work is **entirely frontend**: F3 → F4 → F5 → F6.
+Frontend F0 (auth scaffold), F1 (Account CRUD UI), F2 (Instrument + StrategyConfig
+UI), F3 (Position CRUD + detail page), F4 (Trade entry UI), and F5 (Dashboard) have
+**all shipped** on `refactoring/rebuild` (`vue-tsc` + `vite build` clean;
+`schema.d.ts` fresh). **Backend is V1-complete** — P6 through P12 all shipped (406
+backend tests green; `ruff` + `mypy --strict` clean); see
+[backend-expansion-plan.md §4](./backend-expansion-plan.md#4-phase-roadmap). The only
+remaining V1 phase is **F6** (single-container Docker production wiring).
 
 **Sequencing decision (revised v0.2):** backend leads, frontend follows in the same
 iteration — **but the F-phase granularity has been coarsened** so each F-phase
@@ -63,10 +65,10 @@ UI iteration than micro-stepped F2.x slices would.
 | F-phase | Backend gate | UI deliverable | Status |
 |---|---|---|---|
 | **F2** | [P6](./backend-expansion-plan.md#p6--instrument-base--extensions) ✅ + [P7](./backend-expansion-plan.md#p7--strategyconfig) ✅ | `InstrumentPicker` component + `/instruments` browse page + `/settings/strategies` page | ✅ done (2026-05-26) |
-| **F3** | [P8](./backend-expansion-plan.md#p8--position) ✅ + [P10](./backend-expansion-plan.md#p10--strategy-meta-extensions) ✅ + [P11](./backend-expansion-plan.md#p11--tradeplan-event-stream) ✅ + [P12.1](./backend-expansion-plan.md#p12--derived-read-layer) ✅ (list `net_cash_flow`) | Position list + create/edit + detail page (with strategy-meta tabs and Plan tab) | ⏳ next (all gates ready) |
-| **F4** | [P9](./backend-expansion-plan.md#p9--trade) ✅ | Trade entry (multi-leg `order_group_id` UX) + Position-detail trade log | — (gate ready) |
-| **F5** | [P12.2](./backend-expansion-plan.md#p12--derived-read-layer) ✅ (`/api/dashboard/summary`) | Dashboards: per-currency PnL + open/closed positions + monthly PnL chart | — (gate ready) |
-| **F6** | [Backend Phase 5](./mvp-implementation-plan.md#phase-5--docker-single-container-deployment) | Single-container Docker production build wiring (FastAPI serves `frontend/dist`) | — |
+| **F3** | [P8](./backend-expansion-plan.md#p8--position) ✅ + [P10](./backend-expansion-plan.md#p10--strategy-meta-extensions) ✅ + [P11](./backend-expansion-plan.md#p11--tradeplan-event-stream) ✅ + [P12.1](./backend-expansion-plan.md#p12--derived-read-layer) ✅ (list `net_cash_flow`) | Position list + create/edit + detail page (with strategy-meta tabs and Plan tab) | ✅ done (2026-05-28) |
+| **F4** | [P9](./backend-expansion-plan.md#p9--trade) ✅ | Trade entry (multi-leg `order_group_id` UX) + Position-detail trade log | ✅ done (2026-05-28) |
+| **F5** | [P12.2](./backend-expansion-plan.md#p12--derived-read-layer) ✅ (`/api/dashboard/summary`) | Dashboards: per-currency PnL + open/closed positions + monthly PnL chart | ✅ done (2026-05-29) |
+| **F6** | [Backend Phase 5](./mvp-implementation-plan.md#phase-5--docker-single-container-deployment) | Single-container Docker production build wiring (FastAPI serves `frontend/dist`) | ⏳ next |
 
 [P6.x — external instrument validation](./backend-expansion-plan.md#p6x--external-instrument-validation-first-external-api-integration-optional-non-blocking)
 is **deferred and non-blocking**; it slips into F2 as a small enhancement (typeahead
@@ -105,7 +107,10 @@ F3 + F4 — needs to be solid before Position/Trade screens consume it. The
 backend). StrategyConfig is order-flexible with the rest and tiny; bundling it here
 keeps F3 focused on Position alone.
 
-### F3 — Position CRUD + detail page (with strategy-meta tabs + Plan tab)
+### F3 — Position CRUD + detail page (with strategy-meta tabs + Plan tab) ✅ done (2026-05-28)
+
+**Detailed plan:** [frontend-implementation-plan-f3.md](./frontend-implementation-plan-f3.md)
+(+ [中文](./frontend-implementation-plan-f3.zh.md)).
 
 **Goal.** The user's primary workspace — list, create, edit, archive Position; open
 the detail page to see / edit strategy-specific snapshots and the trade plan.
@@ -124,7 +129,10 @@ the detail page to see / edit strategy-specific snapshots and the trade plan.
 `primary_instrument.currency` per [data-model §6](./data-model.md#currency-placement);
 form shows it as a read-only badge.
 
-### F4 — Trade entry
+### F4 — Trade entry ✅ done (2026-05-28)
+
+**Detailed plan:** [frontend-implementation-plan-f4.md](./frontend-implementation-plan-f4.md)
+(+ [中文](./frontend-implementation-plan-f4.zh.md)).
 
 **Goal.** The journal's data-entry workhorse. Multi-leg `order_group_id` UX is the
 design crux — see §6②.
@@ -144,7 +152,10 @@ design crux — see §6②.
 [data-model §4.5.2](./data-model.md#452-notion-event--atomic-trade-mapping) (12 rows)
 enterable through UI without curl.
 
-### F5 — Dashboards & charts
+### F5 — Dashboards & charts ✅ done (2026-05-29)
+
+**Detailed plan:** [frontend-implementation-plan-f5.md](./frontend-implementation-plan-f5.md)
+(+ [中文](./frontend-implementation-plan-f5.zh.md)).
 
 **Goal.** The numbers that make the journal useful.
 
@@ -197,25 +208,29 @@ enterable through UI without curl.
 
 ## 6. Open design decisions
 
-Each item is **OPEN** pending sign-off. My leanings noted.
+All three are now **SETTLED** (① in F2, ② in F4, ③ in F5). Resolutions inline.
 
 1. **InstrumentPicker UX for options.** Options are identified by a 5-tuple
    `(underlying, opt_type, strike, expiry, multiplier)`. *Lean:* picker for option
    contexts splits into two steps — pick underlying (typeahead), then pick contract
    attributes via dedicated inputs; the picker's "select existing or create" call
-   gets get-or-create semantics for free. Settled in F2.
+   gets get-or-create semantics for free. **Settled in F2** (picker shipped
+   select-only; two-step create landed in F3 via `allowCreate`).
 2. **Trade entry multi-leg ergonomics.** Two designs:
    (a) one master "Add trade" modal with an "Add another leg" button that grows
    the row count, all sharing one `order_group_id`; or
    (b) prebuilt flows ("Open iron condor", "Record assignment") that emit the
    right rows automatically. *Lean:* ship (b) with a "Custom multi-leg" escape
-   hatch that's (a) — named flows cover 90% of the
-   [data-model §4.5.2](./data-model.md#452-notion-event--atomic-trade-mapping)
-   mappings, custom escape hatch covers the long tail. Settled in F4.
+   hatch that's (a). **Settled in F4 (2026-05-28):** shipped the generic Custom
+   multi-leg form (design (a)) as the primary path — `TradeEntryModal` +
+   `TradeLegRow`, rows sharing one server-assigned `order_group_id` — plus
+   read-side pattern-detected badges (`tradePatternBadge`). Named flows (b) were
+   **not** built; deferred to V1.x.
 3. **Dashboard chart library.** ECharts (most coverage), Plotly (data-science
    familiar), or Chart.js (smallest). *Lean:* **ECharts** — Vue 3 wrapper
    `vue-echarts` is mature; the combination chart range we eventually want
-   (bars + lines + per-currency stacks) is well-served. Settled in F5.
+   (bars + lines + per-currency stacks) is well-served. **Settled in F5
+   (2026-05-29):** shipped `vue-echarts` (+ `echarts`) for `MonthlyPnlChart`.
 
 ## 7. After this roadmap
 
@@ -234,6 +249,7 @@ Each item is **OPEN** pending sign-off. My leanings noted.
 
 ## Changelog
 
+- **v0.5 (2026-05-29)** — F3 + F4 + F5 all shipped (`vue-tsc` + `vite build` clean; `schema.d.ts` fresh). §1 "Where we are" rewritten: F0–F5 all done, F6 (Docker) is the only remaining V1 phase. §3 mapping table flips F3/F4/F5 rows to ✅ done (F3/F4 2026-05-28, F5 2026-05-29) and F6 to "⏳ next". §4 F3/F4/F5 headers marked done and linked to their detail plans. §6 open decisions ② (multi-leg ergonomics) and ③ (chart lib) closed: F4 shipped the Custom multi-leg form as primary (`TradeEntryModal`/`TradeLegRow` + pattern badges; named flows deferred), F5 shipped `vue-echarts`. CI codegen gate and Vitest/Playwright remain deferred (§5) — not built in F3–F5.
 - **v0.4 (2026-05-28)** — All backend gates for F3 + F4 + F5 are now green (P8/P10/P11 ✅, P9 ✅, P12 ✅; 406 backend tests passing). §1 "Where we are" rewritten to reflect "V1-complete backend; remaining work entirely frontend". §3 mapping table flips F3/F4/F5 rows from "—" to "gate ready". Detail plans `frontend-implementation-plan-f3.md` / `-f4.md` / `-f5.md` (+ each `.zh.md`) drafted in the same iteration. Open decision ③ (chart lib) settled at the V1 layer to `vue-echarts`; F5 detail plan still does the side-by-side write-up.
 - **v0.3 (2026-05-26)** — Mark F2 as done. Delivered `InstrumentPicker` (typeahead,
   reusable for F3/F4), `InstrumentForm` (stock/option/forex tabs with get-or-create

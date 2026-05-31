@@ -2,7 +2,7 @@
 
 **Language:** English | [中文](./v1-release-plan.zh.md)
 
-> Status: **DRAFT v0.1** (2026-05-27). North-star scope document for the first deployable release of the trading journal on `refactoring/rebuild`. Consolidates the V1-cut content from [backend-expansion-plan.md](./backend-expansion-plan.md) and [frontend-expansion-plan.md](./frontend-expansion-plan.md). Companion to [data-model.md](./data-model.md). After V1 ships, this document remains as the V1 record; the two macro roadmaps are archived.
+> Status: **DRAFT v0.3** (2026-05-29). North-star scope document for the first deployable release of the trading journal on `refactoring/rebuild`. Consolidates the V1-cut content from [backend-expansion-plan.md](./backend-expansion-plan.md) and [frontend-expansion-plan.md](./frontend-expansion-plan.md). Companion to [data-model.md](./data-model.md). After V1 ships, this document remains as the V1 record; the two macro roadmaps are archived.
 
 ## 1. Purpose and maintenance
 
@@ -21,7 +21,7 @@ This document is the **single source of truth for V1**:
 
 When a V1 scope or decision changes, all three are updated in the same change. The macro docs hold the long-term horizon; this doc holds the V1 cut. After V1 ships, the macros are archived and this becomes the record.
 
-## 2. Where we are (2026-05-28)
+## 2. Where we are (2026-05-29)
 
 **Backend (406 tests passing; `ruff` + `mypy --strict` clean) — V1 backend cut complete:**
 
@@ -35,13 +35,16 @@ When a V1 scope or decision changes, all three are updated in the same change. T
 - P11 TradePlan (append-only event stream, server-allocated `revision_no`)
 - P12 Derived read layer — per-position `net_cash_flow` on list/detail + `GET /api/dashboard/summary`
 
-**Frontend (`vue-tsc` + `vite build` clean; `schema.d.ts` fresh):**
+**Frontend (`vue-tsc` + `vite build` clean; `schema.d.ts` fresh) — F0–F5 shipped:**
 
 - F0 Auth scaffold + `AuthenticatedLayout`
 - F1 Account CRUD UI
-- F2 `InstrumentPicker` (select-only typeahead) + `InstrumentForm` + `/instruments` browse + `/settings/strategies`
+- F2 `InstrumentPicker` (typeahead) + `InstrumentForm` + `/instruments` browse + `/settings/strategies`
+- F3 Position CRUD + detail page (Overview / Meta / Plan / Trades tabs); `InstrumentPicker` gained `allowCreate` (inline get-or-create)
+- F4 Trade entry UI — `TradeEntryModal` + `TradeLegRow` Custom multi-leg form (rows share one `order_group_id`) + Position-detail Trades tab grouped by `order_group_id` with pattern badges
+- F5 Dashboard — per-currency PnL cards + open/closed positions tables + monthly realized-PnL chart (`vue-echarts`) + win-rate gauge
 
-**Not yet built:** F3 (Position UI), F4 (Trade entry UI), F5 (Dashboard), F6 (Docker single-container). The remaining V1 work is **entirely frontend**.
+**Not yet built:** F6 (Docker single-container) — the only remaining V1 phase.
 
 ## 3. V1 cut
 
@@ -50,9 +53,9 @@ When a V1 scope or decision changes, all three are updated in the same change. T
 | Phase | Deliverable | Macro reference |
 |---|---|---|
 | **P12** ✅ | Position list `net_cash_flow` + `GET /api/dashboard/summary` (per-currency PnL, monthly buckets, win_rate, open snapshot) | [backend-expansion-plan.md §P12](./backend-expansion-plan.md#p12--derived-read-layer) |
-| **F3** | Position list / create / edit / detail page (Overview / Meta / Plan / Trades tabs); `InstrumentPicker` gains `allowCreate` | [frontend-expansion-plan.md §F3](./frontend-expansion-plan.md#f3--position-crud--detail-page-with-strategy-meta-tabs--plan-tab) |
-| **F4** | Trade entry UI (Custom multi-leg primary); Position-detail Trades tab grouped by `order_group_id` | [frontend-expansion-plan.md §F4](./frontend-expansion-plan.md#f4--trade-entry) |
-| **F5** | Dashboard — per-currency PnL cards + open/closed tables + one chart (monthly realized PnL bars) | [frontend-expansion-plan.md §F5](./frontend-expansion-plan.md#f5--dashboards--charts) |
+| **F3** ✅ | Position list / create / edit / detail page (Overview / Meta / Plan / Trades tabs); `InstrumentPicker` gains `allowCreate` | [frontend-expansion-plan.md §F3](./frontend-expansion-plan.md#f3--position-crud--detail-page-with-strategy-meta-tabs--plan-tab) |
+| **F4** ✅ | Trade entry UI (Custom multi-leg primary); Position-detail Trades tab grouped by `order_group_id` | [frontend-expansion-plan.md §F4](./frontend-expansion-plan.md#f4--trade-entry) |
+| **F5** ✅ | Dashboard — per-currency PnL cards + open/closed tables + one chart (monthly realized PnL bars) | [frontend-expansion-plan.md §F5](./frontend-expansion-plan.md#f5--dashboards--charts) |
 | **F6** | Single-container Docker: FastAPI serves `frontend/dist`, SPA fallback, SQLite volume | [frontend-expansion-plan.md §F6](./frontend-expansion-plan.md#f6--single-container-docker-production-wiring) + [mvp-implementation-plan.md §5 Phase 5](./mvp-implementation-plan.md#phase-5--docker-single-container-deployment) |
 
 ### Deferred to V1.x (explicitly out of V1)
@@ -124,14 +127,14 @@ Split based on data-fetch shape and dataset size:
 
 ```
 Backend already done:  P6 → P7 → P8 → P9 → P10 → P11 → P12 ✅
-Frontend already done: F0 → F1 → F2 ✅
+Frontend already done: F0 → F1 → F2 → F3 → F4 → F5 ✅
 
-V1 remaining (frontend-only):
+V1 remaining:
 
-F3 ──> F4 ──> F5 ──> F6
+F6 (single-container Docker)
 ```
 
-**Default execution order** (recommended): **F3 → F4 → F5 → F6**. F3 ships Position list (consumes P12's `net_cash_flow`) + create/edit + detail page with Overview/Meta/Plan/Trades tabs (Trades tab is a placeholder until F4). F4 wires the trade entry modal and turns the Trades tab live. F5 consumes `GET /api/dashboard/summary`. F6 packages the lot in a single container.
+**Default execution order** (recommended): **F3 → F4 → F5 → F6** — followed as planned. F3 shipped Position list (consumes P12's `net_cash_flow`) + create/edit + detail page with Overview/Meta/Plan/Trades tabs (Trades tab was a placeholder until F4). F4 wired the trade entry modal and turned the Trades tab live. F5 consumes `GET /api/dashboard/summary`. **F6 (the only phase left)** packages the lot in a single container.
 
 **Alternative considered**: lead with F4 then F3 (Trade-led model means Position is born with a first Trade; doing F4 first would let F3 always have real positions to display). Discussed on 2026-05-26 and reverted — F3 ships the Position list/detail surface that F4's entry modal docks into, so the natural order is F3 first with a read-only Trades tab placeholder, then F4 makes it interactive.
 
@@ -160,10 +163,10 @@ Detailed plans live in their own `*-pN.md` / `*-fN.md` files (one EN + one ZH pe
 - Granular endpoints (`/per-currency`, `/monthly-pnl`, `/win-rate`, `/counts`) — subsumed by the single summary endpoint; split only if a future view needs partial fetches.
 - Date-range filtering / strategy-type filtering on the summary.
 
-### 6.2 F3 — Position UI
+### 6.2 F3 — Position UI ✅ done (2026-05-28)
 
 - **Macro reference:** [frontend-expansion-plan.md §F3](./frontend-expansion-plan.md#f3--position-crud--detail-page-with-strategy-meta-tabs--plan-tab)
-- **Detail plan:** `frontend-implementation-plan-f3.md` (+ `.zh.md`) — to be written
+- **Detail plan:** [frontend-implementation-plan-f3.md](./frontend-implementation-plan-f3.md) (+ [.zh.md](./frontend-implementation-plan-f3.zh.md)) — done
 
 **V1 scope.**
 
@@ -176,10 +179,10 @@ Detailed plans live in their own `*-pN.md` / `*-fN.md` files (one EN + one ZH pe
   - **Trades** — chronological trade log grouped visually by `order_group_id`. Initially a placeholder until F4 lands the entry path; the read pane and grouping logic ship here, the entry modal in F4.
 - **Position delete** — current 409-aware flow; UI surfaces the "has attached trades / plans" error inline (no `archived_at`, per Decision 4).
 
-### 6.3 F4 — Trade entry UI
+### 6.3 F4 — Trade entry UI ✅ done (2026-05-28)
 
 - **Macro reference:** [frontend-expansion-plan.md §F4](./frontend-expansion-plan.md#f4--trade-entry)
-- **Detail plan:** `frontend-implementation-plan-f4.md` (+ `.zh.md`) — to be written
+- **Detail plan:** [frontend-implementation-plan-f4.md](./frontend-implementation-plan-f4.md) (+ [.zh.md](./frontend-implementation-plan-f4.zh.md)) — done
 
 **V1 scope.**
 
@@ -200,10 +203,10 @@ Detailed plans live in their own `*-pN.md` / `*-fN.md` files (one EN + one ZH pe
 - No bulk import / CSV / broker fill ingestion.
 - No Vitest unless the badge-detection logic warrants it.
 
-### 6.4 F5 — Dashboard
+### 6.4 F5 — Dashboard ✅ done (2026-05-29)
 
 - **Macro reference:** [frontend-expansion-plan.md §F5](./frontend-expansion-plan.md#f5--dashboards--charts)
-- **Detail plan:** `frontend-implementation-plan-f5.md` (+ `.zh.md`) — to be written
+- **Detail plan:** [frontend-implementation-plan-f5.md](./frontend-implementation-plan-f5.md) (+ [.zh.md](./frontend-implementation-plan-f5.zh.md)) — done
 
 **V1 scope.**
 
@@ -221,10 +224,10 @@ Detailed plans live in their own `*-pN.md` / `*-fN.md` files (one EN + one ZH pe
 - Per-strategy drill-down dashboards.
 - Date-range pickers beyond month bucketing.
 
-### 6.5 F6 — Single-container Docker production wiring
+### 6.5 F6 — Single-container Docker production wiring ⏳ next (only remaining V1 phase)
 
 - **Macro reference:** [frontend-expansion-plan.md §F6](./frontend-expansion-plan.md#f6--single-container-docker-production-wiring) + [mvp-implementation-plan.md §5 Phase 5](./mvp-implementation-plan.md#phase-5--docker-single-container-deployment)
-- **Detail plan:** `v1-implementation-plan-f6.md` (+ `.zh.md`) — to be written; final filename settled when F6 plan starts
+- **Detail plan:** [v1-implementation-plan-f6.md](./v1-implementation-plan-f6.md) (+ [.zh.md](./v1-implementation-plan-f6.zh.md)) — **drafted 2026-05-30** (plan-first; code not yet landed). The detail plan **widens F6** beyond Docker into the V1 closeout bundle: **(A) Docker image + (B) CI/CD (GitHub Actions → GHCR) + (C) full-feature walkthrough guide** — folding in §8.1 (CI gate) and §8.3 (walkthrough).
 
 **V1 scope.**
 
@@ -267,7 +270,7 @@ Items explicitly out of V1. Each links to its trigger condition and macro refere
 
 ### 8.1 CI codegen freshness gate
 
-**Recommended slot:** alongside P12 / F3 — the next backend schema churn.
+**Slot:** delivered in **F6.B** — full CI design (jobs, triggers, GHCR push) is in [v1-implementation-plan-f6.md §4](./v1-implementation-plan-f6.md#4-part-b--cicd-github-actions).
 
 The check runs:
 
@@ -290,7 +293,7 @@ Lands as a checklist item near F6, not a phase.
 
 ### 8.3 Manual acceptance walkthrough
 
-**Deferred until V1 is nearly done** (per user direction 2026-05-27) — added to this document as a §8.3 expansion when F6 is the last unchecked phase. Will cover every primary flow: register → account → instrument (incl. inline create from picker) → position (create / edit / detail tabs) → trade (single + Custom multi-leg) → dashboard (cards / tables / chart).
+**Deferred until V1 is nearly done** (per user direction 2026-05-27) — added to this document as a §8.3 expansion when F6 is the last unchecked phase. **Trigger now active (2026-05-29):** with F3/F4/F5 shipped, F6 is the last unchecked phase, so this walkthrough should be expanded alongside F6 planning. Will cover every primary flow: register → account → instrument (incl. inline create from picker) → position (create / edit / detail tabs) → trade (single + Custom multi-leg) → dashboard (cards / tables / chart). **Now planned in F6.C** — see [v1-implementation-plan-f6.md §5 (Part C)](./v1-implementation-plan-f6.md#5-part-c--full-feature-walkthrough-guide); the guide ships as standalone `docs/walkthrough.md` + `.zh.md`.
 
 ## 9. After V1
 
@@ -308,6 +311,7 @@ V1.x candidates in rough priority order:
 
 ## Changelog
 
+- **v0.3 (2026-05-29)** — F3 + F4 + F5 all shipped (`vue-tsc` + `vite build` clean; `schema.d.ts` fresh). §2 "Where we are" updated to 2026-05-29 with the F3/F4/F5 deliverables listed; "Not yet built" reduced to F6 only. §3 V1-cut rows for F3/F4/F5 ticked ✅. §5 sequencing graph collapsed — F0–F5 done, F6 is the lone remainder. §6.2/6.3/6.4 marked done with detail-plan links now resolving; §6.5 F6 flagged "⏳ next (only remaining V1 phase)". §8.3 manual-acceptance walkthrough trigger marked active (F6 is now the last unchecked phase). Cross-cutting deferrals unchanged: CI codegen gate (§8.1) and Vitest/Playwright (§7) still not built.
 - **v0.2 (2026-05-28)** — P12 backend derived read layer shipped (406 tests passing). §2 "Where we are" updated; §3 V1 cut row for P12 ticked; §5 sequencing graph collapsed to the frontend-only remainder (F3 → F4 → F5 → F6); §6.1 rewritten as a shipped record with field names finalised (`net_cash_flow` on list/detail + single `GET /api/dashboard/summary`). Detail plan link in §6.1 now resolves. Frontend detail plans (`frontend-implementation-plan-f3.md`, `-f4.md`, `-f5.md` + `.zh.md` each) drafted in the same iteration.
 - **v0.1 (2026-05-27)** — Initial V1 release plan. Consolidates the V1 cut from `backend-expansion-plan.md` and `frontend-expansion-plan.md`. Five cross-cutting decisions settled:
   1. `InstrumentPicker` get-or-create + `allowCreate` prop; option flow is two-step (underlying then attrs).
