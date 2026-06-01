@@ -28,6 +28,7 @@ pip-wheel-metadata/
 
 # Docker bind-mount data dir (runtime SQLite + backups live here)
 /data/
+/example/data/
 
 # Node.js
 node_modules/

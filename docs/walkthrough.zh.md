@@ -26,22 +26,27 @@
 ## 1. Build 并跑容器（在 dev 服务器上）
 
 ```bash
-cd /path/to/trading-journal
+# 示例 compose 在 ./example 下。从那里跑容器，让它相对的 ./data bind mount 和
+# .env 紧挨着 compose 文件。
+cd /path/to/trading-journal/example
 
 # 1. 先建 data 目录、属主是你。这是头号坑：
 #    容器以你的 UID（1000）运行、把 app.db 写进 ./data。
 #    若让 Docker 自动建 ./data，它会归 root，迁移会失败。
 mkdir -p data
 
-# 2. 造一个真实的 .env（它被 gitignore）。
-cp .env.example .env
+# 2. 造一个真实的 .env（它被 gitignore）。模板在仓库根目录。
+cp ../.env.example .env
 #    生成一个真实 secret，填进 .env 的 COOKIE_SECRET=...
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 #    编辑 .env：把 COOKIE_SECRET 设成上面那个值。COOKIE_SECURE 保持 false
 #    （现在是 SSH 隧道上的纯 HTTP，还不是 HTTPS）。
 
-# 3. build 镜像并后台起容器。
-docker compose up --build -d
+# 3. 示例 compose 拉取 ghcr.io/t-liu93/trading-journal:latest。要跑你自己的本地
+#    build 做验收，先 build 出这个 tag（context = 仓库根）：
+docker build -t ghcr.io/t-liu93/trading-journal:latest ..
+#    然后后台起容器。想直接用已发布镜像就跳过上面的 build。
+docker compose up -d
 
 # 4. 确认起来且健康（healthcheck 给它 ~10-15s）。
 docker compose ps
@@ -54,7 +59,7 @@ docker compose logs --tail=20 app
 `PGID=$(id -g)`）再 `up`。
 
 **安全提示（SSH 开发推荐）：** 默认 Compose 把 `8000:8000` 发布在服务器的 `0.0.0.0`
-（所有网卡）。要让它私有、**只**能经你的 SSH 隧道访问，把 `docker-compose.yml` 的端口
+（所有网卡）。要让它私有、**只**能经你的 SSH 隧道访问，把 `example/docker-compose.yml` 的端口
 行改成只绑 loopback：
 
 ```yaml
@@ -180,7 +185,7 @@ docker compose up -d       # 再起来；数据还在
 | 笔记本 `localhost:8000` 连接被拒 | SSH 隧道没开，或容器没起/不健康。重查 `ssh -N -L …` 和 `docker compose ps`。 |
 | 登录后 session 老掉 | 你在用服务器 IP，而非经隧道的 `localhost`。改用 `localhost`。 |
 | 服务器上 8000 端口被占 | 有别的东西占了。改 ports 映射的宿主侧（如 `8001:8000`），转发 `8001`。 |
-| 改了代码但前端还是旧的 | 重新 build：`docker compose up --build -d`（SPA 在 build 时烤进镜像）。 |
+| 改了代码但前端还是旧的 | 重新 build：`docker build -t ghcr.io/t-liu93/trading-journal:latest .. && docker compose up -d`（SPA 在 build 时烤进镜像）。 |
 
 日志：`docker compose logs -f app`。
 

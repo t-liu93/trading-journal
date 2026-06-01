@@ -1,7 +1,10 @@
+# Example single-container deployment for Trading Journal.
+# It pulls the published image (no local build). Copy this file into a directory
+# with a `.env` and an empty `./data` dir next to it, then `docker compose up -d`.
+# See the repo's docs/walkthrough.md for the full guide and the .env.example template.
 services:
   app:
-    build: .
-    image: ghcr.io/t-liu93/trading-journal:dev
+    image: ghcr.io/t-liu93/trading-journal:latest
     # Run as the host user (default 1000) so the SQLite file written into the
     # ./data bind mount is owned by you, not root. Override via PUID/PGID in .env.
     user: "${PUID:-1000}:${PGID:-1000}"

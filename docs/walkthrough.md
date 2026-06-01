@@ -27,22 +27,28 @@ On your **laptop**:
 ## 1. Build & run the container (on the dev server)
 
 ```bash
-cd /path/to/trading-journal
+# The example compose lives in ./example. Run the container from there so its
+# relative ./data bind mount and .env sit next to the compose file.
+cd /path/to/trading-journal/example
 
 # 1. Create the data dir FIRST, owned by you. This is the #1 gotcha:
 #    the container runs as your UID (1000) and writes ./data/app.db here.
 #    If Docker auto-creates ./data it'll be root-owned and the migration fails.
 mkdir -p data
 
-# 2. Make a real .env (it's gitignored).
-cp .env.example .env
+# 2. Make a real .env (it's gitignored). The template lives at the repo root.
+cp ../.env.example .env
 #    Generate a real secret and put it in .env as COOKIE_SECRET=...
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 #    Edit .env: set COOKIE_SECRET=<that value>. Leave COOKIE_SECURE=false
 #    (we're on plain HTTP behind an SSH tunnel, not HTTPS yet).
 
-# 3. Build the image and start the container (detached).
-docker compose up --build -d
+# 3. The example compose pulls ghcr.io/t-liu93/trading-journal:latest. To run
+#    YOUR local build for acceptance, build that tag first (context = repo root):
+docker build -t ghcr.io/t-liu93/trading-journal:latest ..
+#    Then start the container (detached). Skip the build above to just pull the
+#    already-published image instead.
+docker compose up -d
 
 # 4. Confirm it came up healthy (give it ~10-15s for the healthcheck).
 docker compose ps
@@ -57,7 +63,7 @@ If `PUID`/`PGID` on your server aren't 1000, set them in `.env` (`PUID=$(id -u)`
 **Security note (recommended for SSH dev):** by default Compose publishes
 `8000:8000` on the server's `0.0.0.0` (all interfaces). To keep it private and
 reachable *only* through your SSH tunnel, change the port line in
-`docker-compose.yml` to bind loopback:
+`example/docker-compose.yml` to bind loopback:
 
 ```yaml
     ports:
@@ -191,7 +197,7 @@ docker compose up -d       # bring it back; your data is still there
 | `localhost:8000` refused on laptop | SSH tunnel not running, or the container isn't up/healthy. Re-check `ssh -N -L …` and `docker compose ps`. |
 | Logged in but session keeps dropping | You're hitting the server IP, not `localhost` over the tunnel. Use `localhost`. |
 | Port 8000 already in use on the server | Something else is bound. Change the host side of the ports mapping (e.g. `8001:8000`) and forward `8001` instead. |
-| Stale frontend after a code change | Rebuild: `docker compose up --build -d` (the SPA is baked into the image at build time). |
+| Stale frontend after a code change | Rebuild: `docker build -t ghcr.io/t-liu93/trading-journal:latest .. && docker compose up -d` (the SPA is baked into the image at build time). |
 
 Logs: `docker compose logs -f app`.
 
