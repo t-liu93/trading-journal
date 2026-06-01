@@ -111,6 +111,10 @@ jobs:
         working-directory: .
         run: git diff --exit-code -- frontend/src/api/schema.d.ts
 
+      - name: Stop backend server
+        if: always()
+        run: pkill -f "uvicorn trading_journal.main:app" || true
+
   # =========================================================================
   # 4.3  Frontend build — vue-tsc + vite build
   # =========================================================================
