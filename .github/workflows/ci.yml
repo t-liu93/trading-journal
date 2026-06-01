@@ -1,30 +1,22 @@
-name: CI / CD
+name: Test and Build
 
 on:
   push:
     branches: ["**"]
-    tags: ["v*"]
   pull_request:
     branches: [main]
 
-# Cancel superseded runs on the same branch / PR.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
-  packages: write       # needed by docker-image job for GHCR push
 
-# ---------------------------------------------------------------------------
-# Shared environment defaults
-# ---------------------------------------------------------------------------
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "22"
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   # =========================================================================
@@ -101,7 +93,6 @@ jobs:
         run: |
           uv run uvicorn trading_journal.main:app \
             --host 127.0.0.1 --port 8000 &
-          # Wait until the health endpoint responds.
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:8000/api/health > /dev/null 2>&1; then
               echo "Backend is ready"
@@ -147,17 +138,16 @@ jobs:
         run: npm run build
 
   # =========================================================================
-  # 4.4  Docker image — build always on PR/main; build+push on v* tags
+  # 4.4  Docker build — native only, verifies the Dockerfile stays green
   # =========================================================================
-  docker-image:
-    name: Docker image
+  docker-build:
+    name: Docker build
     needs: [backend-quality]
     runs-on: ubuntu-latest
-    # Only run on main pushes, PRs to main, or v-prefixed tags.
+    # Only on main pushes and PRs to main (not every feature branch).
     if: >
       github.event_name == 'pull_request' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
 
     steps:
       - uses: actions/checkout@v4
@@ -165,34 +155,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            # v1.2.3 → 1.2.3 + latest
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            # PR / branch builds get a short SHA tag for identification.
-            type=sha,prefix=pr-,format=short,enable=${{ github.event_name == 'pull_request' }}
-            type=sha,prefix=,format=short,enable=${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v') }}
-
-      - name: Build and push Docker image
+      - name: Build Docker image (native)
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
