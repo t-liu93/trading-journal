@@ -1,20 +1,29 @@
 <script setup lang="ts">
-import { h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { type DataTableColumns, NButton, NTime } from 'naive-ui'
 import AuthenticatedLayout from '../components/AuthenticatedLayout.vue'
 import PositionFormModal from '../components/PositionFormModal.vue'
 import PositionStatusBadge from '../components/PositionStatusBadge.vue'
 import { usePositions } from '../composables/usePositions'
+import { useAccounts } from '../composables/useAccounts'
 import { type Instrument, instrumentsApi } from '../api/instruments'
 import { type Position, type StrategyType } from '../api/positions'
 import { formatAmount } from '../utils/positionDerived'
 
 const router = useRouter()
 const { positions, loading, error, statusFilter, strategyTypeFilter, refresh } = usePositions()
+const { accounts, refresh: refreshAccounts } = useAccounts()
 
 const instrumentMap = ref<Record<string, Instrument>>({})
 const showCreateModal = ref(false)
+
+const accountName = computed<Record<string, string>>(() =>
+  Object.fromEntries(accounts.value.map(a => [a.id, a.name])),
+)
+const accountFilterOptions = computed(() =>
+  accounts.value.map(a => ({ label: a.name, value: a.id })),
+)
 
 const statusOptions = [
   { label: 'All', value: '' },
@@ -42,11 +51,20 @@ function prettifyStrategy(s: StrategyType): string {
   return map[s] ?? s
 }
 
-const columns: DataTableColumns<Position> = [
+const columns = computed<DataTableColumns<Position>>(() => [
   {
     title: 'Symbol',
     key: 'symbol',
     render: (row) => instrumentMap.value[row.primary_instrument_id]?.symbol ?? '—',
+  },
+  {
+    title: 'Account',
+    key: 'account_id',
+    render: (row) => accountName.value[row.account_id] ?? '—',
+    // Built-in client-side column filter (single account at a time).
+    filter: (value, row) => row.account_id === value,
+    filterOptions: accountFilterOptions.value,
+    filterMultiple: false,
   },
   {
     title: 'Strategy',
@@ -97,7 +115,7 @@ const columns: DataTableColumns<Position> = [
         () => 'Open',
       ),
   },
-]
+])
 
 async function loadInstruments() {
   try {
@@ -109,7 +127,7 @@ async function loadInstruments() {
 }
 
 onMounted(async () => {
-  await Promise.all([refresh(), loadInstruments()])
+  await Promise.all([refresh(), refreshAccounts(), loadInstruments()])
 })
 
 function handleSaved(position?: Position) {

@@ -8,5 +8,8 @@ export type CurrencyAmount      = components['schemas']['CurrencyAmount']
 export type MonthCurrencyAmount = components['schemas']['MonthCurrencyAmount']
 
 export const dashboardApi = {
-  summary: () => http.get('/api/dashboard/summary') as Promise<DashboardSummary>,
+  summary: (accountId?: string | null) => {
+    const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
+    return http.get(`/api/dashboard/summary${query}`) as Promise<DashboardSummary>
+  },
 }

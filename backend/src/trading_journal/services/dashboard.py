@@ -27,14 +27,18 @@ def _utc_month_key(dt: datetime) -> str:
 
 
 async def compute_summary(
-    session: AsyncSession, user_id: uuid.UUID
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    account_id: uuid.UUID | None = None,
 ) -> DashboardSummary:
     """Return the V1 dashboard summary for a given user.
 
-    All queries scope by ``Position.user_id == user_id``. Archived trades
-    are excluded from open-side net_cash_flow rollups (closed-side uses
-    Position.pnl_realized directly, which was already computed with the
-    correct trade set frozen at close).
+    All queries scope by ``Position.user_id == user_id``; when ``account_id`` is
+    given they are further narrowed to that account (the ``user_id`` filter still
+    applies, so a foreign account id simply yields an empty summary rather than
+    leaking another user's data). Archived trades are excluded from open-side
+    net_cash_flow rollups (closed-side uses Position.pnl_realized directly, which
+    was already computed with the correct trade set frozen at close).
     """
     # closed: count + win_rate + per_currency_pnl + monthly_pnl
     closed_stmt = (
@@ -48,6 +52,8 @@ async def compute_summary(
             Position.status == PositionStatus.CLOSED,
         )
     )
+    if account_id is not None:
+        closed_stmt = closed_stmt.where(Position.account_id == account_id)
     closed_rows = (await session.execute(closed_stmt)).all()
 
     closed_count = len(closed_rows)
@@ -77,6 +83,8 @@ async def compute_summary(
             Position.status == PositionStatus.OPEN,
         )
     )
+    if account_id is not None:
+        open_stmt = open_stmt.where(Position.account_id == account_id)
     open_rows = (await session.execute(open_stmt)).all()
     open_count = len(open_rows)
     open_position_ids = [r.id for r in open_rows]

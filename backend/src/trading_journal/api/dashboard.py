@@ -1,5 +1,6 @@
 """Dashboard endpoints (P12)."""
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -18,5 +19,6 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 async def get_dashboard_summary(
     user: Annotated[User, Depends(current_active_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
+    account_id: uuid.UUID | None = None,
 ) -> DashboardSummary:
-    return await compute_summary(session, user.id)
+    return await compute_summary(session, user.id, account_id)

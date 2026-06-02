@@ -8,12 +8,12 @@ export function useDashboard() {
   const error = ref<string | null>(null)
   let refreshSeq = 0
 
-  async function refresh(): Promise<void> {
+  async function refresh(accountId?: string | null): Promise<void> {
     const seq = ++refreshSeq
     loading.value = true
     error.value = null
     try {
-      const result = await dashboardApi.summary()
+      const result = await dashboardApi.summary(accountId)
       if (seq === refreshSeq) summary.value = result
     } catch (e) {
       if (seq === refreshSeq)

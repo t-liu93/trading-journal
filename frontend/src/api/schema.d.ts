@@ -2662,7 +2662,9 @@ export interface operations {
     };
     get_dashboard_summary_api_dashboard_summary_get: {
         parameters: {
-            query?: never;
+            query?: {
+                account_id?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2676,6 +2678,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

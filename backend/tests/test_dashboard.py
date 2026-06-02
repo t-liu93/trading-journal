@@ -427,6 +427,51 @@ async def test_cross_user_isolation(
     assert alice_resp.json()["closed"]["count"] == 1
 
 
+async def test_account_id_filter_scopes_summary(auth_client: AsyncClient) -> None:
+    """``account_id`` query param narrows the summary to that account only."""
+    acct_a = await _seed_account(auth_client, name="Acct A")
+    acct_b = await _seed_account(auth_client, name="Acct B")
+    instr = await _seed_instrument(auth_client)
+
+    # Acct A: one closed position.
+    pos_a = await _seed_position(auth_client, acct_a["id"], instr["id"])
+    await _seed_trade(
+        auth_client, pos_a["id"], instr["id"],
+        action="buy", quantity="10", price="50",
+    )
+    await _seed_trade(
+        auth_client, pos_a["id"], instr["id"],
+        action="sell", quantity="10", price="60",
+    )
+    await _close_position(auth_client, pos_a["id"])
+
+    # Acct B: one open position.
+    pos_b = await _seed_position(auth_client, acct_b["id"], instr["id"])
+    await _seed_trade(
+        auth_client, pos_b["id"], instr["id"],
+        action="buy", quantity="5", price="50",
+    )
+
+    # No filter → both accounts roll up together.
+    all_data = (await auth_client.get("/api/dashboard/summary")).json()
+    assert all_data["closed"]["count"] == 1
+    assert all_data["open"]["count"] == 1
+
+    # Filter to Acct A → only its closed position.
+    a_data = (
+        await auth_client.get(f"/api/dashboard/summary?account_id={acct_a['id']}")
+    ).json()
+    assert a_data["closed"]["count"] == 1
+    assert a_data["open"]["count"] == 0
+
+    # Filter to Acct B → only its open position.
+    b_data = (
+        await auth_client.get(f"/api/dashboard/summary?account_id={acct_b['id']}")
+    ).json()
+    assert b_data["closed"]["count"] == 0
+    assert b_data["open"]["count"] == 1
+
+
 async def test_requires_auth(client: AsyncClient) -> None:
     """Unauthenticated GET /api/dashboard/summary → 401."""
     resp = await client.get("/api/dashboard/summary")

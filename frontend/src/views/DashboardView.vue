@@ -8,14 +8,32 @@ import OpenPositionsTable from '../components/OpenPositionsTable.vue'
 import ClosedPositionsTable from '../components/ClosedPositionsTable.vue'
 import { useDashboard } from '../composables/useDashboard'
 import { usePositions } from '../composables/usePositions'
+import { useAccounts } from '../composables/useAccounts'
 import { type Instrument, instrumentsApi } from '../api/instruments'
 
 const { summary, loading: summaryLoading, error: summaryError, refresh: refreshSummary } = useDashboard()
 const { positions, loading: positionsLoading, error: positionsError, refresh: refreshPositions } = usePositions({ status: '' })
+const { accounts, refresh: refreshAccounts } = useAccounts()
 const instrumentMap = ref<Record<string, Instrument>>({})
 const instrumentsError = ref<string | null>(null)
 
 const localError = ref<string | null>(null)
+
+// Sentinel for "all accounts" (the default, user-level view); naive-ui select
+// option values must be string|number, so we can't use null here.
+const ALL_ACCOUNTS = '__all__'
+const selectedAccountId = ref<string>(ALL_ACCOUNTS)
+const accountOptions = computed(() => [
+  { label: 'All accounts', value: ALL_ACCOUNTS },
+  ...accounts.value.map(a => ({ label: a.name, value: a.id })),
+])
+// null when "all" is selected → sent as no filter to the API / table filter.
+const effectiveAccountId = computed(() =>
+  selectedAccountId.value === ALL_ACCOUNTS ? null : selectedAccountId.value,
+)
+
+// Summary is aggregated server-side, so re-fetch it scoped to the account.
+watch(effectiveAccountId, (id) => { void refreshSummary(id) })
 
 // Surface the first error from either summary or positions
 watch([summaryError, positionsError], ([sErr, pErr]) => {
@@ -26,8 +44,15 @@ function dismissError() {
   localError.value = null
 }
 
-const openPositions = computed(() => positions.value.filter(p => p.status === 'open'))
-const closedPositions = computed(() => positions.value.filter(p => p.status === 'closed'))
+// Tables reuse the already-fetched positions list, filtered client-side by the
+// selected account (PositionRead carries account_id).
+const accountPositions = computed(() =>
+  effectiveAccountId.value
+    ? positions.value.filter(p => p.account_id === effectiveAccountId.value)
+    : positions.value,
+)
+const openPositions = computed(() => accountPositions.value.filter(p => p.status === 'open'))
+const closedPositions = computed(() => accountPositions.value.filter(p => p.status === 'closed'))
 
 const loading = computed(() => summaryLoading.value || positionsLoading.value)
 
@@ -44,13 +69,28 @@ async function loadInstruments() {
 }
 
 onMounted(async () => {
-  await Promise.all([refreshSummary(), refreshPositions(), loadInstruments()])
+  await Promise.all([
+    refreshSummary(effectiveAccountId.value),
+    refreshPositions(),
+    refreshAccounts(),
+    loadInstruments(),
+  ])
 })
 </script>
 
 <template>
   <AuthenticatedLayout>
-    <n-page-header title="Dashboard" />
+    <n-page-header title="Dashboard">
+      <template #extra>
+        <n-select
+          v-model:value="selectedAccountId"
+          :options="accountOptions"
+          style="width: 220px;"
+          size="small"
+          aria-label="Filter by account"
+        />
+      </template>
+    </n-page-header>
 
     <n-alert
       v-if="localError"
