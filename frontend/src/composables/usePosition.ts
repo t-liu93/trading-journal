@@ -41,9 +41,11 @@ export function usePosition(positionId: Ref<string>) {
   }
 
   async function close(): Promise<void> {
+    // closed_at is intentionally omitted: the backend derives it from the
+    // last fill (MAX trade executed_at) so days_held reflects the actual
+    // holding period rather than the moment "Close" was clicked.
     await positionsApi.update(positionId.value, {
       status: 'closed',
-      closed_at: new Date().toISOString(),
     })
     await refresh()
   }

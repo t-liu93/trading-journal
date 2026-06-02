@@ -634,7 +634,8 @@ async def test_patch_close_transition_freezes_pnl_realized(
     data = resp.json()
     assert data["status"] == "closed"
     assert Decimal(data["pnl_realized"]) == sum(cash_flows)
-    assert data["closed_at"] is not None
+    # Explicit closed_at wins over the last-fill derivation (trades use NOW).
+    assert "2026-06-15" in data["closed_at"]
 
 
 async def test_patch_close_transition_with_zero_trades(auth_client: AsyncClient) -> None:
@@ -650,15 +651,107 @@ async def test_patch_close_transition_with_zero_trades(auth_client: AsyncClient)
     assert Decimal(resp.json()["pnl_realized"]) == Decimal("0")
 
 
-async def test_patch_close_rejects_missing_closed_at_422(auth_client: AsyncClient) -> None:
+async def test_patch_close_without_closed_at_derives_from_last_trade(
+    auth_client: AsyncClient, db_session_maker,
+) -> None:
     acct = await _seed_account(auth_client)
     instr = await _seed_instrument(auth_client)
     pos = await _seed_position(auth_client, acct["id"], instr["id"])
 
+    # Two fills at different times; the later one defines the close date.
+    early = datetime(2026, 5, 20, 14, 30, tzinfo=UTC)
+    late = datetime(2026, 6, 1, 9, 0, tzinfo=UTC)
+    async with db_session_maker() as session:
+        for ts, cf in ((early, Decimal("500")), (late, Decimal("-300"))):
+            await session.execute(
+                insert(Trade).values(
+                    id=uuid.uuid4(),
+                    position_id=uuid.UUID(pos["id"]),
+                    account_id=uuid.UUID(acct["id"]),
+                    instrument_id=uuid.UUID(instr["id"]),
+                    action="buy",
+                    quantity=Decimal("10"),
+                    price=Decimal("50"),
+                    cash_flow=cf,
+                    executed_at=ts,
+                )
+            )
+        await session.commit()
+
+    # Close WITHOUT closed_at -> derived from the last fill's executed_at.
     resp = await auth_client.patch(f"/api/positions/{pos['id']}", json={
         "status": "closed",
     })
-    assert resp.status_code == 422
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["status"] == "closed"
+    assert data["closed_at"] is not None
+    assert "2026-06-01" in data["closed_at"]
+
+
+async def test_patch_close_without_closed_at_ignores_archived_last_trade(
+    auth_client: AsyncClient, db_session_maker,
+) -> None:
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos = await _seed_position(auth_client, acct["id"], instr["id"])
+
+    active = datetime(2026, 5, 25, 14, 30, tzinfo=UTC)
+    archived = datetime(2026, 6, 1, 9, 0, tzinfo=UTC)
+    async with db_session_maker() as session:
+        await session.execute(
+            insert(Trade).values(
+                id=uuid.uuid4(),
+                position_id=uuid.UUID(pos["id"]),
+                account_id=uuid.UUID(acct["id"]),
+                instrument_id=uuid.UUID(instr["id"]),
+                action="buy",
+                quantity=Decimal("10"),
+                price=Decimal("50"),
+                cash_flow=Decimal("500"),
+                executed_at=active,
+            )
+        )
+        await session.execute(
+            insert(Trade).values(
+                id=uuid.uuid4(),
+                position_id=uuid.UUID(pos["id"]),
+                account_id=uuid.UUID(acct["id"]),
+                instrument_id=uuid.UUID(instr["id"]),
+                action="buy",
+                quantity=Decimal("10"),
+                price=Decimal("50"),
+                cash_flow=Decimal("-300"),
+                executed_at=archived,
+                archived_at=datetime(2026, 6, 2, 9, 0, tzinfo=UTC),
+            )
+        )
+        await session.commit()
+
+    resp = await auth_client.patch(f"/api/positions/{pos['id']}", json={
+        "status": "closed",
+    })
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["closed_at"] is not None
+    assert "2026-05-25" in data["closed_at"]
+    assert Decimal(data["pnl_realized"]) == Decimal("500")
+    assert Decimal(data["net_cash_flow"]) == Decimal("500")
+
+
+async def test_patch_close_without_closed_at_no_trades_falls_back_to_now(
+    auth_client: AsyncClient,
+) -> None:
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos = await _seed_position(auth_client, acct["id"], instr["id"])
+
+    # No trades to anchor the date -> close still succeeds, closed_at set to now.
+    resp = await auth_client.patch(f"/api/positions/{pos['id']}", json={
+        "status": "closed",
+    })
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["closed_at"] is not None
 
 
 async def test_patch_rejects_closed_at_on_open_position_422(auth_client: AsyncClient) -> None:

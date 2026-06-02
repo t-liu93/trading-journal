@@ -7,7 +7,10 @@ Key design choices:
   - POST sets ``status="open"`` and derives ``currency`` from
     ``primary_instrument.currency``.
   - PATCH with ``status: "closed"`` triggers ``freeze_pnl_realized`` which
-    sums all attached Trade ``cash_flow`` rows.
+    sums all attached Trade ``cash_flow`` rows. When ``closed_at`` is omitted
+    it is derived from the last fill (MAX Trade ``executed_at``), falling back
+    to now() only when the position has no trades; an explicit ``closed_at``
+    still wins.
   - DELETE is a hard delete that only succeeds when the position has zero
     attached Trade rows and zero TradePlan revisions.
   - P12: ``net_cash_flow`` is derived at read time and injected into every
@@ -33,7 +36,11 @@ from trading_journal.models.trade import Trade
 from trading_journal.models.trade_plan import TradePlan
 from trading_journal.models.user import User
 from trading_journal.schemas.position import PositionCreate, PositionRead, PositionUpdate
-from trading_journal.services.positions import compute_net_cash_flows, freeze_pnl_realized
+from trading_journal.services.positions import (
+    compute_net_cash_flows,
+    freeze_pnl_realized,
+    latest_trade_executed_at,
+)
 
 router = APIRouter(prefix="/positions", tags=["positions"])
 
@@ -216,9 +223,14 @@ async def update_position(
 
     if transitioning_to_closed:
         if position.closed_at is None:
-            raise HTTPException(
-                status_code=422,
-                detail="closed_at is required when closing",
+            # Derive the close date from the last fill (symmetric with
+            # opened_at = first fill). Fall back to now() only when the
+            # position has no trades to anchor the date to.
+            last_executed = await latest_trade_executed_at(session, position)
+            position.closed_at = (
+                last_executed
+                if last_executed is not None
+                else _to_utc(datetime.now(UTC))
             )
         await freeze_pnl_realized(session, position)
 

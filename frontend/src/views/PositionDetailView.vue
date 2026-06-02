@@ -18,6 +18,7 @@ import {
   computeDaysOpen,
   computePnlTotal,
   computeRoi,
+  computeAnnualizedRoi,
   computeResult,
   formatAmount,
 } from '../utils/positionDerived'
@@ -69,6 +70,11 @@ const pnlTotal = computed(() => {
 const roi = computed(() => {
   if (!position.value) return null
   return computeRoi(pnlTotal.value, position.value.capital_used)
+})
+
+const annualizedRoi = computed(() => {
+  if (!position.value) return null
+  return computeAnnualizedRoi(pnlTotal.value, position.value.capital_used, daysOpen.value)
 })
 
 const result = computed(() => {
@@ -236,6 +242,9 @@ onMounted(() => { void refreshWithInstrument() })
                     </n-descriptions-item>
                     <n-descriptions-item label="ROI on Capital">
                       {{ roi !== null ? `${roi}%` : '—' }}
+                    </n-descriptions-item>
+                    <n-descriptions-item label="Annualized ROI on Capital">
+                      {{ annualizedRoi !== null ? `${annualizedRoi}%` : '—' }}
                     </n-descriptions-item>
                     <n-descriptions-item v-if="result" label="Result">
                       <n-tag :type="resultColor" size="small">{{ result }}</n-tag>

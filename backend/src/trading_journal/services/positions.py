@@ -6,6 +6,7 @@ P12 adds ``compute_net_cash_flows`` for read-time derived aggregation.
 
 import uuid
 from collections.abc import Iterable
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -28,6 +29,26 @@ async def freeze_pnl_realized(session: AsyncSession, position: Position) -> Deci
     total: Decimal = (await session.execute(stmt)).scalar_one()
     position.pnl_realized = total
     return total
+
+
+async def latest_trade_executed_at(
+    session: AsyncSession, position: Position
+) -> datetime | None:
+    """Return MAX(``executed_at``) over non-archived Trade rows for *position*,
+    or ``None`` when the position has no non-archived trades.
+
+    Used on close to set ``position.closed_at`` to the moment the last fill
+    completed — symmetric with ``opened_at`` being derived from the first fill
+    (see PositionFormModal). This keeps the derived ``days_held`` tied to the
+    actual holding period rather than the instant the user clicked "Close".
+    Archived trades are excluded for consistency with the pnl_realized /
+    net_cash_flow aggregates (P12 invariant).
+    """
+    stmt = select(func.max(Trade.executed_at)).where(
+        Trade.position_id == position.id,
+        Trade.archived_at.is_(None),
+    )
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def compute_net_cash_flows(

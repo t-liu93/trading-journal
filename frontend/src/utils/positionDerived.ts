@@ -15,6 +15,23 @@ export function computeRoi(pnlTotal: number, capitalUsed: string | null): string
   return ((pnlTotal / capital) * 100).toFixed(2)
 }
 
+/**
+ * Simple (linear) annualization of ROI on capital, as a percentage string.
+ * Convention used by income/options traders: roi_period * (365 / days_held).
+ * Returns null when capital is missing or the holding period rounds to 0 days
+ * (annualizing a sub-day position is meaningless).
+ */
+export function computeAnnualizedRoi(
+  pnlTotal: number,
+  capitalUsed: string | null,
+  daysHeld: number,
+): string | null {
+  const capital = Number(capitalUsed)
+  if (!capitalUsed || capital <= 0) return null
+  if (daysHeld <= 0) return null
+  return ((pnlTotal / capital) * (365 / daysHeld) * 100).toFixed(2)
+}
+
 export type PositionResult = 'Win' | 'Loss' | 'Breakeven'
 
 export function computeResult(pnlRealized: string | null): PositionResult | null {
