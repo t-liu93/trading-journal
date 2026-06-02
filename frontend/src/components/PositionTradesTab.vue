@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { type Trade } from '../api/trades'
 import { type Instrument, instrumentsApi } from '../api/instruments'
+import { formatInstrumentCode } from '../utils/instrumentLabel'
 import { useTrades } from '../composables/useTrades'
 import { detectPattern, type PatternBadge } from '../utils/tradePatternBadge'
 import TradeActionBadge from './TradeActionBadge.vue'
@@ -89,8 +90,9 @@ function formatNum(val: string | number | null): string {
   return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(Number(val))
 }
 
-function instrumentSymbol(id: string): string {
-  return instrumentMap.value[id]?.symbol ?? id.slice(0, 8)
+function instrumentLabel(id: string): string {
+  const inst = instrumentMap.value[id]
+  return inst ? formatInstrumentCode(inst) : id.slice(0, 8)
 }
 
 function patternLabel(badge: PatternBadge): string {
@@ -227,7 +229,7 @@ defineExpose({ refresh })
               <tbody>
                 <tr v-for="trade in group.trades" :key="trade.id" :style="{ opacity: trade.archived_at ? 0.5 : 1 }">
                   <td><TradeActionBadge :action="trade.action" /></td>
-                  <td>{{ instrumentSymbol(trade.instrument_id) }}</td>
+                  <td>{{ instrumentLabel(trade.instrument_id) }}</td>
                   <td>{{ formatNum(trade.quantity) }}</td>
                   <td>{{ formatNum(trade.price) }}</td>
                   <td>
@@ -279,7 +281,7 @@ defineExpose({ refresh })
             <!-- Group notes if any -->
             <div v-for="trade in group.trades" :key="'note-' + trade.id">
               <n-text v-if="trade.notes" depth="3" style="font-size: 0.8rem; display: block; margin-top: 0.25rem;">
-                {{ instrumentSymbol(trade.instrument_id) }}: {{ trade.notes }}
+                {{ instrumentLabel(trade.instrument_id) }}: {{ trade.notes }}
               </n-text>
             </div>
           </n-list-item>

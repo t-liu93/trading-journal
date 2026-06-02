@@ -10,12 +10,14 @@ import {
   type ForexCreate,
 } from '../api/instruments'
 import CurrencySelect from './CurrencySelect.vue'
+import InstrumentPicker from './InstrumentPicker.vue'
 import { ApiError } from '../api/types'
 
 const props = defineProps<{
   show: boolean
   initialKind?: InstrumentKind
   initialSymbol?: string
+  lockedKind?: InstrumentKind
 }>()
 
 const emit = defineEmits<{
@@ -27,13 +29,14 @@ const message = useMessage()
 const formRef = ref<FormInst | null>(null)
 const submitting = ref(false)
 
-type KindKey = 'stock' | 'option' | 'forex'
+type KindKey = InstrumentKind
 const kindTabs: { label: string; value: KindKey }[] = [
   { label: 'Stock', value: 'stock' },
   { label: 'Option', value: 'option' },
   { label: 'Forex', value: 'forex' },
 ]
 const activeKind = ref<KindKey>('stock')
+const lockedKind = computed<KindKey | null>(() => props.lockedKind ?? null)
 
 const optTypeOptions = [
   { label: 'Call', value: 'call' },
@@ -50,6 +53,9 @@ interface StockModel {
   currency: string | null
 }
 interface OptionModel {
+  // The chosen underlying stock instrument; symbol/currency/exchange below are
+  // derived from it (an option must bind to an existing stock).
+  underlying_instrument_id: string | null
   underlying_symbol: string
   underlying_exchange: string
   currency: string | null
@@ -69,6 +75,7 @@ interface ForexModel {
 
 const stockModel = ref<StockModel>({ symbol: '', exchange: '', currency: null })
 const optionModel = ref<OptionModel>({
+  underlying_instrument_id: null,
   underlying_symbol: '',
   underlying_exchange: '',
   currency: null,
@@ -112,11 +119,9 @@ const stockRules: FormRules = {
   currency: [{ required: true, validator: currencyValidator }],
 }
 const optionRules: FormRules = {
-  underlying_symbol: [
-    { required: true, message: 'Underlying symbol is required' },
-    { max: 64, message: 'Max 64 characters' },
+  underlying_instrument_id: [
+    { required: true, message: 'Select an underlying stock', trigger: ['change', 'blur'] },
   ],
-  currency: [{ required: true, validator: currencyValidator }],
   opt_type: [{ required: true, message: 'Option type is required' }],
   strike: [{ required: true, validator: positiveDecimalValidator('Strike') }],
   expiry: [{ required: true, message: 'Expiry date is required', type: 'number' }],
@@ -147,6 +152,7 @@ const currentModel = computed(() => {
 function resetModels() {
   stockModel.value = { symbol: '', exchange: '', currency: null }
   optionModel.value = {
+    underlying_instrument_id: null,
     underlying_symbol: '',
     underlying_exchange: '',
     currency: null,
@@ -168,17 +174,20 @@ function resetModels() {
 watch(() => props.show, (visible) => {
   if (visible) {
     resetModels()
-    if (props.initialKind) {
-      activeKind.value = props.initialKind as KindKey
-    } else {
-      activeKind.value = 'stock'
-    }
+    activeKind.value = lockedKind.value ?? props.initialKind ?? 'stock'
     if (props.initialSymbol) {
+      // Options bind to an existing stock chosen via the picker, so a free-text
+      // symbol hint only applies to the stock/forex tabs.
       const sym = props.initialSymbol
       if (activeKind.value === 'stock') stockModel.value.symbol = sym
-      else if (activeKind.value === 'option') optionModel.value.underlying_symbol = sym
-      else forexModel.value.symbol = sym
+      else if (activeKind.value === 'forex') forexModel.value.symbol = sym
     }
+  }
+})
+
+watch(activeKind, (kind) => {
+  if (lockedKind.value && kind !== lockedKind.value) {
+    activeKind.value = lockedKind.value
   }
 })
 
@@ -190,6 +199,20 @@ watch(() => forexModel.value.symbol, (s) => {
     forexModel.value.quote_currency = s.slice(3, 6).toUpperCase()
   }
 })
+
+// Derive the option's underlying symbol/currency/exchange from the chosen stock.
+// These are read-only in the form — the underlying must be an existing stock.
+function onUnderlyingSelected(inst: Instrument | null) {
+  if (inst) {
+    optionModel.value.underlying_symbol = inst.symbol
+    optionModel.value.currency = inst.currency
+    optionModel.value.underlying_exchange = inst.exchange ?? ''
+  } else {
+    optionModel.value.underlying_symbol = ''
+    optionModel.value.currency = null
+    optionModel.value.underlying_exchange = ''
+  }
+}
 
 function handleClose() {
   emit('update:show', false)
@@ -276,7 +299,13 @@ function formatDate(ts: number): string {
     @update:show="emit('update:show', $event)"
   >
     <n-radio-group v-model:value="activeKind" style="margin-bottom: 1rem;">
-      <n-radio-button v-for="tab in kindTabs" :key="tab.value" :value="tab.value" :label="tab.label" />
+      <n-radio-button
+        v-for="tab in kindTabs"
+        :key="tab.value"
+        :value="tab.value"
+        :label="tab.label"
+        :disabled="!!lockedKind && tab.value !== lockedKind"
+      />
     </n-radio-group>
 
     <n-form ref="formRef" :model="currentModel" :rules="currentRules" label-placement="top">
@@ -295,14 +324,29 @@ function formatDate(ts: number): string {
 
       <!-- Option fields -->
       <template v-if="activeKind === 'option'">
-        <n-form-item label="Underlying Symbol" path="underlying_symbol">
-          <n-input v-model:value="optionModel.underlying_symbol" placeholder="e.g. AAPL" :disabled="submitting" />
+        <n-form-item label="Underlying Stock" path="underlying_instrument_id">
+          <InstrumentPicker
+            v-model:model-value="optionModel.underlying_instrument_id"
+            kind="stock"
+            allow-create
+            placeholder="Select an existing stock (or create one)…"
+            :disabled="submitting"
+            @update:instrument="onUnderlyingSelected"
+          />
         </n-form-item>
-        <n-form-item label="Underlying Exchange" path="underlying_exchange">
-          <n-input v-model:value="optionModel.underlying_exchange" placeholder="e.g. NASDAQ (optional)" :disabled="submitting" />
+        <n-form-item label="Currency">
+          <n-input
+            :value="optionModel.currency ?? ''"
+            placeholder="From selected stock"
+            disabled
+          />
         </n-form-item>
-        <n-form-item label="Currency" path="currency">
-          <CurrencySelect v-model:model-value="optionModel.currency" :disabled="submitting" />
+        <n-form-item label="Underlying Exchange">
+          <n-input
+            :value="optionModel.underlying_exchange || '—'"
+            placeholder="From selected stock"
+            disabled
+          />
         </n-form-item>
         <n-form-item label="Option Type" path="opt_type">
           <n-select v-model:value="optionModel.opt_type" :options="optTypeOptions" placeholder="Call or Put" :disabled="submitting" />
