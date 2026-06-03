@@ -6,6 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Tianyu Liu", email = "liu.tianyu93@hotmail.com" }
 ]
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "aiosqlite>=0.22.1",

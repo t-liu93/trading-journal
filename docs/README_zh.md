@@ -71,3 +71,7 @@ ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.0.0
 - [Walkthrough](walkthrough.zh.md) —— 构建镜像、运行容器、逐一验证每个功能（[English](walkthrough.md)）。
 - [Release notes](release-notes/) —— 各版本更新说明，归档在本仓库内。
 - [`docs/design/`](design/) —— 数据模型与设计方案。
+
+## License
+
+本项目基于 [MIT License](../LICENSE) 授权。

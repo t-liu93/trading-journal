@@ -71,3 +71,7 @@ See the full build-and-verify guide in [`docs/walkthrough.md`](docs/walkthrough.
 - [Walkthrough](docs/walkthrough.md) — build the image, run the container, and verify every feature ([中文](docs/walkthrough.zh.md)).
 - [Release notes](docs/release-notes/) — per-version changelog, archived in this repo.
 - [`docs/design/`](docs/design/) — data model and design plans.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
