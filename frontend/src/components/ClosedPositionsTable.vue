@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { useRouter } from 'vue-router'
-import { type DataTableColumns, NButton, NTime, NTag, NTooltip } from 'naive-ui'
+import { type DataTableColumns, NButton, NText, NTime, NTag, NTooltip } from 'naive-ui'
 import { type Instrument } from '../api/instruments'
 import { type Position, type StrategyType } from '../api/positions'
 import { computeResult, formatAmount, type PositionResult } from '../utils/positionDerived'
@@ -66,7 +66,7 @@ const columns: DataTableColumns<Position> = [
     key: 'pnl_realized',
     render: (row) => {
       const val = row.pnl_realized
-      if (val === null) return h('span', { style: { color: 'rgba(0,0,0,0.3)' } }, '—')
+      if (val === null) return h(NText, { depth: 3 }, () => '—')
       const n = Number(val)
       const color = n > 0 ? '#18a058' : n < 0 ? '#d03050' : undefined
       return h('span', { style: { color, fontWeight: 500 } }, formatAmount(n, row.currency))

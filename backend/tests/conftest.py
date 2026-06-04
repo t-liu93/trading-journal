@@ -10,6 +10,7 @@ file, so we pay the alembic cost once rather than per test. The app's
 to its own copy.
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -25,8 +26,14 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from trading_journal.db import get_session
-from trading_journal.main import app
+# Cookies are secure-by-default (HTTPS-only). The test client speaks plain HTTP
+# via ASGITransport, so a Secure-only cookie is dropped by httpx and every
+# authenticated request would 401. Force it off BEFORE importing the app — the
+# cookie transport reads COOKIE_SECURE at import time.
+os.environ.setdefault("COOKIE_SECURE", "false")
+
+from trading_journal.db import get_session  # noqa: E402
+from trading_journal.main import app  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 

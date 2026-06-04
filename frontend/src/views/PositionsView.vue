@@ -51,6 +51,11 @@ function prettifyStrategy(s: StrategyType): string {
   return map[s] ?? s
 }
 
+function displayedCashFlow(row: Position): number {
+  const val = row.status === 'closed' ? row.pnl_realized : row.net_cash_flow
+  return val === null ? 0 : Number(val)
+}
+
 const columns = computed<DataTableColumns<Position>>(() => [
   {
     title: 'Symbol',
@@ -85,16 +90,15 @@ const columns = computed<DataTableColumns<Position>>(() => [
     },
     key: 'cash_flow',
     render: (row) => {
-      const label = row.status === 'open' ? 'Net Cash Flow' : 'Realized P/L'
-      const val = row.status === 'closed' ? row.pnl_realized : row.net_cash_flow
-      const n = Number(val)
+      // Open rows show net cash flow; closed rows show realized P/L. The column
+      // header and the Status column already convey which is which, so we drop
+      // the old per-row sub-label (it was hardcoded near-black → invisible in
+      // dark mode).
+      const n = displayedCashFlow(row)
       const color = n > 0 ? '#18a058' : n < 0 ? '#d03050' : undefined
-      return h('div', [
-        h('div', { style: { fontSize: '0.75rem', color: 'rgba(0,0,0,0.45)' } }, label),
-        h('span', { style: { color, fontWeight: 500 } }, formatAmount(n, row.currency)),
-      ])
+      return h('span', { style: { color, fontWeight: 500 } }, formatAmount(n, row.currency))
     },
-    sorter: (a, b) => Number(a.net_cash_flow) - Number(b.net_cash_flow),
+    sorter: (a, b) => displayedCashFlow(a) - displayedCashFlow(b),
   },
   {
     title: 'Currency',

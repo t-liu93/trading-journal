@@ -4,6 +4,7 @@ import { type DataTableColumns, NTag, NText } from 'naive-ui'
 import AuthenticatedLayout from '../components/AuthenticatedLayout.vue'
 import InstrumentForm from '../components/InstrumentForm.vue'
 import { useInstruments } from '../composables/useInstruments'
+import { formatInstrumentCode } from '../utils/instrumentLabel'
 import { type Instrument, type InstrumentKind } from '../api/instruments'
 
 const { instruments, loading, error, kindFilter, query, refresh } = useInstruments()
@@ -51,7 +52,9 @@ const columns = computed<DataTableColumns<Instrument>>(() => [
     render: (row) =>
       h(NTag, { size: 'small', type: kindTagColor(row.kind) }, () => row.kind),
   },
-  { title: 'Symbol', key: 'symbol' },
+  // Compact code so options are distinguishable: a bare "AAPL" stock vs many
+  // "AAPL225.50P260604"-style option rows (same convention as the picker).
+  { title: 'Symbol', key: 'symbol', render: (row) => formatInstrumentCode(row) },
   { title: 'Exchange', key: 'exchange', render: (row) => row.exchange ?? '' },
   { title: 'Currency', key: 'currency' },
   {

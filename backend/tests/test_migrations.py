@@ -18,6 +18,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 EXPECTED_DOMAIN_TABLES = {
     "users",
     "access_tokens",
+    "app_config",
     "accounts",
     "instruments",
     "option_contracts",

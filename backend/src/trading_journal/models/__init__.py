@@ -5,6 +5,7 @@ table so Alembic autogenerate can see the full schema.
 """
 
 from trading_journal.models.account import Account
+from trading_journal.models.app_config import AppConfig
 from trading_journal.models.instrument import ForexPair, Instrument, OptionContract
 from trading_journal.models.position import Position
 from trading_journal.models.strategy_config import StrategyConfig
@@ -16,6 +17,7 @@ from trading_journal.models.user import AccessToken, User
 __all__ = [
     "AccessToken",
     "Account",
+    "AppConfig",
     "ForexPair",
     "Instrument",
     "OptionContract",

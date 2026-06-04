@@ -1,0 +1,23 @@
+# Dev overlay for Trading Journal. Layered on top of docker-compose.yml: builds
+# the image locally from this repo instead of pulling, and relaxes cookie
+# security so login works over plain HTTP.
+#
+# Usage (from the repo root, with both files copied there — see README "Development"):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#
+# Both services build (and share) the same local image tag; Docker builds it once.
+services:
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trading-journal:dev
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trading-journal:dev
+    environment:
+      # Plain-HTTP local dev → cookies must not be Secure-only.
+      COOKIE_SECURE: "false"

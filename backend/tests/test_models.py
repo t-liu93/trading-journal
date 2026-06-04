@@ -4,6 +4,7 @@ from trading_journal.db import Base
 from trading_journal.models import (
     AccessToken,
     Account,
+    AppConfig,
     ForexPair,
     Instrument,
     OptionContract,
@@ -19,6 +20,7 @@ from trading_journal.models import (
 EXPECTED_TABLES = {
     "users",
     "access_tokens",
+    "app_config",
     "accounts",
     "instruments",
     "option_contracts",
@@ -38,6 +40,7 @@ def test_models_can_be_imported() -> None:
         User,
         AccessToken,
         Account,
+        AppConfig,
         Instrument,
         OptionContract,
         ForexPair,

@@ -17,6 +17,7 @@ from fastapi_users import BaseUserManager, InvalidPasswordException, UUIDIDMixin
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from trading_journal.auth.secret import get_cookie_secret
 from trading_journal.config import get_settings
 from trading_journal.db import get_session
 from trading_journal.models.user import User
@@ -35,12 +36,14 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
     def __init__(self, user_db: SQLAlchemyUserDatabase[User, uuid.UUID]) -> None:
         super().__init__(user_db)
-        settings = get_settings()
-        # These secrets are only used by reset-password / verify flows, which we
-        # don't expose yet — but the attributes must exist on the class.
-        self.reset_password_token_secret = settings.cookie_secret
-        self.verification_token_secret = settings.cookie_secret
-        self._min_password_length = settings.min_password_length
+        # The cookie secret is persisted in the DB (generated on first boot) and
+        # loaded at startup — not an operator-supplied env var. It only signs the
+        # reset-password / verify flows, which we don't expose yet, but the
+        # attributes must exist on the class.
+        secret = get_cookie_secret()
+        self.reset_password_token_secret = secret
+        self.verification_token_secret = secret
+        self._min_password_length = get_settings().min_password_length
 
     async def validate_password(
         self,

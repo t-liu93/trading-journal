@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { useRouter } from 'vue-router'
-import { type DataTableColumns, NButton, NTime, NTooltip } from 'naive-ui'
+import { type DataTableColumns, NButton, NText, NTime, NTooltip } from 'naive-ui'
 import { type Instrument } from '../api/instruments'
 import { type Position, type StrategyType } from '../api/positions'
 import {
@@ -74,7 +74,7 @@ const columns: DataTableColumns<Position> = [
     render: (row) => {
       const pnlTotal = computePnlTotal(row.net_cash_flow)
       const roi = computeRoi(pnlTotal, row.capital_used)
-      if (roi === null) return h('span', { style: { color: 'rgba(0,0,0,0.3)' } }, '—')
+      if (roi === null) return h(NText, { depth: 3 }, () => '—')
       const n = Number(roi)
       const color = n > 0 ? '#18a058' : n < 0 ? '#d03050' : undefined
       return h('span', { style: { color } }, `${roi}%`)

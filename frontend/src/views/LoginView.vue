@@ -64,6 +64,7 @@ async function handleSubmit(): Promise<void> {
           <n-input
             v-model:value="password"
             type="password"
+            placeholder="Password"
             show-password-on="click"
             :input-props="{ autocomplete: 'current-password' }"
           />

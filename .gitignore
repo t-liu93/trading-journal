@@ -1,8 +1,9 @@
 # Environment files
 .env
 
-# Local Compose override
-docker-compose.yaml
+# Local Compose working copies (canonical templates live in example/)
+/docker-compose.yml
+/docker-compose.dev.yml
 
 # Python
 __pycache__/

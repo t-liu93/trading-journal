@@ -12,6 +12,8 @@ API and the frontend's client-side router. ``/openapi.json`` and ``/docs``
 stay at the root (FastAPI manages them; consumers expect them there).
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
@@ -29,15 +31,32 @@ from trading_journal.api import (
     trades,
 )
 from trading_journal.auth.backend import auth_backend, fastapi_users
+from trading_journal.auth.secret import ensure_cookie_secret
 from trading_journal.config import get_settings
+from trading_journal.db import get_session_maker
 from trading_journal.schemas.user import UserCreate, UserRead, UserUpdate
 
 API_PREFIX = "/api"
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Startup: generate-or-load the persisted cookie secret before serving.
+
+    The ``app_config`` table is guaranteed present — migrations run (and must
+    succeed) first: the single-container entrypoint and the compose ``migrate``
+    service both gate startup on ``alembic upgrade head``. Tests don't run this
+    lifespan (ASGITransport skips it); ``get_cookie_secret`` falls back to a
+    process-ephemeral value there.
+    """
+    async with get_session_maker()() as session:
+        await ensure_cookie_secret(session)
+    yield
+
+
 def create_app() -> FastAPI:
     """Build the FastAPI app. Factory style so tests can construct fresh instances."""
-    app = FastAPI(title="Trading Journal", version="0.1.0")
+    app = FastAPI(title="Trading Journal", version="0.1.0", lifespan=lifespan)
 
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(health.router)

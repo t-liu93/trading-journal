@@ -1,21 +1,46 @@
-# Example single-container deployment for Trading Journal.
+# Example single-host deployment for Trading Journal.
 # It pulls the published image (no local build). Copy this file into a directory
-# with a `.env` and an empty `./data` dir next to it, then `docker compose up -d`.
-# See the repo's docs/walkthrough.md for the full guide and the .env.example template.
+# with an empty `./data` dir next to it, then `docker compose up -d`.
+# See the repo's docs/walkthrough.md for the full guide.
+#
+# No COOKIE_SECRET needed: the app generates one on first boot and persists it in
+# the database. The only optional knobs are PUID/PGID, COOKIE_SECURE, DEBUG.
 services:
+  # One-shot: bring the schema to head, then exit. `app` waits for this to
+  # succeed (see depends_on below), so a failed migration is fail-closed — the
+  # app never starts on a bad schema.
+  migrate:
+    image: ghcr.io/t-liu93/trading-journal:latest
+    user: "${PUID:-1000}:${PGID:-1000}"
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////data/app.db
+      # The command runs the migration itself; don't also run it in the
+      # entrypoint (would migrate twice).
+      RUN_MIGRATIONS: "false"
+    volumes:
+      - ./data:/data
+    restart: "no"
+
   app:
     image: ghcr.io/t-liu93/trading-journal:latest
     # Run as the host user (default 1000) so the SQLite file written into the
     # ./data bind mount is owned by you, not root. Override via PUID/PGID in .env.
     user: "${PUID:-1000}:${PGID:-1000}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      COOKIE_SECRET: ${COOKIE_SECRET:?set COOKIE_SECRET in .env}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # Secure-by-default. Over plain HTTP (e.g. an SSH tunnel to a non-HTTPS
+      # host) set COOKIE_SECURE=false, or terminate TLS at a reverse proxy.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
       DEBUG: ${DEBUG:-false}
       DATABASE_URL: sqlite+aiosqlite:////data/app.db
       STATIC_DIR: /app/static
+      # The migrate service already brought the schema to head.
+      RUN_MIGRATIONS: "false"
     volumes:
       # Bind mount → app.db lives on the host for direct backup.
       # NOTE: create ./data (owned by you) BEFORE `up`: `mkdir -p data`.

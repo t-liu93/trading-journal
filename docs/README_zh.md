@@ -31,19 +31,21 @@ mkdir trading-journal && cd trading-journal
 # 拉取示例 compose 文件
 curl -O https://raw.githubusercontent.com/t-liu93/trading-journal/main/example/docker-compose.yml
 
-# 建好 data 目录（属主是你），并写一个带真实 session secret 的 .env
+# 建好 data 目录（属主是你，用来放 SQLite 数据库）
 mkdir -p data
-echo "COOKIE_SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" > .env
 
-# 拉取镜像并启动
+# 拉取镜像并启动（会先跑一个一次性的 migrate 服务，迁移成功后才启动 app）。
+# 不需要配置任何密钥 —— 应用会自己生成并持久化。
 docker compose up -d
 ```
 
 然后打开 **http://localhost:8000**，注册账号，开始记录交易。
 
+> Cookie **默认 secure（仅 HTTPS）**。如果你通过纯 HTTP 访问、发现登录状态保持不住，在 compose 文件旁边的 `.env` 里设 `COOKIE_SECURE=false`，或者用反向代理终结 TLS（见「部署」）。
+
 ## 部署
 
-发布的镜像会同时提供前端 SPA 和 API，在启动时自动跑数据库迁移，并把数据持久化到宿主机上的 bind mount。
+发布的镜像会同时提供前端 SPA 和 API。compose 用一个专门的 **`migrate`** 服务跑迁移，**只有迁移成功后才启动 `app`**（fail-closed：迁移出错绝不会进入一个在跑的 app）。数据持久化到宿主机上的 bind mount。
 
 **镜像**（GitHub Container Registry，多架构 `linux/amd64` + `linux/arm64`）：
 
@@ -51,20 +53,48 @@ docker compose up -d
 ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.0.0
 ```
 
-**配置**（写在 compose 文件旁边的 `.env`）：
+**配置**（全部可选，写在 compose 文件旁边的 `.env`）：
 
 | 变量 | 默认值 | 用途 |
 |---|---|---|
-| `COOKIE_SECRET` | _（必填）_ | 用于签名 session cookie 的密钥。生成一次后保持不变。 |
-| `COOKIE_SECURE` | `false` | 走 HTTPS 时设为 `true`。 |
+| `COOKIE_SECURE` | `true` | Cookie 默认仅 HTTPS。只有纯 HTTP 本地访问时才设 `false`。 |
 | `PUID` / `PGID` | `1000` | 容器运行所用的宿主用户/组，确保 `./data` 归你所有。 |
 | `DEBUG` | `false` | 后端详细日志。 |
 
+**不再有 `COOKIE_SECRET`** 需要管理：签名 session 的密钥在首次启动时生成，并持久化在数据库（`app_config` 表）里，重启后照常沿用，不需要运维介入。
+
 **数据与备份。** SQLite 数据库在宿主机的 `./data/app.db` —— 备份就是复制这个文件。容器以非 root 的宿主用户运行，并设了 `restart: unless-stopped`。
 
-**HTTPS / 远程访问。** 示例只绑定 loopback（`127.0.0.1:8000`），适合配合 SSH 隧道使用。要对外公开，请在前面加一个反向代理来终结 TLS（并把 `COOKIE_SECURE=true`）。
+**HTTPS / 远程访问。** 示例只绑定 loopback（`127.0.0.1:8000`），适合配合 SSH 隧道使用。要对外公开，请在前面加一个反向代理来终结 TLS —— 并保持 `COOKIE_SECURE=true`（默认值）。
 
 完整的构建与验收指南见 [`docs/walkthrough.zh.md`](walkthrough.zh.md)（[English](walkthrough.md)）。
+
+## 开发
+
+前后端都已完成、且都在本仓库里，所以本地有两种跑法 —— 按你在做什么来选。
+
+**用 docker-compose 跑整套**（和生产一致，含 `migrate` → `app` 的 fail-closed 步骤）。开发覆盖文件 `docker-compose.dev.yml` 的逻辑很简单：加一个本地 `build:`，并放宽 `COOKIE_SECURE` —— 这样镜像是从你的工作区构建的，而不是拉取。把两个模板拷到仓库根目录（在那里会被 git 忽略），然后一起拉起来：
+
+```bash
+cp example/docker-compose.yml example/docker-compose.dev.yml .
+mkdir -p data
+
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
+
+然后打开 **http://localhost:8000**。因为 `frontend/src/api/schema.d.ts` 已提交，Vite 构建是自包含的 —— 镜像在**后端没启动**的情况下也能构建。（想不用 compose 快速临时验证：`docker build -t trading-journal:dev . && docker run --rm -p 8000:8000 -e COOKIE_SECURE=false trading-journal:dev`。）
+
+**前后端分开跑** 适合你正在改代码、想要热重载（hot reload）的时候：
+
+```bash
+# 后端 → http://127.0.0.1:8000（自动创建 ./dev.db）
+cd backend && uv run alembic upgrade head && uv run uvicorn trading_journal.main:app --reload
+
+# 前端 → http://localhost:5173（Vite 把 /api 代理到 :8000）
+cd frontend && npm install && npm run dev
+```
+
+以上几种都**不需要设置 `COOKIE_SECRET`** —— 应用会在首次启动时自己生成并持久化。
 
 ## 文档
 

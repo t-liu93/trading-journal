@@ -20,8 +20,9 @@ class Settings(BaseSettings):
     )
 
     database_url: str = "sqlite+aiosqlite:///./dev.db"
-    cookie_secret: str = "dev-only-change-me-before-anywhere-real"
     debug: bool = False
+    # NOTE: the cookie-signing secret is NOT an env var. It is generated on first
+    # boot and persisted in the DB (app_config table); see auth/secret.py.
     # Production single-container only: absolute path to the built frontend
     # ``dist/`` that FastAPI serves at ``/``. Unset in dev (Vite serves the SPA
     # on :5173 and proxies ``/api``); set to ``/app/static`` inside the image.
@@ -29,7 +30,9 @@ class Settings(BaseSettings):
 
     # Auth / session
     cookie_name: str = "trading_journal_session"
-    cookie_secure: bool = False  # MUST be True behind HTTPS in production.
+    # Secure-by-default: cookies are HTTPS-only unless explicitly relaxed. Set
+    # COOKIE_SECURE=false for local plain-HTTP development.
+    cookie_secure: bool = True
     session_lifetime_seconds: int = 60 * 60 * 24 * 7  # 7 days
     min_password_length: int = 8
 
