@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { NButton, NCheckbox, type SelectOption, useMessage } from 'naive-ui'
+import { NButton, NCheckbox, type SelectOption, type SelectRenderLabel, useMessage } from 'naive-ui'
 import { type Instrument, type InstrumentKind, instrumentsApi } from '../api/instruments'
 import { formatInstrumentCode } from '../utils/instrumentLabel'
 import InstrumentForm from './InstrumentForm.vue'
@@ -47,10 +47,18 @@ const options = computed<SelectOption[]>(() => {
   }
   return rows
 })
+function selectedInstrumentLabel(value: string): string | null {
+  const instrument = props.underlyingInstrument?.id === value ? props.underlyingInstrument : currentInstrument.value
+  return instrument?.id === value ? formatInstrumentLabel(instrument) : null
+}
 const fallbackOption = (value: string | number): SelectOption => ({
-  label: currentInstrument.value?.id === String(value) ? formatInstrumentLabel(currentInstrument.value) : String(value),
+  label: selectedInstrumentLabel(String(value)) ?? String(value),
   value,
 })
+// Remote NSelect can memoize an ID-only fallback before its lookup resolves.
+// Render from the reactive instrument without adding it to filtered candidates.
+const renderLabel: SelectRenderLabel = option =>
+  selectedInstrumentLabel(String(option.value)) ?? String(option.label ?? option.value)
 const instrumentMap = new Map<string, Instrument>()
 const optionUnderlyingInstrument = computed(() => props.underlyingInstrument ?? (props.optionUnderlyingId ? instrumentMap.get(props.optionUnderlyingId) ?? null : null))
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -253,7 +261,7 @@ onBeforeUnmount(() => { disposed = true; invalidate() })
   <div class="instrument-picker">
     <n-select
       :key="selectGeneration"
-      :value="modelValue" :options="options" :fallback-option="fallbackOption" :placeholder="placeholder" :loading="loading"
+      :value="modelValue" :options="options" :fallback-option="fallbackOption" :render-label="renderLabel" :placeholder="placeholder" :loading="loading"
       :disabled="disabled" filterable remote clearable @search="handleSearch"
       @update:value="handleUpdateValue" @focus="handleFocus" @update:show="handleShowChange"
     >

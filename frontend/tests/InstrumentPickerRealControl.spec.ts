@@ -91,4 +91,39 @@ describe('InstrumentPicker with the real Naive Select', () => {
       wrapper.unmount()
     }
   })
+  it('shows the supplied stock label in a locked contextual picker without waiting for a lookup', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)))
+    const Harness = defineComponent({ setup() {
+      return () => h(NMessageProvider, null, { default: () => h(InstrumentPicker, {
+        modelValue: stockA.id, kind: 'stock', disabled: true,
+        underlyingInstrument: { ...stockA, created_at: '' },
+      }) })
+    } })
+    const wrapper = mount(Harness, { attachTo: document.body,
+      global: { components: { 'n-select': NSelect }, stubs: { InstrumentForm: true } },
+    })
+    await flushPromises()
+    expect(wrapper.get('.n-base-selection-label').text()).toBe('AAA (X) [stock]')
+    expect(wrapper.getComponent(NSelect).props('disabled')).toBe(true)
+    expect(wrapper.getComponent(NSelect).props('options')).toEqual([])
+  })
+
+  it('replaces a cached ID label after a closed disabled picker resolves its instrument', async () => {
+    let resolveLookup!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { resolveLookup = resolve })))
+    const Harness = defineComponent({ setup() {
+      return () => h(NMessageProvider, null, { default: () => h(InstrumentPicker, {
+        modelValue: stockB.id, kind: 'stock', disabled: true,
+      }) })
+    } })
+    const wrapper = mount(Harness, { attachTo: document.body,
+      global: { components: { 'n-select': NSelect }, stubs: { InstrumentForm: true } },
+    })
+    await flushPromises()
+    resolveLookup(new Response(JSON.stringify(stockB), { status: 200, headers: { 'content-type': 'application/json' } }))
+    await flushPromises()
+    expect(wrapper.get('.n-base-selection-label').text()).toBe('BBB (X) [stock]')
+    expect(wrapper.getComponent(NSelect).props('options')).toEqual([])
+  })
+
 })
