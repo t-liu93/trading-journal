@@ -26,8 +26,8 @@ Priority is an ordering recommendation, not authorization. P1 = data correctness
 | [INS-01](milestone-option-entry.md#t3) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
 | [INS-02](milestone-option-entry.md#t4) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
 | [FIX-01](tasks/FIX-01.md) | P1 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
-| [UI-01](milestone-option-entry.md#t5) | P2 | in-review | Implementing M-OPT-01 T5; owner feature acceptance pending |
-| [UI-02](milestone-option-entry.md#t6) | P2 | ready | Shared leg labels/help/errors and narrow-width layout; implementation not started |
+| [UI-01](milestone-option-entry.md#t5) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
+| [UI-02](milestone-option-entry.md#t6) | P2 | in-review | Implementing M-OPT-01 T6; owner feature acceptance pending |
 | UI-03 | P2 | needs-design | Suggest capital/risk/reward from strategy inputs; define formulas, units and manual override |
 | UI-04 | P2 | needs-design | Prefill multi-leg entries, especially Iron Condor; define templates without changing recorded intent |
 | UI-05 | P3 | needs-clarification | Filtering requests clarified and assigned to INS-01/INS-02; other kind/display complaints remain unclarified |

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import { type TradeCreate } from '../api/trades'
+import { ApiError } from '../api/types'
 import TradeLegRow from './TradeLegRow.vue'
 import type { Instrument } from '../api/instruments'
 
@@ -65,15 +66,40 @@ function getRows(): TradeCreate[] {
 }
 
 function validate(): boolean {
-  for (const row of legRows.value) {
+  for (const [index, row] of legRows.value.entries()) {
     const legRef = legRefs.value[row.id]
     if (!legRef) return false
     const err = legRef.validate()
     if (err) {
-      message.warning(err)
+      message.warning(`Leg ${index + 1}: ${err}`)
+      void legRef.focusValidationError()
       return false
     }
   }
+  return true
+}
+
+function showApiError(error: unknown): boolean {
+  if (!(error instanceof ApiError) || !Array.isArray(error.detail)) return false
+  const fieldMap: Record<string, 'instrument' | 'action' | 'quantity' | 'price' | 'commission' | 'fees' | 'executed_at'> = {
+    instrument_id: 'instrument', action: 'action', quantity: 'quantity', price: 'price',
+    commission: 'commission', fees: 'fees', executed_at: 'executed_at',
+  }
+  const first = error.detail.find((item): item is { loc: unknown[]; msg?: unknown } =>
+    !!item && typeof item === 'object' && 'loc' in item && Array.isArray((item as { loc?: unknown }).loc),
+  )
+  if (!first) return false
+  const parts = first.loc
+  let fieldName: string | undefined
+  for (const part of parts) if (typeof part === 'string' && part in fieldMap) fieldName = part
+  if (typeof fieldName !== 'string') return false
+  const rowIndex = parts.find(part => typeof part === 'number')
+  const row = legRows.value[typeof rowIndex === 'number' ? rowIndex : 0]
+  const leg = row ? legRefs.value[row.id] : undefined
+  if (!leg) return false
+  const messageText = typeof first.msg === 'string' ? first.msg : 'Check this trade value.'
+  leg.showServerError(fieldMap[fieldName]!, messageText)
+  void leg.focusValidationError()
   return true
 }
 
@@ -108,6 +134,7 @@ async function handleSubmit() {
   } catch (err) {
     const { ApiError } = await import('../api/types')
     if (err instanceof ApiError) {
+      showApiError(err)
       message.error(err.message)
     } else {
       message.error('Failed to create trade(s)')
@@ -121,7 +148,7 @@ function handleClose() {
   emit('update:show', false)
 }
 
-defineExpose({ rows: legRows, validate, getRows, reset })
+defineExpose({ rows: legRows, validate, getRows, reset, showApiError })
 </script>
 
 <template>
@@ -143,8 +170,8 @@ defineExpose({ rows: legRows, validate, getRows, reset })
     <n-button dashed block @click="addLeg" style="margin-bottom: 0.5rem;">
       + Add leg
     </n-button>
-    <n-text depth="3" style="font-size: 0.75rem; display: block; margin-bottom: 0.5rem;">
-      Cash flow previews are for display only. Server computes the authoritative values.
+      <n-text depth="3" style="font-size: 0.75rem; display: block; margin-bottom: 0.5rem;">
+      Cash flow previews estimate the amount received or paid for each trade after costs.
     </n-text>
     <n-alert v-if="primaryInstrumentLoading" type="info" :bordered="false" style="margin-bottom: 0.5rem;">Loading primary instrument context. Option selection is paused.</n-alert>
     <n-alert v-else-if="primaryInstrumentError" type="error" :bordered="false" style="margin-bottom: 0.5rem;">
@@ -158,7 +185,7 @@ defineExpose({ rows: legRows, validate, getRows, reset })
     :show="show"
     title="New Trade"
     preset="card"
-    style="max-width: 700px;"
+    style="width: min(700px, calc(100vw - 24px)); max-width: 700px;"
     :mask-closable="!submitting"
     @update:show="emit('update:show', $event)"
   >
@@ -178,8 +205,8 @@ defineExpose({ rows: legRows, validate, getRows, reset })
     <n-button dashed block @click="addLeg" :disabled="submitting" style="margin-bottom: 0.5rem;">
       + Add leg
     </n-button>
-    <n-text depth="3" style="font-size: 0.75rem; display: block; margin-bottom: 0.5rem;">
-      Cash flow previews are for display only. Server computes the authoritative values.
+      <n-text depth="3" style="font-size: 0.75rem; display: block; margin-bottom: 0.5rem;">
+      Cash flow previews estimate the amount received or paid for each trade after costs.
     </n-text>
     <n-alert v-if="primaryInstrumentLoading" type="info" :bordered="false" style="margin-bottom: 0.5rem;">Loading primary instrument context. Option selection is paused.</n-alert>
     <n-alert v-else-if="primaryInstrumentError" type="error" :bordered="false" style="margin-bottom: 0.5rem;">

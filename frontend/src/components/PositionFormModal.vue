@@ -225,6 +225,7 @@ async function handleSubmit() {
       } catch (e) {
         // Save full position object so retry can reuse it without a GET
         orphanPosition.value = position
+        tradeEntryRef.value?.showApiError(e)
         message.error(
           `Position created (id=${position.id}) but Trade(s) failed: ` +
           `${e instanceof ApiError ? e.message : 'unknown error'}. ` +
@@ -270,7 +271,7 @@ async function handleSubmit() {
     :show="show"
     :title="mode === 'create' ? 'New Position' : 'Edit Position'"
     preset="card"
-    style="max-width: 600px;"
+    style="width: min(600px, calc(100vw - 24px)); max-width: 600px;"
     :mask-closable="!submitting"
     @update:show="emit('update:show', $event)"
   >
@@ -322,7 +323,7 @@ async function handleSubmit() {
           disabled
         />
         <n-text depth="3" style="font-size: 0.75rem; margin-left: 0.5rem;">
-          Derived from first Trade executed_at
+          Based on the earliest trade date.
         </n-text>
       </n-form-item>
 
@@ -371,7 +372,7 @@ async function handleSubmit() {
         <n-divider />
         <n-h4 style="margin: 0 0 0.5rem;">First Trade</n-h4>
         <n-text depth="3" style="font-size: 0.85rem; display: block; margin-bottom: 0.5rem;">
-          opened_at will be derived from the first Trade's executed_at.
+          Add the opening trade or trades for this position. The opening date follows the earliest trade date.
         </n-text>
         <TradeEntryModal
           ref="tradeEntryRef"

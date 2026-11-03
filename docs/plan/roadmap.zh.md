@@ -26,8 +26,8 @@ M-OPT-01 集中维护共享决策、完整任务卡和验收记录，涵盖过�
 | [INS-01](milestone-option-entry.zh.md#t3) | P2 | implemented | 本轮切片实现、自动检查与独立评审通过；用户功能验收待进行 |
 | [INS-02](milestone-option-entry.zh.md#t4) | P2 | implemented | 本轮切片实现、自动检查与独立评审通过；用户功能验收待进行 |
 | [FIX-01](tasks/FIX-01.zh.md) | P1 | implemented | 本轮切片实现、自动检查与独立评审通过；用户功能验收待进行 |
-| [UI-01](milestone-option-entry.zh.md#t5) | P2 | in-review | 按 M-OPT-01 T5 实现中；用户功能验收待进行 |
-| [UI-02](milestone-option-entry.zh.md#t6) | P2 | ready | 共用成交腿标签／帮助／错误与窄屏布局；实现未开始 |
+| [UI-01](milestone-option-entry.zh.md#t5) | P2 | implemented | 本轮切片实现、自动检查与独立评审通过；用户功能验收待进行 |
+| [UI-02](milestone-option-entry.zh.md#t6) | P2 | in-review | 按 M-OPT-01 T6 实现中；用户功能验收待进行 |
 | UI-03 | P2 | needs-design | 按策略输入建议资金／风险／收益，定义公式、单位与手动覆盖 |
 | UI-04 | P2 | needs-design | 多腿录入预填，尤其 Iron Condor；模板不改变记录意图 |
 | UI-05 | P3 | needs-clarification | 筛选需求已澄清并归入 INS-01／INS-02，其他类型／显示反馈继续待澄清 |
