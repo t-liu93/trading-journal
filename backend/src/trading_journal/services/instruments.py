@@ -21,6 +21,7 @@ def instrument_query(
     q: str | None = None,
     include_expired: bool = True,
     option_underlying_id: uuid.UUID | None = None,
+    related_underlying_id: uuid.UUID | None = None,
 ) -> Select[tuple[Instrument]]:
     """Build a filtered list query. Underlying/expiry rules only affect options."""
     stmt = select(Instrument)
@@ -44,6 +45,14 @@ def instrument_query(
             (Instrument.kind != InstrumentKind.OPTION)
             | Instrument.id.in_(option_ids)
         )
+    if related_underlying_id is not None:
+        related_options = select(OptionContract.instrument_id).where(
+            OptionContract.underlying_id == related_underlying_id
+        )
+        stmt = stmt.where(
+            (Instrument.id == related_underlying_id)
+            | Instrument.id.in_(related_options)
+        )
     return stmt
 
 
@@ -56,12 +65,14 @@ async def list_instruments(
     offset: int = 0,
     include_expired: bool = True,
     option_underlying_id: uuid.UUID | None = None,
+    related_underlying_id: uuid.UUID | None = None,
 ) -> list[Instrument]:
     stmt = instrument_query(
         kind=kind,
         q=q,
         include_expired=include_expired,
         option_underlying_id=option_underlying_id,
+        related_underlying_id=related_underlying_id,
     )
     stmt = stmt.order_by(Instrument.symbol, Instrument.created_at, Instrument.id)
     result = await session.execute(stmt.offset(offset).limit(limit))

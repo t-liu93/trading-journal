@@ -20,6 +20,7 @@ export interface InstrumentListParams {
   offset?: number
   include_expired?: boolean
   option_underlying_id?: string
+  related_underlying_id?: string
 }
 
 function buildQuery(params?: InstrumentListParams): string {
@@ -31,6 +32,7 @@ function buildQuery(params?: InstrumentListParams): string {
   if (params.offset !== undefined) parts.push(`offset=${params.offset}`)
   if (params.include_expired !== undefined) parts.push(`include_expired=${params.include_expired}`)
   if (params.option_underlying_id) parts.push(`option_underlying_id=${encodeURIComponent(params.option_underlying_id)}`)
+  if (params.related_underlying_id) parts.push(`related_underlying_id=${encodeURIComponent(params.related_underlying_id)}`)
   return parts.length > 0 ? `?${parts.join('&')}` : ''
 }
 

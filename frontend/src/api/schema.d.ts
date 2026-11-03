@@ -1696,6 +1696,7 @@ export interface operations {
                 offset?: number;
                 include_expired?: boolean;
                 option_underlying_id?: string | null;
+                related_underlying_id?: string | null;
             };
             header?: never;
             path?: never;

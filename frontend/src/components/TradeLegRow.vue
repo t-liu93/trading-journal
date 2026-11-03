@@ -221,6 +221,8 @@ defineExpose({ validate, focusValidationError, showServerError, toPayload, reset
             v-model:model-value="instrument_id"
             :allow-create="true"
             :option-underlying-id="primaryUnderlyingId"
+            :related-underlying-id="primaryUnderlyingId"
+            :search-context-key="primaryInstrument?.id ?? null"
             :option-context-ready="!primaryInstrumentLoading && !primaryInstrumentError"
             :underlying-instrument="optionUnderlyingInstrument ?? (primaryInstrument?.kind === 'stock' ? primaryInstrument : null)"
             class="field-control"

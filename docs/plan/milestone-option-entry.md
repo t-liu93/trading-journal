@@ -75,6 +75,7 @@ Extend `GET /api/instruments`; keep the response as `InstrumentRead[]`.
 | `offset` | Integer, default 0, minimum 0 | New pagination offset |
 | `include_expired` | Boolean, default true | false excludes expired options |
 | `option_underlying_id` | Optional UUID | Restrict the underlying of option rows only; other kinds are unaffected |
+| `related_underlying_id` | Optional UUID, unrestricted by default | Walkthrough R1: return only that stock ID and its options; compose with every other filter before pagination |
 
 - Preserve older clients with API default `include_expired=true`; product list entry points explicitly send `false`.
 - Combining `kind=option` and `option_underlying_id` returns only that underlying's options. An unmatched underlying yields no option results; malformed UUIDs return 422.
@@ -87,7 +88,7 @@ Minimal pagination: show 50 rows per page, request 51 and use the extra row only
 
 - For stock Primary Instruments use their ID; for option Primary Instruments use `option.underlying_id`.
 - Apply no option-underlying condition for forex or an unselected primary instrument.
-- Preserve stock and forex candidate behavior; the general Trade form must not become option-only.
+- Walkthrough R1 (2026-11-03, owner confirmed) replaces the prior candidate scope: when the primary resolves to a stock underlying, every shared Trade-leg entry point lists only that exact stock ID and its options, excluding other stocks and forex. Stock and option primaries use their resolved underlying ID. Forex or an unselected primary retains the general candidates; management and Primary pickers remain unscoped. The legacy `option_underlying_id` API semantics stay unchanged; new `related_underlying_id` narrows Trade candidates. This adds no Trade-write prohibition.
 - PMCC LEAP remains option-only and keeps the backend's existing check that the underlying equals the Position's primary stock ID. Show an explicit Meta-form explanation for incompatible primary instruments rather than relaxing backend validation.
 - Show primary-resolution errors and retry. Suspend context-dependent selection instead of silently falling back to all options.
 - Compare resolved underlying IDs: retain options for the same underlying. When the underlying changes or the primary is cleared, clear incompatible option selections and notify the user.
@@ -108,6 +109,7 @@ Minimal pagination: show 50 rows per page, request 51 and use the extra row only
 - Search, kind, underlying, expiry visibility and pagination form the complete request context.
 - Invalidate previous requests immediately on condition changes, including pending debounce callbacks. Late responses must not restore old candidates or loading state.
 - Remove old candidates when context changes; maintain selected-value labels separately.
+- Walkthrough R1: switching/clearing the primary clears the visible Trade-picker search, internal query and creation-search context, invalidates old debounce/requests and resets pagination. The new query must not retain the old primary search term. Selection/clearing also keeps visible search and actual requests consistent. Switching within the same underlying preserves the selected contract and leg values while resetting search; quantity, price, date, costs and notes must remain intact.
 - Show request errors and retry, distinguish them from empty results, and preserve loaded pages after load-more failure for retry at the same offset.
 - Clear timers on unmount and prevent outstanding requests from writing state afterward.
 - Query again whenever a picker opens. Midnight does not need to clear a selection being edited automatically.
@@ -149,7 +151,7 @@ Forms: use labels above shared leg fields, with help and errors below. Use one c
 
 All cards share section 2 and cannot change its contract independently. Paths are relative to the repository root; proposed new application files do not exist before implementation.
 
-Current execution status is in section 5.2. T1–T6 are implemented with passing automated checks and independent review; T7 phase B integration checks have passed and independent review is in progress. Checked items below record verified technical conditions; owner feature acceptance remains separately pending. Candidates use immutable source snapshots including untracked files, without new commits. Design approval is not application acceptance.
+Current execution status is in section 5.2. T1–T6 are implemented with passing automated checks and independent review; T7 phase B implementation, integration checks and independent review have passed. Checked items below record verified technical conditions; owner feature acceptance remains separately pending. Candidates use immutable source snapshots including untracked files, without new commits. Design approval is not application acceptance.
 
 <a id="t1"></a>
 
@@ -322,7 +324,7 @@ Current execution status is in section 5.2. T1–T6 are implemented with passing
 
 **Goal:** one complete milestone contract and accurate delivery records.
 
-**Dependencies/status:** phase A is the accepted design/status-document delivery (`MOPT-DOC`). Phase B has updated application documentation and completed integration checks; it is `in-review`, with owner feature acceptance pending. Do not keep the completed documentation phase in progress or mark future application verification complete.
+**Dependencies/status:** phase A is the accepted design/status-document delivery (`MOPT-DOC`). Phase B has updated application documentation and completed integration checks and independent review; it is `implemented`, with owner feature acceptance pending. Do not keep the completed documentation phase in progress or mark future application verification complete.
 
 **Files/actions:**
 
@@ -438,13 +440,23 @@ All six implementation cards satisfy acceptance; backend quality/full tests, fro
 | T5 / UI-01 | implemented | Passed | Passed | Pending |
 | T6 / UI-02 | implemented | Passed | Passed | Pending |
 | T7 phase A / MOPT-DOC | Complete | Documentation checks passed | Not requested | Documentation accepted; additional manual review omitted |
-| T7 phase B / application integration | in-review | Integration checks passed | In review | Pending |
+| T7 phase B / application integration | implemented | Integration checks passed | Passed | Pending |
 
-Application candidate: an uncommitted worktree based on `18404935b0de91e52b7981a53907c4ae9a8cec7d`; final technical candidates for T1–T6 are `T1-c00`, `T2-c00`, `T3-c02`, `T4-c01`, `T5-c00` and `T6-c01`. Local evidence is in ignored `development-notes/mopt01-20261103-01/`, preserving full source archives, binary diffs, file manifests and SHA-256 hashes per step. The full T7 phase B candidate is `T7-c01`, with an equivalent whole-milestone diff snapshot `milestone-c01`; integration checks have passed and phase B independent review is in progress. Owner feature acceptance is pending. The earlier commit/push grant applied only to accepted documentation delivery; this run has no Git-write authorization.
+Application candidate: an uncommitted worktree based on `18404935b0de91e52b7981a53907c4ae9a8cec7d`; final technical candidates for T1–T6 are `T1-c00`, `T2-c00`, `T3-c02`, `T4-c01`, `T5-c00` and `T6-c01`. Local evidence is in ignored `development-notes/mopt01-20261103-01/`, preserving full source archives, binary diffs, file manifests and SHA-256 hashes per step. The full T7 phase B candidate is `T7-c01`, with an equivalent whole-milestone diff snapshot `milestone-c01`; integration checks and phase B independent review have passed. Owner feature acceptance is pending. Delivery snapshot `final` adds only post-review status-document updates to that reviewed source; application code is identical. The earlier commit/push grant applied only to accepted documentation delivery; this run has no Git-write authorization.
 
 Historical documentation delivery record (2026-11-03, before application execution): the owner confirmed the design, accepted the documentation handoff without further manual review and authorized status updates, commit and push. Bilingual design, README/map entry points and roadmap/FIX-01/triage updates are complete. DOC-01 and T7 phase A are accepted with the stated manual-review omission; phase B and application work remain unstarted. Targeted checks passed: local links/anchors, paired heading structure, decision/task IDs, acceptance-checklist state, identical command blocks and technical inline-code parity (apart from the translated UTC-date placeholder). Changed/new Markdown whitespace, original incident preservation and documentation-only scope were checked. Application source, dependencies, generated types and databases are unchanged. Application tests, image builds, independent review and owner feature walkthrough were not run. Git outcomes are established by the actual repository/remote operation, not by design acceptance.
 
-Application technical-delivery record (2026-11-03): T1–T6 implementation, automated checks and independent review passed. T7 phase B updated development/walkthrough guidance and documentation entry points. Backend locked dependencies, Ruff, strict mypy and all 425 tests passed; frontend npm ci, 43 behavior tests and build passed; isolated OpenAPI generation had no drift. Real image build, disposable Compose migration/health/login/SPA deep-link/persistence and representative browser/API feature checks passed; detailed coverage and untested manual paths remain in local reports. Not every context/inline-create/PMCC/First Trade branch was repeated in the real browser; component and domain boundaries are covered by those automated tests, which do not establish owner acceptance. Phase B independent review awaits verification of the current candidate; all owner feature acceptance is pending. No new migration, real-data backfill or Git write was performed. Phase A/DOC-01 acceptance remains valid.
+Application technical-delivery record (2026-11-03): T1–T6 implementation, automated checks and independent review passed. T7 phase B updated development/walkthrough guidance and documentation entry points. Backend locked dependencies, Ruff, strict mypy and all 425 tests passed; frontend npm ci, 43 behavior tests and build passed; isolated OpenAPI generation had no drift. Real image build, disposable Compose migration/health/login/SPA deep-link/persistence and representative browser/API feature checks passed; detailed coverage and untested manual paths remain in local reports. Not every context/inline-create/PMCC/First Trade branch was repeated in the real browser; component and domain boundaries are covered by those automated tests, which do not establish owner acceptance. Phase B independent rereview passed; all owner feature acceptance is pending. No new migration, real-data backfill or Git write was performed. Phase A/DOC-01 acceptance remains valid.
+
+### Walkthrough repair R1 · OWNER-03-001 / OWNER-03-002
+
+- State: `in-review`. The owner confirmed walkthrough steps 1/5 and 2/5; step 3/5 found issues and is paused. This run explicitly authorizes orchestrated repair and updating the existing walkthrough environment. Preserve original milestone delivery/review history; R1 requires new implementation, checks and independent review.
+- Contract: revised D03/D04/D06 clear hidden stale search and limit stock-context Trade candidates to the primary stock and its options. Other date/money/archival/write-lock/selected-history/non-option-leg retention rules remain. Creation results must also match the current candidate context and cannot select another underlying through creation.
+- One bounded step: implementation/regressions → frozen snapshot and independent review → necessary repair/rereview → integration/rebuild → replace only this walkthrough app on its existing database and Cookie configuration → owner retries step 3/5. No Git or production-deployment authorization.
+- Files: backend instruments API/query service and test_instruments; frontend instruments client, InstrumentPicker, TradeLegRow, real-control/context regressions and necessary callers; regenerate OpenAPI types, never edit them manually; synchronize EN/ZH development/walkthrough guidance and milestone/roadmap. No migration or changes to existing Trades, user passwords or walkthrough fixtures.
+- Technical acceptance: after searching/selecting A then switching to B, visible search is empty, requests carry no stale A, and B stock/options remain reachable; same-underlying changes preserve selection while clearing search; clear/reopen/late responses/pending debounce do not restore stale terms; other stocks including same-symbol/different-ID rows and forex do not enter scoped candidates; over 50 unrelated stocks/expired options cannot crowd out matching pages. Preserve history toggles, load-more/retry, current labels, creation-result guards and legacy/unscoped clients.
+- Verification: backend lint/strict types/full pytest, full frontend Vitest/build, generated OpenAPI freshness; real browser checks for fresh B and searched-A→B; preserve the current walkthrough database, accounts/password/session and step-1/2 results, with owner step-3 retry after handoff.
+- Current evidence: R1 implementation complete; backend 426/frontend 47 tests, lint/strict types/build/generated-type freshness passed; initial independent review found a reproducible picker-reopen refresh defect; repair round 1 and its regression checks are complete, with independent rereview pending. The walkthrough environment is not yet updated and owner step 3 has not passed. Local records: `development-notes/mopt01-owner-repair-20261103-01/`; identify candidates by this run’s complete before/after snapshots and hashes.
 
 ### 5.3 Remaining work
 

@@ -13,6 +13,8 @@ const props = withDefaults(defineProps<{
   allowCreate?: boolean
   disabled?: boolean
   optionUnderlyingId?: string | null
+  relatedUnderlyingId?: string | null
+  searchContextKey?: string | null
   optionContextReady?: boolean
   underlyingInstrument?: Instrument | null
 }>(), { placeholder: 'Search instrument…', allowCreate: false, disabled: false, optionUnderlyingId: null, optionContextReady: true })
@@ -32,6 +34,7 @@ const showCreateForm = ref(false)
 const createOptionForUnderlying = ref(false)
 const createQuery = ref('')
 const searchQuery = ref('')
+const selectGeneration = ref(0)
 const options = computed<SelectOption[]>(() => {
   const rows: SelectOption[] = candidates.value
     .filter(inst => props.optionContextReady || inst.kind !== 'option')
@@ -85,11 +88,14 @@ async function loadPage(q: string, append: boolean) {
     const results = await instrumentsApi.list({
       q: q || undefined, kind: props.kind, limit: PAGE_SIZE + 1, offset,
       include_expired: includeExpired.value, option_underlying_id: props.optionUnderlyingId ?? undefined,
+      related_underlying_id: props.relatedUnderlyingId ?? undefined,
     })
     if (seq !== requestSeq || disposed) return
-    const contextResults = props.optionUnderlyingId
-      ? results.filter(inst => inst.kind !== 'option' || inst.option?.underlying_id === props.optionUnderlyingId)
-      : results
+    const contextResults = results.filter(inst => {
+      if (props.optionUnderlyingId && inst.kind === 'option' && inst.option?.underlying_id !== props.optionUnderlyingId) return false
+      if (props.relatedUnderlyingId && !(inst.id === props.relatedUnderlyingId || (inst.kind === 'option' && inst.option?.underlying_id === props.relatedUnderlyingId))) return false
+      return true
+    })
     const page = contextResults.slice(0, PAGE_SIZE)
     for (const inst of page) instrumentMap.set(inst.id, inst)
     if (append) {
@@ -118,6 +124,17 @@ function scheduleSearch(q: string) {
 }
 
 function handleSearch(q: string) { scheduleSearch(q) }
+function clearSearchContext() {
+  const wasOpen = isOpen
+  invalidate()
+  // The keyed NSelect remounts closed, so keep its new instance and our
+  // open-state guard in sync. Otherwise its next open event skips loading.
+  isOpen = false
+  searchQuery.value = ''
+  createQuery.value = ''
+  selectGeneration.value += 1
+  if (wasOpen) void loadPage('', false)
+}
 function handleFocus() {
   if (!props.disabled && !isOpen) {
     isOpen = true
@@ -154,6 +171,10 @@ function handleUpdateValue(val: string | null) {
     message.error(`Expected a ${props.kind} instrument`)
     return
   }
+  if (instrument && props.relatedUnderlyingId && !(instrument.id === props.relatedUnderlyingId || (instrument.kind === 'option' && instrument.option?.underlying_id === props.relatedUnderlyingId))) {
+    message.warning('Choose the primary stock or an option on that stock.')
+    return
+  }
   if (instrument?.kind === 'option' && (!props.optionContextReady || (props.optionUnderlyingId && instrument.option?.underlying_id !== props.optionUnderlyingId))) {
     message.warning('Wait for the primary instrument context to load, or choose an option on that underlying.')
     return
@@ -161,10 +182,16 @@ function handleUpdateValue(val: string | null) {
   currentInstrument.value = instrument
   emit('update:modelValue', val)
   emit('update:instrument', instrument)
+  clearSearchContext()
 }
 function handleInstrumentSaved(instrument: Instrument) {
   if (props.kind && instrument.kind !== props.kind) {
     message.error(`Expected a ${props.kind} instrument`)
+    return
+  }
+  if (props.relatedUnderlyingId && !(instrument.id === props.relatedUnderlyingId || (instrument.kind === 'option' && instrument.option?.underlying_id === props.relatedUnderlyingId))) {
+    message.error('The created instrument does not match the current primary stock context.')
+    showCreateForm.value = false
     return
   }
   if (instrument.kind === 'option' && (!props.optionContextReady || (props.optionUnderlyingId && instrument.option?.underlying_id !== props.optionUnderlyingId))) {
@@ -189,6 +216,7 @@ function handleInstrumentSaved(instrument: Instrument) {
   emit('update:modelValue', instrument.id)
   emit('update:instrument', instrument)
   showCreateForm.value = false
+  clearSearchContext()
 }
 async function resolveCurrent(id: string) {
   const seq = ++labelSeq
@@ -209,10 +237,7 @@ watch(() => props.kind, () => {
   searchQuery.value = ''
   if (isOpen) void loadPage('', false)
 })
-watch(() => props.optionUnderlyingId, () => {
-  invalidate()
-  if (isOpen) void loadPage(searchQuery.value, false)
-})
+watch(() => [props.optionUnderlyingId, props.relatedUnderlyingId, props.searchContextKey], () => clearSearchContext())
 watch(() => props.modelValue, (id) => {
   if (!id) { currentInstrument.value = null; return }
   void resolveCurrent(id)
@@ -227,6 +252,7 @@ onBeforeUnmount(() => { disposed = true; invalidate() })
 <template>
   <div class="instrument-picker">
     <n-select
+      :key="selectGeneration"
       :value="modelValue" :options="options" :fallback-option="fallbackOption" :placeholder="placeholder" :loading="loading"
       :disabled="disabled" filterable remote clearable @search="handleSearch"
       @update:value="handleUpdateValue" @focus="handleFocus" @update:show="handleShowChange"

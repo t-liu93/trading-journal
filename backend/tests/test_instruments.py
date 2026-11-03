@@ -252,6 +252,40 @@ async def test_underlying_filter_only_restricts_option_rows_and_offset_composes(
     assert invalid.status_code == 422
 
 
+async def test_related_underlying_limits_to_exact_stock_and_its_options_before_pagination(
+    auth_client: AsyncClient,
+) -> None:
+    primary = await _create_stock(auth_client, symbol="DUP", currency="USD")
+    other_same_symbol = await _create_stock(auth_client, symbol="DUP", currency="EUR")
+    for index in range(55):
+        await _create_stock(auth_client, symbol=f"A{index:02d}", currency="USD")
+    matched = await _create_option(
+        auth_client, underlying_symbol="DUP", strike="100", expiry="2027-01-01"
+    )
+    unrelated = await _create_option(
+        auth_client, underlying_symbol="A00", strike="100", expiry="2027-01-01"
+    )
+    forex = await _create_forex(auth_client, symbol="DUPUSD")
+
+    response = await auth_client.get(
+        "/api/instruments",
+        params={"related_underlying_id": primary["id"], "limit": 50},
+    )
+    assert response.status_code == 200
+    rows = response.json()
+    assert {row["id"] for row in rows} == {primary["id"], matched["id"]}
+    assert other_same_symbol["id"] not in {row["id"] for row in rows}
+    assert unrelated["id"] not in {row["id"] for row in rows}
+    assert forex["id"] not in {row["id"] for row in rows}
+
+    combined = await auth_client.get(
+        "/api/instruments",
+        params={"related_underlying_id": primary["id"], "kind": "option", "q": "DUP", "limit": 1},
+    )
+    assert combined.status_code == 200
+    assert [row["id"] for row in combined.json()] == [matched["id"]]
+
+
 # ---------------------------------------------------------------------------
 # P6.1 — Get by ID
 # ---------------------------------------------------------------------------

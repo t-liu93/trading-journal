@@ -71,6 +71,57 @@ describe('exact primary instrument context', () => {
     expect(wrapper.find('[data-test="pick-option-b"]').exists()).toBe(false)
   })
 
+  it('limits all related candidates to the exact stock ID and its options', async () => {
+    const forex: Instrument = { ...stockA, id: 'forex-a', kind: 'forex', forex: null }
+    list.mockResolvedValue([stockA, stockB, optionA, optionB, forex])
+    get.mockResolvedValue(stockA)
+    const wrapper = mount(InstrumentPicker, { props: {
+      modelValue: null, relatedUnderlyingId: stockA.id, searchContextKey: stockA.id,
+    }, global: { stubs: pickerStubs } })
+    await wrapper.get('[data-test="open"]').trigger('click')
+    await flushPromises()
+
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({ related_underlying_id: stockA.id }))
+    expect(wrapper.find('[data-test="pick-stock-a"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="pick-option-a"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="pick-stock-b"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="pick-option-b"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="pick-forex-a"]').exists()).toBe(false)
+  })
+
+  it('cancels pending A search and ignores its late response after switching to B', async () => {
+    vi.useFakeTimers()
+    let resolveA: ((rows: Instrument[]) => void) | undefined
+    list.mockImplementationOnce(() => new Promise<Instrument[]>((resolve) => { resolveA = resolve }))
+      .mockResolvedValue([stockB, optionB])
+    const wrapper = mount(InstrumentPicker, { props: {
+      modelValue: null, relatedUnderlyingId: stockA.id, searchContextKey: stockA.id,
+    }, global: { stubs: pickerStubs } })
+    const select = wrapper.findComponent(SelectStub)
+    await select.vm.$emit('update:show', true)
+    await flushPromises()
+    await select.vm.$emit('search', 'AAA')
+    await wrapper.setProps({ relatedUnderlyingId: stockB.id, searchContextKey: stockB.id })
+    await vi.advanceTimersByTimeAsync(350)
+    await flushPromises()
+    resolveA?.([stockA, optionA])
+    await flushPromises()
+
+    expect(list.mock.calls.slice(1).every(([params]) => params.related_underlying_id === stockB.id && params.q === undefined)).toBe(true)
+    expect(wrapper.find('[data-test="pick-stock-b"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="pick-option-b"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="pick-option-a"]').exists()).toBe(false)
+  })
+
+  it('does not select an inline-created instrument outside the current relation', async () => {
+    const wrapper = mount(InstrumentPicker, { props: {
+      modelValue: null, allowCreate: true, relatedUnderlyingId: stockA.id,
+    }, global: { stubs: pickerStubs } })
+    await wrapper.findComponent(FormStub).vm.$emit('saved', optionB)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.emitted('update:instrument')).toBeUndefined()
+  })
+
   it('clears a selected option when resolved primary changes to a different same-symbol stock', async () => {
     get.mockImplementation(async (id: string) => id === optionA.id ? optionA : id === stockB.id ? stockB : stockA)
     list.mockResolvedValue([optionA])

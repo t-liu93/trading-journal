@@ -216,6 +216,7 @@ async def list_instruments(
     offset: int = _offset_param,
     include_expired: bool = True,
     option_underlying_id: uuid.UUID | None = None,
+    related_underlying_id: uuid.UUID | None = None,
 ) -> list[InstrumentRead]:
     instruments = await query_instruments(
         session,
@@ -225,6 +226,7 @@ async def list_instruments(
         offset=offset,
         include_expired=include_expired,
         option_underlying_id=option_underlying_id,
+        related_underlying_id=related_underlying_id,
     )
     reads = []
     for inst in instruments:

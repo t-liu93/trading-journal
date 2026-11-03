@@ -13,7 +13,7 @@
 - 权威财务值使用后端 `Decimal` 和现有 SQL `Numeric` 精度。Trade 现金流为 `sign(action) × price × quantity × multiplier − commission − fees`。前端预览、持仓天数、ROI 和年化 ROI 仅展示，不同币种分开。
 - 按登录用户校验所有权，Trade 经 Position 判断归属，访问他人资源返回 404。Instrument 是按自然键 get-or-create 的共享参考数据。
 - Trade DELETE 是归档，统计排除归档行。PATCH 只接受 notes；未平仓仓位中其他字段纠错需归档后重新录入。已平仓仓位拒绝 Trade 写入，不能重新打开；没有支持的取消归档端点。
-- 期权按当前 UTC 日期过期（`expiry < today`）。产品列表与选择器默认隐藏过期合约；Instrument API 为兼容旧客户端默认 `include_expired=true`。全部筛选先于排序／分页执行。Instruments 管理页和选择器每次显示 50 条，并多请求一条判断是否有下一页；API 接受任意非负 `offset` 和 1–200 的 `limit`。已选历史 Instrument 仍按 ID 解析。过期开关在当前表单／picker 会话内保留；新 Trade 表单会话恢复默认隐藏状态。上下文创建期权会继承并锁定 underlying，匹配关系按 underlying ID 判断。一般 Trade 表单仍可录入股票与外汇。
+- 期权按当前 UTC 日期过期（`expiry < today`）。产品列表与选择器默认隐藏过期合约；Instrument API 为兼容旧客户端默认 `include_expired=true`。全部筛选先于排序／分页执行。`option_underlying_id` 仍只限制期权行；`related_underlying_id` 仅返回精确股票 ID 及其期权行。Instruments 管理页和选择器每次显示 50 条，并多请求一条判断是否有下一页；API 接受任意非负 `offset` 和 1–200 的 `limit`。已选历史 Instrument 仍按 ID 解析。过期开关在当前表单／picker 会话内保留；新 Trade 表单会话恢复默认隐藏状态。Primary Instrument 解析到股票时，Trade 腿候选仅包括该股票及其期权；外汇或未选择 Primary 时保留通用候选。管理页和 Primary Instrument 选择器不加关联范围。上下文创建期权会继承并锁定 underlying，匹配关系按 underlying ID 判断。切换 Primary 会清空 picker 搜索并使旧请求失效，即使新旧 Primary 解析到同一股票也一样。没有股票上下文的一般 Trade 表单仍可录入股票与外汇。
 - 未平仓 Position 的 `opened_at` 是有效成交最早时间（`MIN(executed_at)`）。成功创建或归档 Trade 后刷新日期；若全部成交归档，保留上次开仓日期，直到有新有效成交。新建空 Position 在首笔成交前保留输入日期。新成交时间在持久化与排序前统一为 UTC；旧的 naive 时间解释为 UTC，不回填历史数据。
 - 平仓冻结已实现盈亏。平仓时，有效成交会重新计算 `opened_at`；未指定平仓时间则取最后一笔有效成交，空集合使用当前 UTC 时间。开平仓同一时刻允许；平仓早于开仓时原子拒绝，包括修改已平仓 Position 的时间。其他字段编辑不会自动修复或拒绝历史无效日期。
 - 多腿 Trade 写入保持原子性。Position 与首笔 Trade 当前由前端两次请求完成，含部分失败恢复，不是后端同事务。
