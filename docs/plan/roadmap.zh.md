@@ -24,7 +24,7 @@ M-OPT-01 集中维护共享决策、完整任务卡和验收记录，涵盖过�
 |---|---|---|---|
 | DOC-01 | P2 | accepted | 2026-11-03 接受文档交付，免额外人工审阅；原针对性检查通过，不声称独立评审或运行走查 |
 | [INS-01](milestone-option-entry.zh.md#t3) | P2 | implemented | 本轮切片实现、自动检查与独立评审通过；用户功能验收待进行 |
-| [INS-02](milestone-option-entry.zh.md#t4) | P2 | implemented | 人工走查 R1 实现、自动检查及独立复评通过，已更新原走查环境；用户确认R1两项修复和第3步通过，剩余走查待进行 |
+| [INS-02](milestone-option-entry.zh.md#t4) | P2 | implemented | R1 独立复评及用户复验通过，第3步通过；锁定标的名称修复和前端／浏览器检查通过，用户确认名称修复和第4步通过，第5步待验收 |
 | [FIX-01](tasks/FIX-01.zh.md) | P1 | implemented | 本轮切片实现、自动检查与独立评审通过；用户功能验收待进行 |
 | [UI-01](milestone-option-entry.zh.md#t5) | P2 | implemented | 本轮切片实现、自动检查与独立评审通过；用户功能验收待进行 |
 | [UI-02](milestone-option-entry.zh.md#t6) | P2 | implemented | 本轮切片实现、自动检查与独立评审通过；用户功能验收待进行 |

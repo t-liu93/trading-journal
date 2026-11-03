@@ -24,7 +24,7 @@ Priority is an ordering recommendation, not authorization. P1 = data correctness
 |---|---|---|---|
 | DOC-01 | P2 | accepted | Documentation handoff accepted on 2026-11-03 with additional manual review omitted; prior targeted checks passed; no independent review or runtime walkthrough claimed |
 | [INS-01](milestone-option-entry.md#t3) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
-| [INS-02](milestone-option-entry.md#t4) | P2 | implemented | Walkthrough R1 implemented, checks and fresh independent rereview passed; existing walkthrough environment updated; owner confirmed both R1 fixes and step 3; remaining walkthrough checks pending |
+| [INS-02](milestone-option-entry.md#t4) | P2 | implemented | R1 independently reviewed and owner-confirmed; step 3 passed. Locked-underlying label follow-up implemented, frontend checks/browser passed; owner confirmed label fix and step 4; step 5 pending |
 | [FIX-01](tasks/FIX-01.md) | P1 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
 | [UI-01](milestone-option-entry.md#t5) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
 | [UI-02](milestone-option-entry.md#t6) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
