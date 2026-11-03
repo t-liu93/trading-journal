@@ -13,7 +13,7 @@ Trading Journal 是一个用来**记录与分析交易**的 Web 应用 —— �
 ## 功能
 
 - **账户** —— 多个交易账户（`cash` / `margin` / `paper`），支持归档。
-- **品种** —— 股票、期权、外汇对；带 typeahead 选择器，并支持内联即时创建（重复项自动去重）。
+- **品种** —— 股票、期权、外汇对；支持过期期权显示开关、候选分页、主股票关联及带上下文的内嵌创建，重复项自动去重。
 - **仓位** —— 一套模型覆盖所有策略（`spot_stock`、`spot_forex`、`wheel`、`iron_condor`、`pmcc`）；详情页含 **Overview / Meta / Plan / Trades** 四个 tab。
 - **Trade（成交）** —— 单腿或多腿录入、同一订单共享一个 order group，cash flow 由服务端计算，软删除并保留历史（审计友好）。
 - **Dashboard** —— 分币种的已实现盈亏卡片、开仓/平仓仓位表、按月已实现盈亏图、胜率仪表。
@@ -51,7 +51,7 @@ COOKIE_SECURE=false docker compose up -d
 **镜像**（GitHub Container Registry，多架构 `linux/amd64` + `linux/arm64`）：
 
 ```
-ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.0.0
+ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.1.0
 ```
 
 **配置**（全部可选，写在 compose 文件旁边的 `.env`）：
@@ -82,7 +82,8 @@ ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.0.0
 
 - [文档地图](index.zh.md)（[English](index.md)）—— 当前指导与历史参考。
 - [当前路线图](plan/roadmap.zh.md)（[English](plan/roadmap.md)）—— 优先级、任务契约、进度与验收。
-- [M-OPT-01 设计](plan/milestone-option-entry.zh.md)（[English](plan/milestone-option-entry.md)）—— 已接受的下个里程碑设计与完整实现任务卡，应用工作尚未开始。
+- [M-OPT-01 里程碑](plan/milestone-option-entry.zh.md)（[English](plan/milestone-option-entry.md)）—— 已完成的期权录入改进、检查及五步用户验收。
+- [v1.1.0 发布说明](release-notes/v1.1.0.zh.md)（[English](release-notes/v1.1.0.md)）—— 变更、升级说明及验证范围。
 - [开发指南](development.zh.md)（[English](development.md)）—— 命令、领域规则、验证与评审。
 - [走查指南](walkthrough.zh.md)（[English](walkthrough.md)）—— 一次性构建与代表性功能检查。
 - [设计参考](design/README.zh.md)（[English](design/README.md)）和[发布记录](release-notes/)—— 历史计划与版本记录。

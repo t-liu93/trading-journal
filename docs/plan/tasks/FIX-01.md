@@ -4,11 +4,11 @@
 
 ## Identity and authoritative contract
 
-- Queue state: `implemented` in the [roadmap](../roadmap.md); the owner confirmed the M-OPT-01 design and subsequently authorized orchestrated application implementation on 2026-11-03.
+- Queue state: `accepted` in the [roadmap](../roadmap.md); the owner confirmed the M-OPT-01 design and subsequently authorized orchestrated application implementation on 2026-11-03.
 - Goal: archive-and-replace correction or earlier-fill backfill must not anchor an open Position's holding period to an obsolete first fill.
 - The full contract, dependencies, exact implementation files, acceptance, reviewer focus, checks and execution evidence now live in [M-OPT-01 T2](../milestone-option-entry.md#t2), together with shared decisions D07/D08 and the milestone walkthrough.
 - This file remains the stable FIX-01 entry point. Do not maintain a competing implementation or acceptance checklist here.
-- Current execution authorization covers M-OPT-01 implementation, independent review, repair and disposable verification. Git writes, publication and production deployment are not authorized.
+- The implementation grant covered M-OPT-01 implementation, independent review, repair and disposable verification. After owner acceptance, a separate explicit grant covers milestone commits, push and v1.1.0 publication. Production deployment is a separate action.
 
 ## Incident and current evidence
 
@@ -24,4 +24,4 @@ Closed-Trade locks, frozen P&L and retained audit history remain. Historical clo
 
 ## Execution status
 
-Implementation, automated checks and independent review passed for the M-OPT-01 T2 snapshot; owner feature acceptance remains pending. Update the milestone card and roadmap as these dimensions change, rather than duplicating their records here.
+Implementation, automated checks and independent review passed for the M-OPT-01 T2 snapshot; owner step 5 is accepted. The later timezone-display correction passed frontend tests/build and real-browser checks without separate independent review. Update the milestone card and roadmap as these dimensions change, rather than duplicating their records here.

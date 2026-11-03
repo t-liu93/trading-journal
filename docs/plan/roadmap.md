@@ -10,7 +10,7 @@ Already implemented: account/instrument/strategy configuration, Position and Tra
 
 Current verification infrastructure: backend Ruff/strict mypy/pytest, migrated isolated test databases, codegen freshness, frontend Vitest/Vue Test Utils/jsdom behavior tests and type-check/build, and conditional image builds. REL-01 still tracks release-quality/runtime gates. SQLite is supported; PostgreSQL equivalence has not been demonstrated.
 
-**Current scope (2026-11-03):** [M-OPT-01: option selection and trade-entry improvements](milestone-option-entry.md) T1–T6 are implemented with passing automated checks and independent review. T7 phase B application documentation, integration checks and independent review have passed; owner feature acceptance is pending. Design-document phase A and DOC-01 remain accepted with additional manual document review omitted; that acceptance is not repeated. The owner separately authorized this run’s implementation, independent review/repair and isolated verification, without Git writes, release/tag publication or production deployment.
+**Current scope (2026-11-03):** [M-OPT-01: option selection and trade-entry improvements](milestone-option-entry.md) T1–T6 and T7 phase B are `accepted` after implementation, checks and the five-step owner walkthrough. Original milestone/R1 candidates passed independent review; later UUID-label/timezone follow-ups passed automated/browser checks and owner acceptance without separate independent review. Phase A and DOC-01 remain accepted without repeating their documentation acceptance. The owner subsequently authorized milestone commits, push and [v1.1.0 publication](../release-notes/v1.1.0.md); production deployment remains a separate action.
 
 M-OPT-01 owns shared decisions, complete task cards and acceptance records. It covers expired-option visibility/history/pagination, primary-underlying filtering and contextual creation, FIX-01, UI-01/UI-02 and a bounded QA-01 slice. `ready` records an agreed contract, not authorization to start coding.
 
@@ -23,17 +23,17 @@ Priority is an ordering recommendation, not authorization. P1 = data correctness
 | ID | Priority | State | Scope / next action |
 |---|---|---|---|
 | DOC-01 | P2 | accepted | Documentation handoff accepted on 2026-11-03 with additional manual review omitted; prior targeted checks passed; no independent review or runtime walkthrough claimed |
-| [INS-01](milestone-option-entry.md#t3) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
-| [INS-02](milestone-option-entry.md#t4) | P2 | implemented | R1 independently reviewed and owner-confirmed; step 3 passed. Locked-underlying label follow-up implemented, frontend checks/browser passed; owner confirmed label fix and step 4; step 5 pending |
-| [FIX-01](tasks/FIX-01.md) | P1 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
-| [UI-01](milestone-option-entry.md#t5) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
-| [UI-02](milestone-option-entry.md#t6) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
+| [INS-01](milestone-option-entry.md#t3) | P2 | accepted | Milestone slice checks, independent review and owner expiry/pagination walkthrough passed |
+| [INS-02](milestone-option-entry.md#t4) | P2 | accepted | Original task/R1 independently reviewed; label follow-up checked; owner steps 3/4 accepted, follow-up not separately reviewed |
+| [FIX-01](tasks/FIX-01.md) | P1 | accepted | Original task independently reviewed; timezone follow-up checks/browser and owner step 5 passed, follow-up not separately reviewed |
+| [UI-01](milestone-option-entry.md#t5) | P2 | accepted | Milestone slice implementation, checks, independent review and owner step 4 passed |
+| [UI-02](milestone-option-entry.md#t6) | P2 | accepted | Milestone slice implementation, checks, independent review and owner steps 3/4 passed |
 | UI-03 | P2 | needs-design | Suggest capital/risk/reward from strategy inputs; define formulas, units and manual override |
 | UI-04 | P2 | needs-design | Prefill multi-leg entries, especially Iron Condor; define templates without changing recorded intent |
 | UI-05 | P3 | needs-clarification | Filtering requests clarified and assigned to INS-01/INS-02; other kind/display complaints remain unclarified |
-| [QA-01](milestone-option-entry.md#t1) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
+| [QA-01](milestone-option-entry.md#t1) | P2 | accepted | Only this milestone slice accepted; remaining ROI/grouping/failure-recovery coverage stays deferred |
 | REL-01 | P2 | proposed | Gate tag publication on exact-source quality checks and runtime image validation; separate design required |
-| [MOPT-DOC](milestone-option-entry.md#t7) | P2 | accepted | Phase A design documentation accepted; phase B application integration implemented; owner feature acceptance pending |
+| [MOPT-DOC](milestone-option-entry.md#t7) | P2 | accepted | Phase A documentation acceptance retained; phase B integration/original-candidate review and five-step owner walkthrough passed |
 
 Original reports and the 2026-06-02 incident remain in [triage](../triage/improvements.md). Work outside M-OPT-01 needs a bounded card before implementation; do not treat this queue as an approved implementation batch. Atomic Position+first-Trade creation and an audited closed-record correction path are explicitly deferred by this milestone.
 

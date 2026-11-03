@@ -14,7 +14,7 @@
 - 按登录用户校验所有权，Trade 经 Position 判断归属，访问他人资源返回 404。Instrument 是按自然键 get-or-create 的共享参考数据。
 - Trade DELETE 是归档，统计排除归档行。PATCH 只接受 notes；未平仓仓位中其他字段纠错需归档后重新录入。已平仓仓位拒绝 Trade 写入，不能重新打开；没有支持的取消归档端点。
 - 期权按当前 UTC 日期过期（`expiry < today`）。产品列表与选择器默认隐藏过期合约；Instrument API 为兼容旧客户端默认 `include_expired=true`。全部筛选先于排序／分页执行。`option_underlying_id` 仍只限制期权行；`related_underlying_id` 仅返回精确股票 ID 及其期权行。Instruments 管理页和选择器每次显示 50 条，并多请求一条判断是否有下一页；API 接受任意非负 `offset` 和 1–200 的 `limit`。已选历史 Instrument 仍按 ID 解析。过期开关在当前表单／picker 会话内保留；新 Trade 表单会话恢复默认隐藏状态。Primary Instrument 解析到股票时，Trade 腿候选仅包括该股票及其期权；外汇或未选择 Primary 时保留通用候选。管理页和 Primary Instrument 选择器不加关联范围。上下文创建期权会继承并锁定 underlying，匹配关系按 underlying ID 判断。切换 Primary 会清空 picker 搜索并使旧请求失效，即使新旧 Primary 解析到同一股票也一样。没有股票上下文的一般 Trade 表单仍可录入股票与外汇。
-- 未平仓 Position 的 `opened_at` 是有效成交最早时间（`MIN(executed_at)`）。成功创建或归档 Trade 后刷新日期；若全部成交归档，保留上次开仓日期，直到有新有效成交。新建空 Position 在首笔成交前保留输入日期。新成交时间在持久化与排序前统一为 UTC；旧的 naive 时间解释为 UTC，不回填历史数据。
+- 未平仓 Position 的 `opened_at` 是有效成交最早时间（`MIN(executed_at)`）。成功创建或归档 Trade 后刷新日期；若全部成交归档，保留上次开仓日期，直到有新有效成交。新建空 Position 在首笔成交前保留输入日期。新成交时间在持久化与排序前统一为 UTC；旧的 naive 时间解释为 UTC，不回填历史数据。 Position／Trade API 客户端先将无时区响应明确为 UTC，再用于浏览器本地显示与日期计算；已有显式偏移保持不变。日期时间选择器使用浏览器本地时间。
 - 平仓冻结已实现盈亏。平仓时，有效成交会重新计算 `opened_at`；未指定平仓时间则取最后一笔有效成交，空集合使用当前 UTC 时间。开平仓同一时刻允许；平仓早于开仓时原子拒绝，包括修改已平仓 Position 的时间。其他字段编辑不会自动修复或拒绝历史无效日期。
 - 多腿 Trade 写入保持原子性。Position 与首笔 Trade 当前由前端两次请求完成，含部分失败恢复，不是后端同事务。
 - Trade 备注以纯文本放在对应成交行紧邻的下一行，保留换行并自动折行。由对应 Trade 的操作编辑备注；Ctrl/Command+Enter 或 Save 提交，Cancel 撤销。成交表单标签在输入框上方，帮助／错误在下方；600px 以上双列、以下单列；Instrument 与 Notes 跨整行。此布局范围限于受影响表单。
@@ -72,6 +72,8 @@ uv run uvicorn trading_journal.main:app --reload
 | 文档 | 链接／锚点、双语一致性、命令与配置、空白及改动范围 |
 
 当前 CI 提供后端 lint／类型／测试、codegen 一致性、前端单元测试／构建和有条件 Docker 构建。`npm run test` 单次运行 Vitest，`npm run test:watch` 启动监视模式。Tag 发布不依赖完整质量检查／镜像运行冒烟测试，[REL-01](plan/roadmap.zh.md) 追踪缺口。不声称未运行的测试、未发生的独立评审或未经确认的用户验收。
+
+版本使用 `vX.Y.Z` Git 标签。准确源码提交通过 CI 后，标签触发 `.github/workflows/release.yml` 发布 `linux/amd64` 和 `linux/arm64` 的 GHCR 镜像；再使用成对发布说明创建 GitHub Release，并核对 workflow 及仓库 manifest。Git 推送、标签／版本发布和生产部署分别需要适用授权。发版不会替换运行中的 app，自动发布门禁仍由 REL-01 跟踪。
 
 ## 独立评审与本地交接
 

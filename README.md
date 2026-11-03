@@ -13,7 +13,7 @@ Trading Journal is a web app for logging and analyzing your trades — spot stoc
 ## Features
 
 - **Accounts** — multiple trading accounts (`cash` / `margin` / `paper`) with archiving.
-- **Instruments** — stocks, options, and forex pairs, with a typeahead picker and inline create-on-the-fly (duplicates dedupe automatically).
+- **Instruments** — stocks, options, and forex pairs; expired-option visibility, paginated candidates, primary-stock filtering and contextual inline creation with deduplication.
 - **Positions** — one model for every strategy (`spot_stock`, `spot_forex`, `wheel`, `iron_condor`, `pmcc`); a detail page with **Overview / Meta / Plan / Trades** tabs.
 - **Trades** — single or multi-leg entry sharing one order group, server-computed cash flow, and audit-friendly soft-delete with retained history.
 - **Dashboard** — per-currency realized P&L cards, open/closed position tables, a monthly realized-P&L chart, and a win-rate gauge.
@@ -51,7 +51,7 @@ The published image serves the SPA and the API together. The compose file runs m
 **Images** (GitHub Container Registry, multi-arch `linux/amd64` + `linux/arm64`):
 
 ```
-ghcr.io/t-liu93/trading-journal:latest   # or pin a version, e.g. :1.0.0
+ghcr.io/t-liu93/trading-journal:latest   # or pin a version, e.g. :1.1.0
 ```
 
 **Configuration** (all optional, via a `.env` next to the compose file):
@@ -82,7 +82,8 @@ Current scope and acceptance are tracked in the [roadmap](docs/plan/roadmap.md) 
 
 - [Documentation map](docs/index.md) ([中文](docs/index.zh.md)) — current guidance and historical references.
 - [Current roadmap](docs/plan/roadmap.md) ([中文](docs/plan/roadmap.zh.md)) — priorities, task contracts, progress and acceptance.
-- [M-OPT-01 design](docs/plan/milestone-option-entry.md) ([中文](docs/plan/milestone-option-entry.zh.md)) — accepted next-milestone design and complete implementation cards; application work has not started.
+- [M-OPT-01 milestone](docs/plan/milestone-option-entry.md) ([中文](docs/plan/milestone-option-entry.zh.md)) — completed option-entry work, verification and five-step owner acceptance.
+- [v1.1.0 release notes](docs/release-notes/v1.1.0.md) ([中文](docs/release-notes/v1.1.0.zh.md)) — changes, upgrade notes and validation scope.
 - [Development guide](docs/development.md) ([中文](docs/development.zh.md)) — commands, domain rules, verification and review.
 - [Walkthrough](docs/walkthrough.md) ([中文](docs/walkthrough.zh.md)) — disposable build and representative feature checks.
 - [Design references](docs/design/README.md) ([中文](docs/design/README.zh.md)) and [release notes](docs/release-notes/) — historical plans and version-specific records.
