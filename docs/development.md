@@ -6,15 +6,18 @@
 
 Backend code is under `backend/src/trading_journal/`: `models/` for ORM persistence, `schemas/` for API validation/serialization, `services/` for reusable business logic, `api/` for HTTP orchestration, and `auth/` for authentication. Frontend code under `frontend/src/` separates API clients, composables, stores, views, components, utilities and routing.
 
-FastAPI, async SQLAlchemy 2, Alembic, FastAPI Users, Pydantic Settings and uv support the backend; Vue 3/TypeScript, Vite, Pinia, Vue Router, Naive UI and ECharts support the frontend. SQLite is the default. PostgreSQL portability is a goal without a current verified deployment record. Business routes use `/api/*`, health is `/api/health`, and OpenAPI is `/openapi.json`. Production serves the SPA outside API/docs routes; Vite proxies `/api` to `127.0.0.1:8000`.
+FastAPI, async SQLAlchemy 2, Alembic, FastAPI Users, Pydantic Settings and uv support the backend; Vue 3/TypeScript, Vite, Pinia, Vue Router, Naive UI and ECharts support the frontend. SQLite is the default. PostgreSQL portability is a goal without a current verified deployment record. Business routes use `/api/*`, health is `/api/health`, and OpenAPI is `/openapi.json`. Production serves the SPA outside API/docs routes; Vite proxies `/api` to `127.0.0.1:8000`. `npm run codegen` reads that OpenAPI endpoint by default and accepts an alternate backend URL through `OPENAPI_URL`.
 
 Preserve these contracts unless the task explicitly changes them:
 
 - Authoritative financial values use backend `Decimal` and existing SQL `Numeric` precision. Trade cash flow is `sign(action) × price × quantity × multiplier − commission − fees`. Frontend previews, days held, ROI and annualized ROI are display-only. Keep different currencies separate.
 - Enforce ownership using the authenticated user, resolving Trade through Position; return 404 for another user's resource. Instruments are shared reference data with natural-key get-or-create.
 - Trade DELETE archives; sums exclude archived rows. PATCH accepts notes only; corrections to other fields on open positions require archive + replacement. Closed positions reject Trade writes and cannot be reopened. There is no supported unarchive endpoint.
-- Closing freezes realized P&L. Without an explicit close time, use the latest non-archived fill, or now for an empty position. `opened_at` currently does not follow later Trade changes: [FIX-01](plan/tasks/FIX-01.md) has an agreed design in M-OPT-01, but the repair is not implemented.
+- Options expire by the current UTC date (`expiry < today`). Default product lists and pickers hide expired options; the instrument API defaults `include_expired=true` to keep older clients compatible. Filters run before ordering/pagination. The Instruments page and pickers show 50-row pages and request one extra row to detect a next page; the API accepts any nonnegative `offset` and `limit` from 1 to 200. Historical selected instruments continue to resolve by ID. The expired switch lasts for the current form/picker session; a new Trade form session restores the default hidden state. Contextual option creation inherits and locks its underlying; selection context compares underlying IDs. General Trade entry still permits stocks and forex.
+- For an open Position, `opened_at` is the earliest active fill (`MIN(executed_at)`). Successful Trade creation or archival refreshes it; if all fills are archived, the last opening date is retained until another active fill is added. A new empty Position keeps its supplied date until its first fill. New timestamps are normalized to UTC before persistence and ordering; legacy naive timestamps are interpreted as UTC without backfill.
+- Closing freezes realized P&L. On close, active fills recompute `opened_at`; without an explicit close time, `closed_at` is the latest active fill, or current UTC time for an empty Position. Equal opening/closing instants are allowed. A close earlier than opening is rejected atomically, including when amending a closed Position's close time. Historical invalid date pairs are not automatically repaired by unrelated edits.
 - Multi-leg Trade writes are atomic. Position + first Trade currently involves two frontend requests with partial-failure recovery, not one backend transaction.
+- Trade notes render as plain text in a companion row directly below each Trade, preserving newlines and wrapping. Notes are edited from that Trade's actions; Ctrl/Command+Enter or Save commits, Cancel discards. Trade-entry fields place labels above inputs, help/errors below, use two columns above 600px and one below; Instrument and Notes span the row. This layout scope is limited to the affected forms.
 - TradePlan is append-only, protected by revision uniqueness and retry handling. Any Trade, including archived history, or plan revision prevents Position deletion.
 - Add Alembic migrations for shipped schema changes. Tests exercise a migrated template copied into an isolated database for each test.
 - The automatically persisted `app_config` secret is for token signing; sessions use opaque database tokens. No operator-provided `COOKIE_SECRET` is needed.
@@ -34,9 +37,10 @@ Current CI/Docker use Python 3.12 and Node 22. Consult manifests, lockfiles, `Do
 | `frontend/` | `npm ci` | Locked dependencies; preserve `.npmrc` |
 | `frontend/` | `npm run dev` | Vite at `http://localhost:5173` |
 | `frontend/` | `npm run build` | Type-check and production bundle |
-| `frontend/` | `npm run codegen` | Generate committed types from running backend |
+| `frontend/` | `OPENAPI_URL=http://127.0.0.1:<port>/openapi.json npm run codegen` | Generate committed types from the selected backend; default is port 8000 |
+| `frontend/` | `npm run test` / `npm run test:watch` | Run Vitest once / in watch mode |
 
-Use the [walkthrough](walkthrough.md) for disposable Compose verification. Templates live in `example/`; ignored root Compose files are local working copies and may point at real records. Do not overwrite or reuse them for checks. Compose runs `migrate` before `app`, preventing startup on migration failure.
+Use the [walkthrough](walkthrough.md) for disposable Compose verification and the option/date/notes integration walkthrough. Templates live in `example/`; ignored root Compose files are local working copies and may point at real records. Do not overwrite or reuse them for checks. Compose runs `migrate` before `app`, preventing startup on migration failure.
 
 For hot reload, run in `backend/`:
 
@@ -61,13 +65,13 @@ Record four separate dimensions: implementation, automated checks, independent r
 |---|---|
 | Backend | Ruff, strict mypy, relevant pytest; full suite for shared domain/auth/migrations; meaningful regression tests |
 | Financial/lifecycle | Decimal results, ownership, archival, rollback, timestamps, empty sets; synthetic data |
-| Frontend | `npm run build` and affected interactions; cover nontrivial logic as [QA-01](plan/roadmap.md) introduces suitable tests |
+| Frontend | `npm run test`, `npm run build` and affected interactions; Vitest/Vue Test Utils cover nontrivial component and request-context behavior |
 | OpenAPI | Regenerate `schema.d.ts`, inspect diff, build frontend; descriptions may affect output too |
 | Container/startup | Real image build and affected migration/startup/SPA checks on disposable data |
 | File moves/deletions | Check imports, links, Docker COPY inputs, packaging and CI references |
 | Documentation | Links/anchors, bilingual parity, commands against configuration, whitespace and change scope |
 
-Current CI provides backend lint/types/tests, codegen freshness, frontend build and conditional Docker build. Frontend unit/E2E scripts do not yet exist. Tag publishing is not dependent on full quality checks/runtime smoke tests; [REL-01](plan/roadmap.md) tracks that gap. Never claim unrun tests, an independent review that did not happen, or user acceptance without confirmation.
+Current CI provides backend lint/types/tests, codegen freshness, frontend unit tests/build and conditional Docker build. Vitest runs once via `npm run test`; `npm run test:watch` starts its watch mode. Tag publishing is not dependent on full quality checks/runtime smoke tests; [REL-01](plan/roadmap.md) tracks that gap. Never claim unrun tests, an independent review that did not happen, or user acceptance without confirmation.
 
 ## Independent review and local handoff
 

@@ -8,13 +8,13 @@ The implementation baseline was established on 2026-11-02; scheduling and docume
 
 Already implemented: account/instrument/strategy configuration, Position and Trade workflows, strategy metadata, append-only plans, per-currency dashboard and account filtering, light/dark switching, generated API types, single-container Docker deployment, migrate-before-app Compose, database sessions and an automatically persisted token-signing secret.
 
-Current verification infrastructure: backend Ruff/strict mypy/pytest, migrated isolated test databases, codegen freshness, frontend type-check/build and conditional image build. Frontend automated behavior tests and release-quality/runtime gates remain gaps. SQLite is supported; PostgreSQL equivalence has not been demonstrated.
+Current verification infrastructure: backend Ruff/strict mypy/pytest, migrated isolated test databases, codegen freshness, frontend Vitest/Vue Test Utils/jsdom behavior tests and type-check/build, and conditional image builds. REL-01 still tracks release-quality/runtime gates. SQLite is supported; PostgreSQL equivalence has not been demonstrated.
 
-**Current scope (2026-11-03):** [M-OPT-01: option selection and trade-entry improvements](milestone-option-entry.md) is the agreed next milestone; application work is ready but not started. Its design-document delivery and DOC-01 are accepted with the owner's additional manual document review omitted. The owner explicitly authorized documentation/status updates, a commit and a push; application implementation, delegation, release/tag publication and deployment remain outside this request.
+**Current scope (2026-11-03):** [M-OPT-01: option selection and trade-entry improvements](milestone-option-entry.md) T1–T6 are implemented with passing automated checks and independent review. T7 phase B application documentation/integration checks have passed and independent review is in progress; owner feature acceptance is pending. Design-document phase A and DOC-01 remain accepted with additional manual document review omitted; that acceptance is not repeated. The owner separately authorized this run’s implementation, independent review/repair and isolated verification, without Git writes, release/tag publication or production deployment.
 
 M-OPT-01 owns shared decisions, complete task cards and acceptance records. It covers expired-option visibility/history/pagination, primary-underlying filtering and contextual creation, FIX-01, UI-01/UI-02 and a bounded QA-01 slice. `ready` records an agreed contract, not authorization to start coding.
 
-Current execution update (2026-11-03): the owner separately authorized orchestration for T1–T6 and T7 phase B, including independent review/repair and isolated verification. Git writes and production operations remain unauthorized. T1 has started; owner feature acceptance is pending.
+See milestone section 5.2 for candidate identity and separate implementation, automated-check, independent-review and owner-acceptance records.
 
 ## Work queue
 
@@ -27,13 +27,13 @@ Priority is an ordering recommendation, not authorization. P1 = data correctness
 | [INS-02](milestone-option-entry.md#t4) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
 | [FIX-01](tasks/FIX-01.md) | P1 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
 | [UI-01](milestone-option-entry.md#t5) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
-| [UI-02](milestone-option-entry.md#t6) | P2 | in-review | Implementing M-OPT-01 T6; owner feature acceptance pending |
+| [UI-02](milestone-option-entry.md#t6) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
 | UI-03 | P2 | needs-design | Suggest capital/risk/reward from strategy inputs; define formulas, units and manual override |
 | UI-04 | P2 | needs-design | Prefill multi-leg entries, especially Iron Condor; define templates without changing recorded intent |
 | UI-05 | P3 | needs-clarification | Filtering requests clarified and assigned to INS-01/INS-02; other kind/display complaints remain unclarified |
 | [QA-01](milestone-option-entry.md#t1) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
 | REL-01 | P2 | proposed | Gate tag publication on exact-source quality checks and runtime image validation; separate design required |
-| [MOPT-DOC](milestone-option-entry.md#t7) | P2 | accepted | T7 phase A design/status documentation delivered and accepted without additional manual review; phase B application documentation/integration is ready, not started |
+| [MOPT-DOC](milestone-option-entry.md#t7) | P2 | accepted | Phase A design documentation accepted; phase B application integration in-review; owner feature acceptance pending |
 
 Original reports and the 2026-06-02 incident remain in [triage](../triage/improvements.md). Work outside M-OPT-01 needs a bounded card before implementation; do not treat this queue as an approved implementation batch. Atomic Position+first-Trade creation and an audited closed-record correction path are explicitly deferred by this milestone.
 

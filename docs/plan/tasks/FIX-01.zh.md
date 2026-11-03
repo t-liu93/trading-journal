@@ -14,7 +14,7 @@
 
 [原始事故记录](../../triage/improvements.md#fix-01--开仓日期不随后续成交变化维护)记载 2026-06-02 的 INTC Wheel Position，曾手动将开仓日期设为非归档成交最早时间，并删除归档孤儿 Trade；当时已实现盈亏已经正确排除归档成交。这是历史证据，不是建议复制的数据库修复步骤。
 
-原始基线体现的未修复行为：[Position schema](../../../backend/src/trading_journal/schemas/position.py)不允许 PATCH `opened_at`；[Trade API](../../../backend/src/trading_journal/api/trades.py)只允许修改 notes，创建／归档后不维护 Position 日期；[平仓处理](../../../backend/src/trading_journal/api/positions.py)推导平仓日期并冻结盈亏；[持仓天数](../../../frontend/src/utils/positionDerived.ts)直接相减。源码检查不代表重新执行了复现。
+当前实现由 [Position 日期服务](../../../backend/src/trading_journal/services/positions.py)聚合有效成交最早时间，[Trade API](../../../backend/src/trading_journal/api/trades.py)在新增／归档的同一事务内维护开仓日期；[平仓处理](../../../backend/src/trading_journal/api/positions.py)校验最终日期顺序后再更新字段和冻结盈亏。[Position schema](../../../backend/src/trading_journal/schemas/position.py)仍不允许 PATCH `opened_at`，Trade PATCH 仍只改 notes；无旧数据回填。技术候选和分项验收见 M-OPT-01 T2／第 5.2 节。
 
 ## 设计历史与边界
 

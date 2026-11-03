@@ -6,15 +6,18 @@
 
 后端位于 `backend/src/trading_journal/`：`models/` 放 ORM 持久化，`schemas/` 放 API 校验／序列化，`services/` 放可复用业务逻辑，`api/` 负责 HTTP 编排，`auth/` 负责鉴权。前端 `frontend/src/` 分开组织 API 客户端、composable、store、view、component、utility 和路由。
 
-后端采用 FastAPI、异步 SQLAlchemy 2、Alembic、FastAPI Users、Pydantic Settings 和 uv；前端采用 Vue 3/TypeScript、Vite、Pinia、Vue Router、Naive UI 和 ECharts。SQLite 是默认数据库；PostgreSQL 可移植性是目标，没有当前已验证部署记录。业务路由用 `/api/*`，健康检查为 `/api/health`，OpenAPI 为 `/openapi.json`。生产环境在 API／文档路由之外提供 SPA；Vite 把 `/api` 代理到 `127.0.0.1:8000`。
+后端采用 FastAPI、异步 SQLAlchemy 2、Alembic、FastAPI Users、Pydantic Settings 和 uv；前端采用 Vue 3/TypeScript、Vite、Pinia、Vue Router、Naive UI 和 ECharts。SQLite 是默认数据库；PostgreSQL 可移植性是目标，没有当前已验证部署记录。业务路由用 `/api/*`，健康检查为 `/api/health`，OpenAPI 为 `/openapi.json`。生产环境在 API／文档路由之外提供 SPA；Vite 把 `/api` 代理到 `127.0.0.1:8000`。`npm run codegen` 默认读取该 OpenAPI 地址，也可通过 `OPENAPI_URL` 指定其他后端。
 
 除非任务明确修改，否则保留以下契约：
 
 - 权威财务值使用后端 `Decimal` 和现有 SQL `Numeric` 精度。Trade 现金流为 `sign(action) × price × quantity × multiplier − commission − fees`。前端预览、持仓天数、ROI 和年化 ROI 仅展示，不同币种分开。
 - 按登录用户校验所有权，Trade 经 Position 判断归属，访问他人资源返回 404。Instrument 是按自然键 get-or-create 的共享参考数据。
 - Trade DELETE 是归档，统计排除归档行。PATCH 只接受 notes；未平仓仓位中其他字段纠错需归档后重新录入。已平仓仓位拒绝 Trade 写入，不能重新打开；没有支持的取消归档端点。
-- 平仓冻结已实现盈亏。无显式平仓时间时取最后一笔未归档成交时间；空仓位回退到当前时间。`opened_at` 当前不随后续 Trade 变化维护，[FIX-01](plan/tasks/FIX-01.zh.md) 已在 M-OPT-01 确认设计，但修复尚未实现。
+- 期权按当前 UTC 日期过期（`expiry < today`）。产品列表与选择器默认隐藏过期合约；Instrument API 为兼容旧客户端默认 `include_expired=true`。全部筛选先于排序／分页执行。Instruments 管理页和选择器每次显示 50 条，并多请求一条判断是否有下一页；API 接受任意非负 `offset` 和 1–200 的 `limit`。已选历史 Instrument 仍按 ID 解析。过期开关在当前表单／picker 会话内保留；新 Trade 表单会话恢复默认隐藏状态。上下文创建期权会继承并锁定 underlying，匹配关系按 underlying ID 判断。一般 Trade 表单仍可录入股票与外汇。
+- 未平仓 Position 的 `opened_at` 是有效成交最早时间（`MIN(executed_at)`）。成功创建或归档 Trade 后刷新日期；若全部成交归档，保留上次开仓日期，直到有新有效成交。新建空 Position 在首笔成交前保留输入日期。新成交时间在持久化与排序前统一为 UTC；旧的 naive 时间解释为 UTC，不回填历史数据。
+- 平仓冻结已实现盈亏。平仓时，有效成交会重新计算 `opened_at`；未指定平仓时间则取最后一笔有效成交，空集合使用当前 UTC 时间。开平仓同一时刻允许；平仓早于开仓时原子拒绝，包括修改已平仓 Position 的时间。其他字段编辑不会自动修复或拒绝历史无效日期。
 - 多腿 Trade 写入保持原子性。Position 与首笔 Trade 当前由前端两次请求完成，含部分失败恢复，不是后端同事务。
+- Trade 备注以纯文本放在对应成交行紧邻的下一行，保留换行并自动折行。由对应 Trade 的操作编辑备注；Ctrl/Command+Enter 或 Save 提交，Cancel 撤销。成交表单标签在输入框上方，帮助／错误在下方；600px 以上双列、以下单列；Instrument 与 Notes 跨整行。此布局范围限于受影响表单。
 - TradePlan 只追加，保留修订唯一约束和重试。任何 Trade（包括归档历史）或计划修订都阻止删除 Position。
 - 已发布 schema 变化新增 Alembic 迁移。测试将迁移后的模板复制为每个测试独立的数据库。
 - 自动持久化的 `app_config` 密钥用于 token 签名，session 使用数据库不透明 token，无需运维提供 `COOKIE_SECRET`。
@@ -34,9 +37,10 @@
 | `frontend/` | `npm ci` | 锁定依赖，保留 `.npmrc` |
 | `frontend/` | `npm run dev` | Vite，`http://localhost:5173` |
 | `frontend/` | `npm run build` | 类型检查与生产构建 |
-| `frontend/` | `npm run codegen` | 从运行中的后端生成已提交类型 |
+| `frontend/` | `OPENAPI_URL=http://127.0.0.1:<port>/openapi.json npm run codegen` | 从指定后端生成已提交类型，默认端口为 8000 |
+| `frontend/` | `npm run test` / `npm run test:watch` | Vitest 单次运行／监视模式 |
 
-一次性 Compose 验证看[走查指南](walkthrough.zh.md)。模板在 `example/`；被忽略的根目录 Compose 是本地工作副本，可能指向真实记录，不覆盖或复用来验证。Compose 先跑 `migrate` 再跑 `app`，迁移失败阻止启动。
+一次性 Compose 验证以及期权／日期／备注集成走查看[走查指南](walkthrough.zh.md)。模板在 `example/`；被忽略的根目录 Compose 是本地工作副本，可能指向真实记录，不覆盖或复用来验证。Compose 先跑 `migrate` 再跑 `app`，迁移失败阻止启动。
 
 需要热重载时，在 `backend/` 运行：
 
@@ -61,13 +65,13 @@ uv run uvicorn trading_journal.main:app --reload
 |---|---|
 | 后端 | Ruff、strict mypy、相关 pytest；共享领域／鉴权／迁移跑完整套件；有意义的回归测试 |
 | 财务／生命周期 | Decimal 结果、所有权、归档、回滚、时间戳、空集；合成数据 |
-| 前端 | `npm run build` 及受影响交互；按 [QA-01](plan/roadmap.zh.md) 引入合适测试后覆盖非平凡逻辑 |
+| 前端 | `npm run test`、`npm run build` 及受影响交互；Vitest/Vue Test Utils 覆盖非平凡组件与请求上下文行为 |
 | OpenAPI | 重新生成 `schema.d.ts`、检查 diff、构建前端；描述也可能影响输出 |
 | 容器／启动 | 真构建镜像，一次性数据验证相关迁移／启动／SPA |
 | 文件移动／删除 | 核对 import、链接、Docker COPY 来源、打包和 CI 引用 |
 | 文档 | 链接／锚点、双语一致性、命令与配置、空白及改动范围 |
 
-当前 CI 提供后端 lint／类型／测试、codegen 一致性、前端构建和有条件 Docker 构建，尚无前端单元／E2E 脚本。Tag 发布不依赖完整质量检查／镜像运行冒烟测试，[REL-01](plan/roadmap.zh.md) 追踪缺口。不声称未运行的测试、未发生的独立评审或未经确认的用户验收。
+当前 CI 提供后端 lint／类型／测试、codegen 一致性、前端单元测试／构建和有条件 Docker 构建。`npm run test` 单次运行 Vitest，`npm run test:watch` 启动监视模式。Tag 发布不依赖完整质量检查／镜像运行冒烟测试，[REL-01](plan/roadmap.zh.md) 追踪缺口。不声称未运行的测试、未发生的独立评审或未经确认的用户验收。
 
 ## 独立评审与本地交接
 

@@ -8,7 +8,7 @@
 |---|---|
 | [Project README](../README.md) | Product overview and normal deployment |
 | [Current roadmap](plan/roadmap.md) | Current scheduling, progress, and task contracts |
-| [M-OPT-01 milestone](plan/milestone-option-entry.md) | Agreed option-selection/trade-entry design, complete task cards and acceptance; application implementation not started |
+| [M-OPT-01 milestone](plan/milestone-option-entry.md) | Agreed option-selection/trade-entry design, task cards, and current implementation/check/review/owner-acceptance status |
 | [Development guide](development.md) | Architecture, domain rules, commands, checks, review, and acceptance |
 | [Task-card template](plan/task-template.md) | A self-contained contract for one reviewable step |
 | [Walkthrough](walkthrough.md) | Disposable full-stack verification and owner actions |

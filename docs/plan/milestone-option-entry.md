@@ -149,7 +149,7 @@ Forms: use labels above shared leg fields, with help and errors below. Use one c
 
 All cards share section 2 and cannot change its contract independently. Paths are relative to the repository root; proposed new application files do not exist before implementation.
 
-Initial application-card evidence: implementation not started; automated checks not run; independent review not requested/performed; owner feature acceptance pending; no implementation candidate. After implementation, record commit boundaries or a reproducible snapshot including relevant untracked files, the local evidence directory and omissions for each card. Design approval is not implementation acceptance.
+Current execution status is in section 5.2. T1–T6 are implemented with passing automated checks and independent review; T7 phase B integration checks have passed and independent review is in progress. Checked items below record verified technical conditions; owner feature acceptance remains separately pending. Candidates use immutable source snapshots including untracked files, without new commits. Design approval is not application acceptance.
 
 <a id="t1"></a>
 
@@ -165,9 +165,9 @@ Initial application-card evidence: implementation not started; automated checks 
 
 **Acceptance:**
 
-- [ ] After `npm ci`, tests/build run and failures exit nonzero and fail the corresponding CI check.
-- [ ] Timers, request mocks and system time do not leak between tests.
-- [ ] Tests do not write `src/components.d.ts` or consist only of empty/mount assertions.
+- [x] After `npm ci`, tests/build run and failures exit nonzero and fail the corresponding CI check.
+- [x] Timers, request mocks and system time do not leak between tests.
+- [x] Tests do not write `src/components.d.ts` or consist only of empty/mount assertions.
 
 **Migration/walkthrough:** none; run tests and build separately, checking for unintended generated files.
 
@@ -193,13 +193,13 @@ Initial application-card evidence: implementation not started; automated checks 
 
 **Acceptance:**
 
-- [ ] Earlier fills move the opening date earlier; archiving the earliest uses the next fill.
-- [ ] Archiving all preserves the date; replacement establishes it again; a first fill later than creation also replaces it.
-- [ ] Multi-leg minimum is input-order independent; an invalid later leg rolls back Trades and dates.
-- [ ] Different UTC offsets are compared on one timeline.
-- [ ] Default/explicit close times, empty sets and same-instant dates satisfy D08; invalid close/amendment rejects atomically.
-- [ ] Notes-only PATCH, cross-user 404 and closed locks remain; active-fill P&L and audit history are preserved.
-- [ ] Archival updates dates without manual reload; fresh list/detail reads agree.
+- [x] Earlier fills move the opening date earlier; archiving the earliest uses the next fill.
+- [x] Archiving all preserves the date; replacement establishes it again; a first fill later than creation also replaces it.
+- [x] Multi-leg minimum is input-order independent; an invalid later leg rolls back Trades and dates.
+- [x] Different UTC offsets are compared on one timeline.
+- [x] Default/explicit close times, empty sets and same-instant dates satisfy D08; invalid close/amendment rejects atomically.
+- [x] Notes-only PATCH, cross-user 404 and closed locks remain; active-fill P&L and audit history are preserved.
+- [x] Archival updates dates without manual reload; fresh list/detail reads agree.
 
 **Migration/walkthrough:** no schema migration or historical backfill; use section 4's date example.
 
@@ -224,13 +224,13 @@ Initial application-card evidence: implementation not started; automated checks 
 
 **Acceptance:**
 
-- [ ] Freeze today at 2026-11-03: hide 11-02, retain 11-03/11-04 and reveal history with the switch.
-- [ ] Expiry filtering preserves stock/forex results and older-client defaults.
-- [ ] More than 50 old contracts cannot crowd out active matches; more than 50 matches remain reachable through pagination.
-- [ ] Search, kind, expiry, underlying and pagination compose correctly.
-- [ ] Expired/off-page current values retain labels; disabling the switch keeps explicitly chosen values.
-- [ ] Errors differ from empty results, stale responses cannot overwrite new context and append failures can retry.
-- [ ] Queries/switches do not modify contracts or Trades.
+- [x] Freeze today at 2026-11-03: hide 11-02, retain 11-03/11-04 and reveal history with the switch.
+- [x] Expiry filtering preserves stock/forex results and older-client defaults.
+- [x] More than 50 old contracts cannot crowd out active matches; more than 50 matches remain reachable through pagination.
+- [x] Search, kind, expiry, underlying and pagination compose correctly.
+- [x] Expired/off-page current values retain labels; disabling the switch keeps explicitly chosen values.
+- [x] Errors differ from empty results, stale responses cannot overwrite new context and append failures can retry.
+- [x] Queries/switches do not modify contracts or Trades.
 
 **Migration/walkthrough:** none; use section 4's option examples.
 
@@ -256,13 +256,13 @@ Initial application-card evidence: implementation not started; automated checks 
 
 **Acceptance:**
 
-- [ ] AAPL primary excludes TSLA options; identical symbols with different IDs are not conflated.
-- [ ] Expiry/search/pagination compose; every entry point, added leg and PMCC LEAP is covered.
-- [ ] The same underlying preserves selections; changed/cleared context follows D04 and retains other fields.
-- [ ] Late requests/resolution errors cannot restore global candidates.
-- [ ] Creation prefills the correct underlying/currency/exchange and handles failure, duplicates and historical contracts.
-- [ ] Created results cannot bypass context; PMCC backend validation is not relaxed.
-- [ ] Stock, forex and atomic multi-leg capabilities remain.
+- [x] AAPL primary excludes TSLA options; identical symbols with different IDs are not conflated.
+- [x] Expiry/search/pagination compose; every entry point, added leg and PMCC LEAP is covered.
+- [x] The same underlying preserves selections; changed/cleared context follows D04 and retains other fields.
+- [x] Late requests/resolution errors cannot restore global candidates.
+- [x] Creation prefills the correct underlying/currency/exchange and handles failure, duplicates and historical contracts.
+- [x] Created results cannot bypass context; PMCC backend validation is not relaxed.
+- [x] Stock, forex and atomic multi-leg capabilities remain.
 
 **Migration/walkthrough:** no migration or expanded Trade-write contract; use section 4's context examples.
 
@@ -282,11 +282,11 @@ Initial application-card evidence: implementation not started; automated checks 
 
 **Acceptance:**
 
-- [ ] Single/multi-leg and repeated-contract notes have clear ownership; empty notes create no blank display row.
-- [ ] Long text, newlines and HTML-like text render safely.
-- [ ] Save, clear, cancel and retry retain ownership/input.
-- [ ] Read-only transitions exit editing; archived rows cannot edit.
-- [ ] No duplicate notes or broken order grouping/cash-flow display.
+- [x] Single/multi-leg and repeated-contract notes have clear ownership; empty notes create no blank display row.
+- [x] Long text, newlines and HTML-like text render safely.
+- [x] Save, clear, cancel and retry retain ownership/input.
+- [x] Read-only transitions exit editing; archived rows cannot edit.
+- [x] No duplicate notes or broken order grouping/cash-flow display.
 
 **Migration/walkthrough:** none; use repeated contracts with different notes and four-leg examples at desktop/narrow widths and light/dark themes.
 
@@ -306,11 +306,11 @@ Initial application-card evidence: implementation not started; automated checks 
 
 **Acceptance:**
 
-- [ ] Two desktop columns/one narrow column without obscured controls.
-- [ ] Labels/help/errors are distinguishable; leg controls, Tab navigation and validation focus work.
-- [ ] Errors do not clear other legs/fields.
-- [ ] When Position creation succeeds but Trade creation fails, retry still reuses the original Position and existing disabled-state rules.
-- [ ] Layout changes do not alter previews or submitted results.
+- [x] Two desktop columns/one narrow column without obscured controls.
+- [x] Labels/help/errors are distinguishable; leg controls, Tab navigation and validation focus work.
+- [x] Errors do not clear other legs/fields.
+- [x] When Position creation succeeds but Trade creation fails, retry still reuses the original Position and existing disabled-state rules.
+- [x] Layout changes do not alter previews or submitted results.
 
 **Migration/walkthrough:** none; enter single/four-leg examples at 1280px and 390px.
 
@@ -322,7 +322,7 @@ Initial application-card evidence: implementation not started; automated checks 
 
 **Goal:** one complete milestone contract and accurate delivery records.
 
-**Dependencies/status:** phase A is the accepted design/status-document delivery (`MOPT-DOC`). Phase B covers application documentation and integration after T1–T6; it is `ready`, not started. Do not keep the completed documentation phase in progress or mark future application verification complete.
+**Dependencies/status:** phase A is the accepted design/status-document delivery (`MOPT-DOC`). Phase B has updated application documentation and completed integration checks; it is `in-review`, with owner feature acceptance pending. Do not keep the completed documentation phase in progress or mark future application verification complete.
 
 **Files/actions:**
 
@@ -332,14 +332,14 @@ Initial application-card evidence: implementation not started; automated checks 
 - After application implementation, update `docs/development.md`, `docs/walkthrough.md` and their mirrors to describe delivered behavior; do not prematurely claim implementation.
 - Do not update historical P/F plan progress.
 
-**Steps/scheduling:** phase A records agreed design and unstarted implementation. INS-01/INS-02 own UI-05's clarified filtering requests; remaining UI-05 issues stay unclarified. QA-01's milestone slice is ready and uncovered work stays deferred. DOC-01 and phase A documentation are accepted with additional manual document review omitted; no runtime acceptance is inferred. Phase B later updates implementation/check/review/acceptance separately for every card.
+**Steps/scheduling:** phase A records agreed design and unstarted implementation. INS-01/INS-02 own UI-05's clarified filtering requests; remaining UI-05 issues stay unclarified. QA-01's milestone slice is ready and uncovered work stays deferred. DOC-01 and phase A documentation are accepted with additional manual document review omitted; no runtime acceptance is inferred. Phase B records actual implementation/check/review/owner acceptance separately for every card.
 
 **Acceptance:**
 
 - [x] Phase A: both languages agree on scope, defaults, errors, dependencies and state; links/anchors resolve.
 - [x] Phase A: no competing contracts; a new agent can execute without the original conversation.
 - [x] Phase A: detailed local evidence stays ignored and outside Git/images.
-- [ ] Phase B: update documentation for delivered application behavior and complete section 4 integration checks, accurately recording omissions and actual owner feature acceptance.
+- [x] Phase B: update documentation for delivered application behavior and complete section 4 integration checks, accurately recording omissions and actual owner feature acceptance.
 
 **Migration/walkthrough:** documentation stage has no data operations; application stage uses section 4's isolated environment.
 
@@ -423,7 +423,7 @@ Store evidence under ignored `development-notes/<run-id>/`, including Chinese `s
 
 ### 5.1 Sequence
 
-Single agent: deliver design/entry points → receive a subsequent implementation instruction → T1 → T2 → T3 → T4 → T5 → T6 → T7 integration records. Keep each step independently inspectable. Without action-specific Git authorization, do not commit; once authorized, organize commits by atomic task.
+This run follows the owner’s subsequent explicit orchestration authorization: T1 → T2 → T3 → T4 → T5 → T6 → T7 phase B integration records; accepted design/documentation phase A is not reaccepted. Keep each step independently inspectable. Without action-specific Git authorization, do not commit; once authorized, organize commits by atomic task.
 
 ### 5.2 Completion criteria
 
@@ -436,13 +436,15 @@ All six implementation cards satisfy acceptance; backend quality/full tests, fro
 | T3 / INS-01 | implemented | Passed | Passed | Pending |
 | T4 / INS-02 | implemented | Passed | Passed | Pending |
 | T5 / UI-01 | implemented | Passed | Passed | Pending |
-| T6 / UI-02 | in-review | Checks passed; integration pending | In review | Pending |
+| T6 / UI-02 | implemented | Passed | Passed | Pending |
 | T7 phase A / MOPT-DOC | Complete | Documentation checks passed | Not requested | Documentation accepted; additional manual review omitted |
-| T7 phase B / application integration | Ready, not started | Not run | Not requested | Pending |
+| T7 phase B / application integration | in-review | Integration checks passed | In review | Pending |
 
-Application implementation candidate/local evidence: none yet. The documentation candidate is the M-OPT-01 documentation commit based on `eecb842ac020b2e5bdd5c247b727cc18f888b7ae`, identified by Git history for this file. Commit/push were explicitly authorized for this documentation delivery; that does not authorize later implementation or publication actions.
+Application candidate: an uncommitted worktree based on `18404935b0de91e52b7981a53907c4ae9a8cec7d`; final technical candidates for T1–T6 are `T1-c00`, `T2-c00`, `T3-c02`, `T4-c01`, `T5-c00` and `T6-c01`. Local evidence is in ignored `development-notes/mopt01-20261103-01/`, preserving full source archives, binary diffs, file manifests and SHA-256 hashes per step. The full T7 phase B candidate is `T7-c01`, with an equivalent whole-milestone diff snapshot `milestone-c01`; integration checks have passed and phase B independent review is in progress. Owner feature acceptance is pending. The earlier commit/push grant applied only to accepted documentation delivery; this run has no Git-write authorization.
 
-Documentation delivery record (2026-11-03): the owner confirmed the design, accepted the documentation handoff without further manual review and authorized status updates, commit and push. Bilingual design, README/map entry points and roadmap/FIX-01/triage updates are complete. DOC-01 and T7 phase A are accepted with the stated manual-review omission; phase B and application work remain unstarted. Targeted checks passed: local links/anchors, paired heading structure, decision/task IDs, acceptance-checklist state, identical command blocks and technical inline-code parity (apart from the translated UTC-date placeholder). Changed/new Markdown whitespace, original incident preservation and documentation-only scope were checked. Application source, dependencies, generated types and databases are unchanged. Application tests, image builds, independent review and owner feature walkthrough were not run. Git outcomes are established by the actual repository/remote operation, not by design acceptance.
+Historical documentation delivery record (2026-11-03, before application execution): the owner confirmed the design, accepted the documentation handoff without further manual review and authorized status updates, commit and push. Bilingual design, README/map entry points and roadmap/FIX-01/triage updates are complete. DOC-01 and T7 phase A are accepted with the stated manual-review omission; phase B and application work remain unstarted. Targeted checks passed: local links/anchors, paired heading structure, decision/task IDs, acceptance-checklist state, identical command blocks and technical inline-code parity (apart from the translated UTC-date placeholder). Changed/new Markdown whitespace, original incident preservation and documentation-only scope were checked. Application source, dependencies, generated types and databases are unchanged. Application tests, image builds, independent review and owner feature walkthrough were not run. Git outcomes are established by the actual repository/remote operation, not by design acceptance.
+
+Application technical-delivery record (2026-11-03): T1–T6 implementation, automated checks and independent review passed. T7 phase B updated development/walkthrough guidance and documentation entry points. Backend locked dependencies, Ruff, strict mypy and all 425 tests passed; frontend npm ci, 43 behavior tests and build passed; isolated OpenAPI generation had no drift. Real image build, disposable Compose migration/health/login/SPA deep-link/persistence and representative browser/API feature checks passed; detailed coverage and untested manual paths remain in local reports. Not every context/inline-create/PMCC/First Trade branch was repeated in the real browser; component and domain boundaries are covered by those automated tests, which do not establish owner acceptance. Phase B independent review awaits verification of the current candidate; all owner feature acceptance is pending. No new migration, real-data backfill or Git write was performed. Phase A/DOC-01 acceptance remains valid.
 
 ### 5.3 Remaining work
 

@@ -14,7 +14,7 @@
 
 The [original incident record](../../triage/improvements.md#fix-01--开仓日期不随后续成交变化维护) reports the 2026-06-02 INTC Wheel Position. Its opening date was manually set to the earliest non-archived fill and an archived orphan Trade was removed. Realized P&L already excluded archived fills. This is historical evidence, not a recommended database repair procedure.
 
-The original baseline established the defect: [Position schema](../../../backend/src/trading_journal/schemas/position.py) rejects `opened_at` PATCH; [Trade API](../../../backend/src/trading_journal/api/trades.py) supports notes-only PATCH without maintaining Position dates on create/archive; [close handling](../../../backend/src/trading_journal/api/positions.py) derives a closing date and freezes P&L; [holding-day display](../../../frontend/src/utils/positionDerived.ts) subtracts recorded dates. Source inspection is not a freshly executed reproduction.
+The current [Position date service](../../../backend/src/trading_journal/services/positions.py) aggregates the earliest active fill, and the [Trade API](../../../backend/src/trading_journal/api/trades.py) maintains opening dates in the same transaction as creation/archival. [Close handling](../../../backend/src/trading_journal/api/positions.py) validates final date ordering before applying fields and freezing P&L. The [Position schema](../../../backend/src/trading_journal/schemas/position.py) still rejects `opened_at` PATCH and Trade PATCH remains notes-only; there is no historical backfill. Technical candidates and separate acceptance dimensions are in M-OPT-01 T2/section 5.2.
 
 ## Design history and boundaries
 
