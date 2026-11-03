@@ -31,6 +31,39 @@ const orphanPosition = ref<Position | null>(null)
 
 const accounts = ref<Account[]>([])
 const selectedInstrument = ref<Instrument | null>(null)
+const optionUnderlyingInstrument = ref<Instrument | null>(null)
+const primaryInstrumentLoading = ref(false)
+const primaryInstrumentError = ref<string | null>(null)
+let primaryRequest = 0
+let viewGeneration = 0
+
+async function resolvePrimary(id: string | null, generation = viewGeneration) {
+  const seq = ++primaryRequest
+  selectedInstrument.value = null
+  optionUnderlyingInstrument.value = null
+  primaryInstrumentError.value = null
+  if (!id) { primaryInstrumentLoading.value = false; return }
+  primaryInstrumentLoading.value = true
+  try {
+    const instrument = await instrumentsApi.get(id)
+    if (seq !== primaryRequest || generation !== viewGeneration) return
+    if (instrument.id !== id) throw new Error('Resolved instrument ID did not match the selected primary.')
+    selectedInstrument.value = instrument
+    if (instrument.kind === 'stock') optionUnderlyingInstrument.value = instrument
+    else if (instrument.kind === 'option') {
+      const underlyingId = instrument.option?.underlying_id
+      if (!underlyingId) throw new Error('The primary option has no resolvable underlying stock.')
+      const underlying = await instrumentsApi.get(underlyingId)
+      if (seq !== primaryRequest || generation !== viewGeneration) return
+      if (underlying.id !== underlyingId || underlying.kind !== 'stock') throw new Error('Could not resolve the option primary underlying stock.')
+      optionUnderlyingInstrument.value = underlying
+    }
+  } catch (err) {
+    if (seq === primaryRequest && generation === viewGeneration) primaryInstrumentError.value = err instanceof Error ? err.message : 'Failed to load the primary instrument.'
+  } finally {
+    if (seq === primaryRequest && generation === viewGeneration) primaryInstrumentLoading.value = false
+  }
+}
 
 const model = ref<{
   account_id: string | null
@@ -77,7 +110,9 @@ const createRules: FormRules = {
 }
 
 watch(() => props.show, async (visible) => {
-  if (!visible) return
+  if (!visible) { viewGeneration += 1; primaryRequest += 1; primaryInstrumentLoading.value = false; return }
+  const generation = ++viewGeneration
+  primaryRequest += 1
 
   orphanPosition.value = null
 
@@ -92,9 +127,7 @@ watch(() => props.show, async (visible) => {
       max_reward_at_open: props.initial.max_reward_at_open !== null ? Number(props.initial.max_reward_at_open) : null,
       notes: props.initial.notes ?? '',
     }
-    try {
-      selectedInstrument.value = await instrumentsApi.get(props.initial.primary_instrument_id)
-    } catch { /* ignore */ }
+    void resolvePrimary(props.initial.primary_instrument_id, generation)
   } else {
     model.value = {
       account_id: null,
@@ -107,6 +140,9 @@ watch(() => props.show, async (visible) => {
       notes: '',
     }
     selectedInstrument.value = null
+    primaryInstrumentError.value = null
+    optionUnderlyingInstrument.value = null
+    primaryInstrumentLoading.value = false
   }
 
   try {
@@ -116,14 +152,10 @@ watch(() => props.show, async (visible) => {
 
 async function handleInstrumentSelect(id: string | null) {
   model.value.primary_instrument_id = id
-  if (id) {
-    try {
-      selectedInstrument.value = await instrumentsApi.get(id)
-    } catch { selectedInstrument.value = null }
-  } else {
-    selectedInstrument.value = null
-  }
+  void resolvePrimary(id)
 }
+
+function retryPrimaryResolution() { void resolvePrimary(model.value.primary_instrument_id) }
 
 function handleClose() {
   // If orphan position exists, emit saved without a position so parent refreshes list
@@ -267,6 +299,10 @@ async function handleSubmit() {
           />
           <n-tag v-if="currencyLabel" size="small" type="info">{{ currencyLabel }}</n-tag>
         </div>
+        <n-alert v-if="primaryInstrumentLoading" type="info" :bordered="false" style="margin-top: 0.4rem;">Loading primary instrument context…</n-alert>
+        <n-alert v-else-if="primaryInstrumentError" type="error" :bordered="false" style="margin-top: 0.4rem;">
+          {{ primaryInstrumentError }} <n-button size="tiny" @click="retryPrimaryResolution">Retry</n-button>
+        </n-alert>
       </n-form-item>
 
       <n-form-item label="Strategy" path="strategy_type">
@@ -342,6 +378,11 @@ async function handleSubmit() {
           :inline="true"
           :account-id="model.account_id ?? ''"
           :currency="currencyLabel"
+          :primary-instrument="selectedInstrument"
+          :option-underlying-instrument="optionUnderlyingInstrument"
+          :primary-instrument-loading="primaryInstrumentLoading"
+          :primary-instrument-error="primaryInstrumentError"
+          @retry-primary-instrument="retryPrimaryResolution"
         />
       </template>
     </n-form>

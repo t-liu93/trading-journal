@@ -18,6 +18,8 @@ const props = defineProps<{
   initialKind?: InstrumentKind
   initialSymbol?: string
   lockedKind?: InstrumentKind
+  underlyingInstrument?: Instrument | null
+  lockUnderlying?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -182,6 +184,10 @@ watch(() => props.show, (visible) => {
       if (activeKind.value === 'stock') stockModel.value.symbol = sym
       else if (activeKind.value === 'forex') forexModel.value.symbol = sym
     }
+    if (activeKind.value === 'option' && props.underlyingInstrument?.kind === 'stock') {
+      optionModel.value.underlying_instrument_id = props.underlyingInstrument.id
+      onUnderlyingSelected(props.underlyingInstrument)
+    }
   }
 })
 
@@ -214,6 +220,13 @@ function onUnderlyingSelected(inst: Instrument | null) {
   }
 }
 
+watch(() => props.underlyingInstrument?.id, () => {
+  if (props.show && props.lockUnderlying && activeKind.value === 'option') {
+    optionModel.value.underlying_instrument_id = props.underlyingInstrument?.kind === 'stock' ? props.underlyingInstrument.id : null
+    onUnderlyingSelected(props.underlyingInstrument?.kind === 'stock' ? props.underlyingInstrument : null)
+  }
+})
+
 function handleClose() {
   emit('update:show', false)
 }
@@ -226,6 +239,7 @@ async function handleSubmit() {
   }
 
   submitting.value = true
+  const expectedUnderlyingId = props.lockUnderlying ? props.underlyingInstrument?.id ?? null : null
   try {
     let payload: StockCreate | OptionCreate | ForexCreate
     if (activeKind.value === 'stock') {
@@ -262,6 +276,14 @@ async function handleSubmit() {
     }
 
     const { instrument, existed } = await instrumentsApi.create(payload)
+    if (expectedUnderlyingId && (instrument.kind !== 'option' || instrument.option?.underlying_id !== expectedUnderlyingId)) {
+      message.error('The returned option belongs to a different underlying. It was not selected.')
+      return
+    }
+    if (expectedUnderlyingId && props.underlyingInstrument?.id !== expectedUnderlyingId) {
+      message.info('Primary instrument changed while creating this option. The result was not selected.')
+      return
+    }
     if (existed) {
       message.info(`Instrument ${instrument.symbol} already exists — selected`)
     } else {
@@ -329,8 +351,9 @@ function formatDate(ts: number): string {
             v-model:model-value="optionModel.underlying_instrument_id"
             kind="stock"
             allow-create
+            :underlying-instrument="underlyingInstrument"
+            :disabled="submitting || lockUnderlying"
             placeholder="Select an existing stock (or create one)…"
-            :disabled="submitting"
             @update:instrument="onUnderlyingSelected"
           />
         </n-form-item>

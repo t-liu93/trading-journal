@@ -31,6 +31,10 @@ const positionId = computed(() => route.params.id as string)
 const { position, loading, error, refresh, close, remove } = usePosition(positionId)
 
 const instrument = ref<Instrument | null>(null)
+const optionUnderlyingInstrument = ref<Instrument | null>(null)
+const primaryInstrumentLoading = ref(false)
+const primaryInstrumentError = ref<string | null>(null)
+let instrumentRequest = 0
 const showEditModal = ref(false)
 const showAddTradeModal = ref(false)
 const activeTab = ref((route.query.tab as string) || 'overview')
@@ -140,15 +144,40 @@ function handleTradesChanged() {
 }
 
 async function refreshWithInstrument() {
+  const seq = ++instrumentRequest
+  instrument.value = null
+  optionUnderlyingInstrument.value = null
+  primaryInstrumentError.value = null
+  primaryInstrumentLoading.value = true
   await refresh()
-  if (position.value) {
+  if (seq !== instrumentRequest) return
+  if (position.value && positionId.value) {
     try {
-      instrument.value = await instrumentsApi.get(position.value.primary_instrument_id)
-    } catch { instrument.value = null }
+      const id = position.value.primary_instrument_id
+      const primary = await instrumentsApi.get(id)
+      if (seq === instrumentRequest && primary.id === id) instrument.value = primary
+      else if (seq === instrumentRequest) throw new Error('Resolved primary instrument ID did not match the Position.')
+      if (seq === instrumentRequest && primary.kind === 'stock') optionUnderlyingInstrument.value = primary
+      else if (seq === instrumentRequest && primary.kind === 'option') {
+        const underlyingId = primary.option?.underlying_id
+        if (!underlyingId) throw new Error('The primary option has no resolvable underlying stock.')
+        const underlying = await instrumentsApi.get(underlyingId)
+        if (seq !== instrumentRequest) return
+        if (underlying.kind !== 'stock' || underlying.id !== underlyingId) throw new Error('Could not resolve the option primary underlying stock.')
+        optionUnderlyingInstrument.value = underlying
+      }
+    } catch (err) {
+      if (seq === instrumentRequest) primaryInstrumentError.value = err instanceof Error ? err.message : 'Failed to load the primary instrument.'
+    } finally {
+      if (seq === instrumentRequest) primaryInstrumentLoading.value = false
+    }
+  } else if (seq === instrumentRequest) {
+    primaryInstrumentLoading.value = false
   }
 }
 
 watch(positionId, () => {
+  instrumentRequest += 1
   planLoaded.value = false
   planStartExpanded.value = false
   void refreshWithInstrument()
@@ -265,7 +294,7 @@ onMounted(() => { void refreshWithInstrument() })
               <WheelMetaForm :position-id="positionId" :key="'wm-' + positionId" />
             </template>
             <template v-else-if="position.strategy_type === 'pmcc'">
-              <PmccMetaForm :position-id="positionId" :key="'pm-' + positionId" />
+              <PmccMetaForm :position-id="positionId" :primary-instrument="instrument" :primary-instrument-loading="primaryInstrumentLoading" :primary-instrument-error="primaryInstrumentError" @retry-primary-instrument="refreshWithInstrument" :key="'pm-' + positionId" />
             </template>
             <template v-else>
               <n-empty :description="`No metadata for ${prettifyStrategy(position.strategy_type)} positions in V1.`" />
@@ -288,6 +317,11 @@ onMounted(() => { void refreshWithInstrument() })
               :account-id="position.account_id"
               :currency="position.currency"
               :readonly="position.status !== 'open'"
+              :primary-instrument="instrument"
+              :option-underlying-instrument="optionUnderlyingInstrument"
+              :primary-instrument-loading="primaryInstrumentLoading"
+              :primary-instrument-error="primaryInstrumentError"
+              @retry-primary-instrument="refreshWithInstrument"
               :key="'tr-' + positionId"
               @trade-saved="handleTradesTabSaved"
               @trades-changed="handleTradesChanged"
@@ -309,6 +343,11 @@ onMounted(() => { void refreshWithInstrument() })
           :position-id="positionId"
           :account-id="position.account_id"
           :currency="position.currency"
+          :primary-instrument="instrument"
+          :option-underlying-instrument="optionUnderlyingInstrument"
+          :primary-instrument-loading="primaryInstrumentLoading"
+          :primary-instrument-error="primaryInstrumentError"
+          @retry-primary-instrument="refreshWithInstrument"
           @saved="handleTradeSaved"
         />
       </template>

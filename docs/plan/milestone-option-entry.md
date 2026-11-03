@@ -433,8 +433,8 @@ All six implementation cards satisfy acceptance; backend quality/full tests, fro
 |---|---|---|---|---|
 | T1 / QA-01 slice | implemented | Passed | Passed | Pending |
 | T2 / FIX-01 | implemented | Passed | Passed | Pending |
-| T3 / INS-01 | in-review | Checks passed; integration pending | Findings; repair in progress | Pending |
-| T4 / INS-02 | Not started | Not run | Not requested | Pending |
+| T3 / INS-01 | implemented | Passed | Passed | Pending |
+| T4 / INS-02 | in-review | Checks passed; integration pending | In review | Pending |
 | T5 / UI-01 | Not started | Not run | Not requested | Pending |
 | T6 / UI-02 | Not started | Not run | Not requested | Pending |
 | T7 phase A / MOPT-DOC | Complete | Documentation checks passed | Not requested | Documentation accepted; additional manual review omitted |

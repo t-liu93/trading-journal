@@ -13,7 +13,9 @@ const props = withDefaults(defineProps<{
   allowCreate?: boolean
   disabled?: boolean
   optionUnderlyingId?: string | null
-}>(), { placeholder: 'Search instrument…', allowCreate: false, disabled: false, optionUnderlyingId: null })
+  optionContextReady?: boolean
+  underlyingInstrument?: Instrument | null
+}>(), { placeholder: 'Search instrument…', allowCreate: false, disabled: false, optionUnderlyingId: null, optionContextReady: true })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', id: string | null): void
@@ -27,12 +29,18 @@ const error = ref<string | null>(null)
 const includeExpired = ref(false)
 const hasMore = ref(false)
 const showCreateForm = ref(false)
+const createOptionForUnderlying = ref(false)
 const createQuery = ref('')
 const searchQuery = ref('')
 const options = computed<SelectOption[]>(() => {
-  const rows: SelectOption[] = candidates.value.map((inst) => ({ label: formatInstrumentLabel(inst), value: inst.id }))
-  if (props.allowCreate && searchQuery.value && candidates.value.length === 0 && !loading.value && !error.value) {
+  const rows: SelectOption[] = candidates.value
+    .filter(inst => props.optionContextReady || inst.kind !== 'option')
+    .map((inst) => ({ label: formatInstrumentLabel(inst), value: inst.id }))
+  if (props.allowCreate && props.optionContextReady && searchQuery.value && candidates.value.length === 0 && !loading.value && !error.value) {
     rows.push({ label: `+ Create new instrument matching "${searchQuery.value}"`, value: '__create__' })
+  }
+  if (props.allowCreate && props.optionUnderlyingId && optionUnderlyingInstrument.value?.kind === 'stock' && !props.disabled && !rows.some(row => row.value === '__create_option__')) {
+    rows.push({ label: '+ Create option for selected underlying', value: '__create_option__' })
   }
   return rows
 })
@@ -41,6 +49,7 @@ const fallbackOption = (value: string | number): SelectOption => ({
   value,
 })
 const instrumentMap = new Map<string, Instrument>()
+const optionUnderlyingInstrument = computed(() => props.underlyingInstrument ?? (props.optionUnderlyingId ? instrumentMap.get(props.optionUnderlyingId) ?? null : null))
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let requestSeq = 0
 let labelSeq = 0
@@ -78,14 +87,17 @@ async function loadPage(q: string, append: boolean) {
       include_expired: includeExpired.value, option_underlying_id: props.optionUnderlyingId ?? undefined,
     })
     if (seq !== requestSeq || disposed) return
-    const page = results.slice(0, PAGE_SIZE)
+    const contextResults = props.optionUnderlyingId
+      ? results.filter(inst => inst.kind !== 'option' || inst.option?.underlying_id === props.optionUnderlyingId)
+      : results
+    const page = contextResults.slice(0, PAGE_SIZE)
     for (const inst of page) instrumentMap.set(inst.id, inst)
     if (append) {
       const ids = new Set(candidates.value.map((item) => item.id))
       candidates.value = [...candidates.value, ...page.filter((item) => !ids.has(item.id))]
     } else candidates.value = page
     requestOffset = offset + PAGE_SIZE
-    hasMore.value = results.length > PAGE_SIZE
+    hasMore.value = contextResults.length > PAGE_SIZE
   } catch (err) {
     if (seq === requestSeq && !disposed) {
       error.value = err instanceof Error ? err.message : 'Failed to load instruments.'
@@ -132,10 +144,18 @@ function retry() {
   else void loadPage(searchQuery.value, false)
 }
 function handleUpdateValue(val: string | null) {
-  if (val === '__create__') { showCreateForm.value = true; return }
+  if (val === '__create__' || val === '__create_option__') {
+    createOptionForUnderlying.value = val === '__create_option__'
+    showCreateForm.value = true
+    return
+  }
   const instrument = val ? instrumentMap.get(val) ?? currentInstrument.value : null
   if (instrument && props.kind && instrument.kind !== props.kind) {
     message.error(`Expected a ${props.kind} instrument`)
+    return
+  }
+  if (instrument?.kind === 'option' && (!props.optionContextReady || (props.optionUnderlyingId && instrument.option?.underlying_id !== props.optionUnderlyingId))) {
+    message.warning('Wait for the primary instrument context to load, or choose an option on that underlying.')
     return
   }
   currentInstrument.value = instrument
@@ -145,6 +165,11 @@ function handleUpdateValue(val: string | null) {
 function handleInstrumentSaved(instrument: Instrument) {
   if (props.kind && instrument.kind !== props.kind) {
     message.error(`Expected a ${props.kind} instrument`)
+    return
+  }
+  if (instrument.kind === 'option' && (!props.optionContextReady || (props.optionUnderlyingId && instrument.option?.underlying_id !== props.optionUnderlyingId))) {
+    message.error('The created option does not match the current primary instrument context.')
+    showCreateForm.value = false
     return
   }
   instrumentMap.set(instrument.id, instrument)
@@ -215,8 +240,12 @@ onBeforeUnmount(() => { disposed = true; invalidate() })
       </template>
     </n-select>
     <n-checkbox v-if="kind === 'option' || !kind" v-model:checked="includeExpired">Show expired options</n-checkbox>
-    <InstrumentForm v-if="allowCreate" :show="showCreateForm" :initial-kind="kind"
-      :initial-symbol="createQuery" :locked-kind="kind" @update:show="showCreateForm = $event"
+    <InstrumentForm v-if="allowCreate" :show="showCreateForm"
+      :initial-kind="createOptionForUnderlying ? 'option' : kind"
+      :initial-symbol="createQuery" :locked-kind="createOptionForUnderlying ? 'option' : kind"
+      :underlying-instrument="createOptionForUnderlying ? optionUnderlyingInstrument : null"
+      :lock-underlying="createOptionForUnderlying"
+      @update:show="showCreateForm = $event"
       @saved="handleInstrumentSaved" />
   </div>
 </template>

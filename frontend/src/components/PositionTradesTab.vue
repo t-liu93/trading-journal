@@ -14,13 +14,22 @@ const props = withDefaults(defineProps<{
   accountId: string
   currency?: string
   readonly?: boolean
+  primaryInstrument?: Instrument | null
+  optionUnderlyingInstrument?: Instrument | null
+  primaryInstrumentLoading?: boolean
+  primaryInstrumentError?: string | null
 }>(), {
   readonly: false,
+  primaryInstrument: null,
+  optionUnderlyingInstrument: null,
+  primaryInstrumentLoading: false,
+  primaryInstrumentError: null,
 })
 
 const emit = defineEmits<{
   (e: 'trade-saved'): void
   (e: 'trades-changed'): void
+  (e: 'retry-primary-instrument'): void
 }>()
 
 const message = useMessage()
@@ -173,6 +182,10 @@ defineExpose({ refresh })
 
 <template>
   <div>
+    <n-alert v-if="primaryInstrumentLoading" type="info" :bordered="false" style="margin-bottom: 0.5rem;">Loading primary instrument context. Option selection is paused.</n-alert>
+    <n-alert v-else-if="primaryInstrumentError" type="error" :bordered="false" style="margin-bottom: 0.5rem;">
+      {{ primaryInstrumentError }} <n-button size="tiny" @click="emit('retry-primary-instrument')">Retry</n-button>
+    </n-alert>
     <!-- Header strip -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
       <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -297,6 +310,11 @@ defineExpose({ refresh })
       :position-id="positionId"
       :account-id="accountId"
       :currency="currency"
+      :primary-instrument="primaryInstrument"
+      :option-underlying-instrument="optionUnderlyingInstrument"
+      :primary-instrument-loading="primaryInstrumentLoading"
+      :primary-instrument-error="primaryInstrumentError"
+      @retry-primary-instrument="emit('retry-primary-instrument')"
       @saved="handleTradeSaved"
     />
   </div>

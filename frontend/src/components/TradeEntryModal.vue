@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import { type TradeCreate } from '../api/trades'
 import TradeLegRow from './TradeLegRow.vue'
+import type { Instrument } from '../api/instruments'
 
 const props = withDefaults(defineProps<{
   show?: boolean
@@ -10,16 +11,25 @@ const props = withDefaults(defineProps<{
   positionId?: string
   accountId: string
   currency?: string
+  primaryInstrument?: Instrument | null
+  optionUnderlyingInstrument?: Instrument | null
+  primaryInstrumentLoading?: boolean
+  primaryInstrumentError?: string | null
 }>(), {
   show: false,
   inline: false,
   positionId: undefined,
   currency: '',
+  primaryInstrument: null,
+  optionUnderlyingInstrument: null,
+  primaryInstrumentLoading: false,
+  primaryInstrumentError: null,
 })
 
 const emit = defineEmits<{
   (e: 'update:show', value: boolean): void
   (e: 'saved'): void
+  (e: 'retry-primary-instrument'): void
 }>()
 
 const message = useMessage()
@@ -123,6 +133,10 @@ defineExpose({ rows: legRows, validate, getRows, reset })
         :account-id="accountId"
         :removable="legRows.length > 1"
         :currency="currency"
+        :primary-instrument="primaryInstrument"
+        :option-underlying-instrument="optionUnderlyingInstrument"
+        :primary-instrument-loading="primaryInstrumentLoading"
+        :primary-instrument-error="primaryInstrumentError"
         @remove="removeLeg(row.id)"
       />
     </div>
@@ -132,6 +146,10 @@ defineExpose({ rows: legRows, validate, getRows, reset })
     <n-text depth="3" style="font-size: 0.75rem; display: block; margin-bottom: 0.5rem;">
       Cash flow previews are for display only. Server computes the authoritative values.
     </n-text>
+    <n-alert v-if="primaryInstrumentLoading" type="info" :bordered="false" style="margin-bottom: 0.5rem;">Loading primary instrument context. Option selection is paused.</n-alert>
+    <n-alert v-else-if="primaryInstrumentError" type="error" :bordered="false" style="margin-bottom: 0.5rem;">
+      {{ primaryInstrumentError }} <n-button size="tiny" @click="emit('retry-primary-instrument')">Retry</n-button>
+    </n-alert>
   </template>
 
   <!-- Standalone mode: render as a modal -->
@@ -150,6 +168,10 @@ defineExpose({ rows: legRows, validate, getRows, reset })
         :account-id="accountId"
         :removable="legRows.length > 1"
         :currency="currency"
+        :primary-instrument="primaryInstrument"
+        :option-underlying-instrument="optionUnderlyingInstrument"
+        :primary-instrument-loading="primaryInstrumentLoading"
+        :primary-instrument-error="primaryInstrumentError"
         @remove="removeLeg(row.id)"
       />
     </div>
@@ -159,6 +181,10 @@ defineExpose({ rows: legRows, validate, getRows, reset })
     <n-text depth="3" style="font-size: 0.75rem; display: block; margin-bottom: 0.5rem;">
       Cash flow previews are for display only. Server computes the authoritative values.
     </n-text>
+    <n-alert v-if="primaryInstrumentLoading" type="info" :bordered="false" style="margin-bottom: 0.5rem;">Loading primary instrument context. Option selection is paused.</n-alert>
+    <n-alert v-else-if="primaryInstrumentError" type="error" :bordered="false" style="margin-bottom: 0.5rem;">
+      {{ primaryInstrumentError }} <n-button size="tiny" @click="emit('retry-primary-instrument')">Retry</n-button>
+    </n-alert>
 
     <template #footer>
       <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
