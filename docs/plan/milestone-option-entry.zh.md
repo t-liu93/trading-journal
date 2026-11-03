@@ -434,8 +434,8 @@ npm run build
 | T1 / QA-01 切片 | implemented | 通过 | 通过 | 待进行 |
 | T2 / FIX-01 | implemented | 通过 | 通过 | 待进行 |
 | T3 / INS-01 | implemented | 通过 | 通过 | 待进行 |
-| T4 / INS-02 | in-review | 检查通过，待集成 | 评审中 | 待进行 |
-| T5 / UI-01 | 未开始 | 未运行 | 未请求 | 待进行 |
+| T4 / INS-02 | implemented | 通过 | 通过 | 待进行 |
+| T5 / UI-01 | in-review | 检查通过，待集成 | 评审中 | 待进行 |
 | T6 / UI-02 | 未开始 | 未运行 | 未请求 | 待进行 |
 | T7 阶段 A / MOPT-DOC | 完成 | 文档检查通过 | 未请求 | 文档已接受，免额外人工审阅 |
 | T7 阶段 B / 应用集成 | ready、未开始 | 未运行 | 未请求 | 待进行 |

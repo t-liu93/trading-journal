@@ -40,7 +40,8 @@ const showTradeModal = ref(false)
 // Notes editing state
 const editingNotesId = ref<string | null>(null)
 const editingNotesValue = ref('')
-const editingNotesLoading = ref(false)
+const savingNotesIds = ref(new Set<string>())
+const notesEditSession = ref(0)
 
 async function loadInstruments() {
   const ids = [...new Set(trades.value.map(t => t.instrument_id))]
@@ -143,31 +144,43 @@ async function handleArchive(id: string) {
 }
 
 function startEditNotes(trade: Trade) {
-  if (trade.archived_at || props.readonly) return
+  if (trade.archived_at || props.readonly || savingNotesIds.value.has(trade.id)) return
+  notesEditSession.value += 1
   editingNotesId.value = trade.id
   editingNotesValue.value = trade.notes ?? ''
 }
 
 function cancelEditNotes() {
+  notesEditSession.value += 1
   editingNotesId.value = null
   editingNotesValue.value = ''
 }
 
 async function saveEditNotes(id: string) {
-  if (props.readonly) {
+  if (props.readonly || editingNotesId.value !== id || savingNotesIds.value.has(id)) {
+    if (props.readonly) cancelEditNotes()
+    return
+  }
+  const trade = trades.value.find((row) => row.id === id)
+  if (!trade || trade.archived_at) {
     cancelEditNotes()
     return
   }
-  editingNotesLoading.value = true
+  const session = notesEditSession.value
+  const value = editingNotesValue.value
+  savingNotesIds.value.add(id)
   try {
-    await updateNotes(id, editingNotesValue.value || null)
+    await updateNotes(id, value || null)
     message.success('Notes updated')
-    editingNotesId.value = null
-    editingNotesValue.value = ''
+    if (notesEditSession.value === session && editingNotesId.value === id) {
+      editingNotesId.value = null
+      editingNotesValue.value = ''
+      notesEditSession.value += 1
+    }
   } catch {
     message.error('Failed to update notes')
   } finally {
-    editingNotesLoading.value = false
+    savingNotesIds.value.delete(id)
   }
 }
 
@@ -229,6 +242,7 @@ defineExpose({ refresh })
             </div>
 
             <!-- Group rows as a small table -->
+            <div class="trade-table-scroll">
             <n-table :bordered="false" :single-line="false" size="small" striped>
               <thead>
                 <tr>
@@ -242,7 +256,8 @@ defineExpose({ refresh })
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="trade in group.trades" :key="trade.id" :style="{ opacity: trade.archived_at ? 0.5 : 1 }">
+                <template v-for="trade in group.trades" :key="trade.id">
+                <tr :data-trade-id="trade.id" :style="{ opacity: trade.archived_at ? 0.5 : 1 }">
                   <td><TradeActionBadge :action="trade.action" /></td>
                   <td>{{ instrumentLabel(trade.instrument_id) }}</td>
                   <td>{{ formatNum(trade.quantity) }}</td>
@@ -255,49 +270,51 @@ defineExpose({ refresh })
                   <td>{{ formatNum(Number(trade.commission) + Number(trade.fees)) }}</td>
                   <td>
                     <div style="display: flex; gap: 0.25rem; flex-wrap: nowrap;">
-                      <!-- Edit notes -->
-                      <template v-if="editingNotesId === trade.id">
-                        <n-input
-                          v-model:value="editingNotesValue"
-                          size="tiny"
-                          placeholder="Notes..."
-                          style="width: 140px;"
-                          :loading="editingNotesLoading"
-                          @keyup.enter="saveEditNotes(trade.id)"
-                        />
-                        <n-button size="tiny" type="primary" @click="saveEditNotes(trade.id)" :loading="editingNotesLoading">Save</n-button>
-                        <n-button size="tiny" @click="cancelEditNotes">Cancel</n-button>
-                      </template>
-                      <template v-else>
-                        <n-button
-                          size="tiny"
-                          quaternary
-                          :disabled="!!trade.archived_at || readonly"
-                          @click="startEditNotes(trade)"
-                        >
-                          Edit notes
-                        </n-button>
-                        <n-popconfirm
-                          v-if="!trade.archived_at && !readonly"
-                          @positive-click="handleArchive(trade.id)"
-                        >
-                          <template #trigger>
-                            <n-button size="tiny" quaternary type="warning">Archive</n-button>
-                          </template>
-                          Archive this trade? It will be excluded from position calculations.
-                        </n-popconfirm>
-                      </template>
+                      <n-button
+                        size="tiny"
+                        quaternary
+                        :disabled="!!trade.archived_at || readonly || editingNotesId === trade.id || savingNotesIds.has(trade.id)"
+                        @click="startEditNotes(trade)"
+                      >
+                        Edit notes
+                      </n-button>
+                      <n-popconfirm
+                        v-if="!trade.archived_at && !readonly && editingNotesId !== trade.id"
+                        @positive-click="handleArchive(trade.id)"
+                      >
+                        <template #trigger>
+                          <n-button size="tiny" quaternary type="warning">Archive</n-button>
+                        </template>
+                        Archive this trade? It will be excluded from position calculations.
+                      </n-popconfirm>
                     </div>
                   </td>
                 </tr>
+                <tr v-if="trade.notes || editingNotesId === trade.id" :key="'notes-' + trade.id" :data-notes-for="trade.id" class="trade-notes-row">
+                  <td colspan="7" class="trade-notes-cell">
+                    <div v-if="editingNotesId === trade.id" class="trade-notes-editor">
+                      <n-input
+                        v-model:value="editingNotesValue"
+                        type="textarea"
+                        size="small"
+                        placeholder="Notes..."
+                        :autosize="{ minRows: 2, maxRows: 8 }"
+                        :disabled="savingNotesIds.has(trade.id)"
+                        :aria-label="`Notes for trade ${trade.id}`"
+                        @keydown.ctrl.enter.prevent="saveEditNotes(trade.id)"
+                        @keydown.meta.enter.prevent="saveEditNotes(trade.id)"
+                      />
+                      <div class="trade-notes-editor-actions">
+                        <n-button size="tiny" type="primary" :loading="savingNotesIds.has(trade.id)" @click="saveEditNotes(trade.id)">Save</n-button>
+                        <n-button size="tiny" :disabled="savingNotesIds.has(trade.id)" @click="cancelEditNotes">Cancel</n-button>
+                      </div>
+                    </div>
+                    <div v-else class="trade-notes-text">{{ trade.notes }}</div>
+                  </td>
+                </tr>
+                </template>
               </tbody>
             </n-table>
-
-            <!-- Group notes if any -->
-            <div v-for="trade in group.trades" :key="'note-' + trade.id">
-              <n-text v-if="trade.notes" depth="3" style="font-size: 0.8rem; display: block; margin-top: 0.25rem;">
-                {{ instrumentLabel(trade.instrument_id) }}: {{ trade.notes }}
-              </n-text>
             </div>
           </n-list-item>
         </n-list>
@@ -319,3 +336,42 @@ defineExpose({ refresh })
     />
   </div>
 </template>
+
+<style scoped>
+.trade-notes-cell {
+  background: var(--n-td-color-striped, var(--n-td-color));
+  white-space: normal;
+}
+
+.trade-table-scroll {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+:deep(.n-list-item__main) {
+  width: 100%;
+  min-width: 0;
+}
+
+.trade-notes-text {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.trade-notes-editor {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.trade-notes-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+</style>
