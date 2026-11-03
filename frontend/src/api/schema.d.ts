@@ -1693,6 +1693,9 @@ export interface operations {
                 kind?: components["schemas"]["InstrumentKind"] | null;
                 q?: string | null;
                 limit?: number;
+                offset?: number;
+                include_expired?: boolean;
+                option_underlying_id?: string | null;
             };
             header?: never;
             path?: never;

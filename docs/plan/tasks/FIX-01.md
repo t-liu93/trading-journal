@@ -4,7 +4,7 @@
 
 ## Identity and authoritative contract
 
-- Queue state: `in-progress` in the [roadmap](../roadmap.md); the owner confirmed the M-OPT-01 design and subsequently authorized orchestrated application implementation on 2026-11-03.
+- Queue state: `implemented` in the [roadmap](../roadmap.md); the owner confirmed the M-OPT-01 design and subsequently authorized orchestrated application implementation on 2026-11-03.
 - Goal: archive-and-replace correction or earlier-fill backfill must not anchor an open Position's holding period to an obsolete first fill.
 - The full contract, dependencies, exact implementation files, acceptance, reviewer focus, checks and execution evidence now live in [M-OPT-01 T2](../milestone-option-entry.md#t2), together with shared decisions D07/D08 and the milestone walkthrough.
 - This file remains the stable FIX-01 entry point. Do not maintain a competing implementation or acceptance checklist here.
@@ -14,7 +14,7 @@
 
 The [original incident record](../../triage/improvements.md#fix-01--开仓日期不随后续成交变化维护) reports the 2026-06-02 INTC Wheel Position. Its opening date was manually set to the earliest non-archived fill and an archived orphan Trade was removed. Realized P&L already excluded archived fills. This is historical evidence, not a recommended database repair procedure.
 
-Current source establishes the unfixed behavior: [Position schema](../../../backend/src/trading_journal/schemas/position.py) rejects `opened_at` PATCH; [Trade API](../../../backend/src/trading_journal/api/trades.py) supports notes-only PATCH without maintaining Position dates on create/archive; [close handling](../../../backend/src/trading_journal/api/positions.py) derives a closing date and freezes P&L; [holding-day display](../../../frontend/src/utils/positionDerived.ts) subtracts recorded dates. Source inspection is not a freshly executed reproduction.
+The original baseline established the defect: [Position schema](../../../backend/src/trading_journal/schemas/position.py) rejects `opened_at` PATCH; [Trade API](../../../backend/src/trading_journal/api/trades.py) supports notes-only PATCH without maintaining Position dates on create/archive; [close handling](../../../backend/src/trading_journal/api/positions.py) derives a closing date and freezes P&L; [holding-day display](../../../frontend/src/utils/positionDerived.ts) subtracts recorded dates. Source inspection is not a freshly executed reproduction.
 
 ## Design history and boundaries
 
@@ -24,4 +24,4 @@ Closed-Trade locks, frozen P&L and retained audit history remain. Historical clo
 
 ## Execution status
 
-Implementation in progress; application checks and independent review pending; owner feature acceptance pending. Update the milestone card and roadmap as these dimensions change, rather than duplicating their records here.
+Implementation, automated checks and independent review passed for the M-OPT-01 T2 snapshot; owner feature acceptance remains pending. Update the milestone card and roadmap as these dimensions change, rather than duplicating their records here.

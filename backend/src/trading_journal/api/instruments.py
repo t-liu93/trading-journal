@@ -28,12 +28,14 @@ from trading_journal.schemas.instrument import (
     OptionCreate,
     StockCreate,
 )
+from trading_journal.services.instruments import list_instruments as query_instruments
 
 router = APIRouter(prefix="/instruments", tags=["instruments"])
 
 _kind_param = Query(default=None)
 _q_param = Query(default=None)
 _limit_param = Query(default=50, ge=1, le=200)
+_offset_param = Query(default=0, ge=0)
 
 
 async def _get_or_create_stock(
@@ -211,14 +213,19 @@ async def list_instruments(
     kind: InstrumentKind | None = _kind_param,
     q: str | None = _q_param,
     limit: int = _limit_param,
+    offset: int = _offset_param,
+    include_expired: bool = True,
+    option_underlying_id: uuid.UUID | None = None,
 ) -> list[InstrumentRead]:
-    stmt = select(Instrument).order_by(Instrument.symbol, Instrument.created_at).limit(limit)
-    if kind is not None:
-        stmt = stmt.where(Instrument.kind == kind)
-    if q is not None:
-        stmt = stmt.where(Instrument.symbol.ilike(f"{q}%"))
-    result = await session.execute(stmt)
-    instruments = list(result.scalars().all())
+    instruments = await query_instruments(
+        session,
+        kind=kind,
+        q=q,
+        limit=limit,
+        offset=offset,
+        include_expired=include_expired,
+        option_underlying_id=option_underlying_id,
+    )
     reads = []
     for inst in instruments:
         reads.append(await _to_read(inst, session))

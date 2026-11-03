@@ -432,8 +432,8 @@ All six implementation cards satisfy acceptance; backend quality/full tests, fro
 | Card | Implementation | Automated verification | Independent review | Owner feature acceptance |
 |---|---|---|---|---|
 | T1 / QA-01 slice | implemented | Passed | Passed | Pending |
-| T2 / FIX-01 | in-progress | Not run | Requested; awaiting candidate | Pending |
-| T3 / INS-01 | Not started | Not run | Not requested | Pending |
+| T2 / FIX-01 | implemented | Passed | Passed | Pending |
+| T3 / INS-01 | in-review | Checks passed; integration pending | Findings; repair in progress | Pending |
 | T4 / INS-02 | Not started | Not run | Not requested | Pending |
 | T5 / UI-01 | Not started | Not run | Not requested | Pending |
 | T6 / UI-02 | Not started | Not run | Not requested | Pending |

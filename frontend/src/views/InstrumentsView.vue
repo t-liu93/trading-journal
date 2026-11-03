@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from 'vue'
-import { type DataTableColumns, NTag, NText } from 'naive-ui'
+import { NCheckbox, type DataTableColumns, NTag, NText } from 'naive-ui'
 import AuthenticatedLayout from '../components/AuthenticatedLayout.vue'
 import InstrumentForm from '../components/InstrumentForm.vue'
 import { useInstruments } from '../composables/useInstruments'
 import { formatInstrumentCode } from '../utils/instrumentLabel'
 import { type Instrument, type InstrumentKind } from '../api/instruments'
 
-const { instruments, loading, error, kindFilter, query, refresh } = useInstruments()
+const { instruments, loading, error, kindFilter, query, includeExpired, offset, hasNext, hasPrevious, refresh, nextPage, previousPage } = useInstruments()
 
 onMounted(refresh)
 
@@ -133,9 +133,12 @@ function renderExpandContent(row: Instrument) {
         clearable
         style="max-width: 280px;"
       />
+      <n-checkbox v-model:checked="includeExpired">Show expired options</n-checkbox>
     </div>
 
-    <n-alert v-if="error" type="error" :title="error" style="margin-bottom: 1rem;" />
+    <n-alert v-if="error" type="error" :title="error" style="margin-bottom: 1rem;">
+      <n-button size="small" @click="refresh">Retry</n-button>
+    </n-alert>
 
     <n-data-table
       :columns="columns"
@@ -145,14 +148,20 @@ function renderExpandContent(row: Instrument) {
       size="small"
     >
       <template #empty>
-        <n-empty v-if="query || kindFilter" description="No instruments match your search." />
-        <n-empty v-else description="No instruments yet — create one to get started.">
+        <n-empty v-if="!error && (query || kindFilter)" description="No instruments match your search." />
+        <n-empty v-else-if="!error" description="No instruments yet — create one to get started.">
           <template #extra>
             <n-button type="primary" @click="openCreate">+ Create your first instrument</n-button>
           </template>
         </n-empty>
       </template>
     </n-data-table>
+
+    <div class="pagination-controls" aria-label="Instrument pages">
+      <n-button :disabled="!hasPrevious || loading" @click="previousPage">Previous</n-button>
+      <span>Rows {{ offset + (instruments.length ? 1 : 0) }}–{{ offset + instruments.length }}</span>
+      <n-button :disabled="!hasNext || loading" @click="nextPage">Next</n-button>
+    </div>
 
     <InstrumentForm v-model:show="modalShow" @saved="onSaved" />
   </AuthenticatedLayout>
@@ -173,5 +182,12 @@ function renderExpandContent(row: Instrument) {
   gap: 0.75rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+}
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 </style>

@@ -5,6 +5,7 @@ is cross-user sharing (``test_instruments_are_global``).
 """
 
 import uuid
+from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient
@@ -171,6 +172,84 @@ async def test_list_filters_by_prefix_q(auth_client: AsyncClient) -> None:
     assert response.status_code == 200
     symbols = {inst["symbol"] for inst in response.json()}
     assert symbols == {"MSFT"}
+
+
+async def test_expiry_filter_happens_before_pagination_and_preserves_other_kinds(
+    auth_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from trading_journal.services import instruments as instrument_service
+
+    monkeypatch.setattr(instrument_service, "current_utc_date", lambda: date(2026, 11, 3))
+    stock = await _create_stock(auth_client, symbol="ZZZ", currency="USD")
+    forex = await _create_forex(auth_client, symbol="ZZZUSD")
+    for index in range(51):
+        await _create_option(
+            auth_client,
+            underlying_symbol="ZZZ",
+            opt_type="call",
+            strike=str(100 + index),
+            expiry="2026-11-02",
+        )
+    today = await _create_option(
+        auth_client, underlying_symbol="ZZZ", strike="500", expiry="2026-11-03"
+    )
+    tomorrow = await _create_option(
+        auth_client, underlying_symbol="ZZZ", strike="501", expiry="2026-11-04"
+    )
+
+    hidden = await auth_client.get(
+        "/api/instruments",
+        params={"kind": "option", "q": "ZZZ", "include_expired": "false", "limit": 50},
+    )
+    assert hidden.status_code == 200
+    assert {row["id"] for row in hidden.json()} == {today["id"], tomorrow["id"]}
+    assert len(hidden.json()) == 2
+
+    legacy = await auth_client.get(
+        "/api/instruments", params={"kind": "option", "q": "ZZZ", "limit": 200}
+    )
+    assert len(legacy.json()) == 53
+    second_page = await auth_client.get(
+        "/api/instruments",
+        params={"kind": "option", "q": "ZZZ", "offset": 50, "limit": 50},
+    )
+    assert len(second_page.json()) == 3
+    other_kinds = await auth_client.get(
+        "/api/instruments", params={"q": "ZZZ", "include_expired": "false", "limit": 200}
+    )
+    assert {row["id"] for row in other_kinds.json()} >= {stock["id"], forex["id"]}
+    assert not any(
+        row["kind"] == "option"
+        and row["option"]["expiry"] == "2026-11-02"
+        for row in other_kinds.json()
+    )
+
+
+async def test_underlying_filter_only_restricts_option_rows_and_offset_composes(
+    auth_client: AsyncClient,
+) -> None:
+    first = await _create_stock(auth_client, symbol="AAA", currency="USD")
+    await _create_stock(auth_client, symbol="BBB", currency="USD")
+    option_a = await _create_option(
+        auth_client, underlying_symbol="AAA", strike="300", expiry="2027-01-01"
+    )
+    await _create_option(
+        auth_client, underlying_symbol="BBB", strike="300", expiry="2027-01-01"
+    )
+    stock_page = await auth_client.get(
+        "/api/instruments",
+        params={"kind": "stock", "option_underlying_id": first["id"], "limit": 10},
+    )
+    assert stock_page.status_code == 200
+    assert len(stock_page.json()) == 2
+    options = await auth_client.get(
+        "/api/instruments",
+        params={"kind": "option", "option_underlying_id": first["id"], "include_expired": "false"},
+    )
+    assert options.status_code == 200
+    assert [row["id"] for row in options.json()] == [option_a["id"]]
+    invalid = await auth_client.get("/api/instruments", params={"option_underlying_id": "bad"})
+    assert invalid.status_code == 422
 
 
 # ---------------------------------------------------------------------------

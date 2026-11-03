@@ -13,17 +13,29 @@ export interface InstrumentCreateResult {
   existed: boolean
 }
 
-function buildQuery(params?: { kind?: InstrumentKind; q?: string; limit?: number }): string {
+export interface InstrumentListParams {
+  kind?: InstrumentKind
+  q?: string
+  limit?: number
+  offset?: number
+  include_expired?: boolean
+  option_underlying_id?: string
+}
+
+function buildQuery(params?: InstrumentListParams): string {
   if (!params) return ''
   const parts: string[] = []
   if (params.kind) parts.push(`kind=${encodeURIComponent(params.kind)}`)
   if (params.q) parts.push(`q=${encodeURIComponent(params.q)}`)
   if (params.limit) parts.push(`limit=${params.limit}`)
+  if (params.offset !== undefined) parts.push(`offset=${params.offset}`)
+  if (params.include_expired !== undefined) parts.push(`include_expired=${params.include_expired}`)
+  if (params.option_underlying_id) parts.push(`option_underlying_id=${encodeURIComponent(params.option_underlying_id)}`)
   return parts.length > 0 ? `?${parts.join('&')}` : ''
 }
 
 export const instrumentsApi = {
-  list: (params?: { kind?: InstrumentKind; q?: string; limit?: number }) =>
+  list: (params?: InstrumentListParams) =>
     http.get(`/api/instruments${buildQuery(params)}`) as Promise<Instrument[]>,
 
   get: (id: string) => http.get(`/api/instruments/${id}`) as Promise<Instrument>,
