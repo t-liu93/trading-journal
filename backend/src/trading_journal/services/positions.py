@@ -51,6 +51,27 @@ async def latest_trade_executed_at(
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
+async def earliest_active_trade_executed_at(
+    session: AsyncSession, position: Position
+) -> datetime | None:
+    """Return MIN executed_at for active fills, or None when there are none."""
+    stmt = select(func.min(Trade.executed_at)).where(
+        Trade.position_id == position.id,
+        Trade.archived_at.is_(None),
+    )
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def maintain_opened_at_from_active_trades(
+    session: AsyncSession, position: Position
+) -> datetime | None:
+    """Set opening date to the earliest active fill, preserving it for an empty set."""
+    earliest = await earliest_active_trade_executed_at(session, position)
+    if earliest is not None:
+        position.opened_at = earliest
+    return earliest
+
+
 async def compute_net_cash_flows(
     session: AsyncSession,
     position_ids: Iterable[uuid.UUID],

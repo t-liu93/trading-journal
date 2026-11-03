@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, update
 
 from trading_journal.models.position import Position
 from trading_journal.models.trade import Trade
@@ -1226,3 +1226,116 @@ async def test_net_cash_flow_list_endpoint_does_one_query_per_request(
     for item in data:
         assert Decimal(item["net_cash_flow"]) == expected_per_pos[item["id"]]
     assert len(sum_group_queries) == 1
+async def test_close_recomputes_opening_and_rejects_reversed_close_atomically(
+    auth_client: AsyncClient,
+) -> None:
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos = await _seed_position(
+        auth_client, acct["id"], instr["id"], opened_at="2026-05-20T00:00:00Z", notes="before"
+    )
+    created = await auth_client.post(
+        "/api/trades",
+        json={
+            "position_id": pos["id"],
+            "instrument_id": instr["id"],
+            "action": "buy",
+            "quantity": "10",
+            "price": "10",
+            "executed_at": "2026-05-01T00:00:00Z",
+        },
+    )
+    assert created.status_code == 201, created.text
+    trade = created.json()[0]
+    invalid = await auth_client.patch(
+        f"/api/positions/{pos['id']}",
+        json={
+            "status": "closed",
+            "closed_at": "2026-04-30T00:00:00Z",
+            "notes": "must roll back",
+        },
+    )
+    assert invalid.status_code == 422
+    current = (await auth_client.get(f"/api/positions/{pos['id']}")).json()
+    assert current["status"] == "open"
+    assert current["opened_at"].startswith("2026-05-01")
+    assert current["closed_at"] is None
+    assert current["notes"] == "before"
+    assert current["pnl_realized"] is None
+    valid = await auth_client.patch(f"/api/positions/{pos['id']}", json={"status": "closed"})
+    assert valid.status_code == 200, valid.text
+    assert valid.json()["opened_at"].startswith("2026-05-01")
+    assert valid.json()["closed_at"].startswith("2026-05-01")
+    assert Decimal(valid.json()["pnl_realized"]) == Decimal(trade["cash_flow"])
+
+
+async def test_closed_at_amendment_checks_order_but_notes_patch_preserves_legacy_invalid_date(
+    auth_client: AsyncClient,
+) -> None:
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos = await _seed_position(
+        auth_client, acct["id"], instr["id"], opened_at="2026-05-20T00:00:00Z"
+    )
+    await auth_client.patch(
+        f"/api/positions/{pos['id']}",
+        json={"status": "closed", "closed_at": "2026-05-25T00:00:00Z"},
+    )
+    invalid = await auth_client.patch(
+        f"/api/positions/{pos['id']}", json={"closed_at": "2026-05-19T00:00:00Z", "notes": "no"}
+    )
+    assert invalid.status_code == 422
+    current = (await auth_client.get(f"/api/positions/{pos['id']}")).json()
+    assert current["closed_at"].startswith("2026-05-25")
+    assert current["notes"] is None
+
+
+async def test_non_date_patch_does_not_repair_or_reject_historical_reversed_dates(
+    auth_client: AsyncClient,
+    db_session_maker,
+) -> None:
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos = await _seed_position(auth_client, acct["id"], instr["id"])
+    closed = await auth_client.patch(
+        f"/api/positions/{pos['id']}",
+        json={
+            "status": "closed",
+            "closed_at": "2026-06-01T00:00:00Z",
+        },
+    )
+    assert closed.status_code == 200
+    legacy_opened = datetime(2026, 6, 2, 0, 0)
+    async with db_session_maker() as session:
+        await session.execute(
+            update(Position)
+            .where(Position.id == uuid.UUID(pos["id"]))
+            .values(opened_at=legacy_opened)
+        )
+        await session.commit()
+    patched = await auth_client.patch(
+        f"/api/positions/{pos['id']}", json={"notes": "non-date update"}
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["opened_at"].startswith("2026-06-02")
+    assert patched.json()["closed_at"].startswith("2026-06-01")
+    assert patched.json()["notes"] == "non-date update"
+
+
+async def test_close_allows_same_instant_after_utc_normalization(auth_client: AsyncClient) -> None:
+    acct = await _seed_account(auth_client)
+    instr = await _seed_instrument(auth_client)
+    pos = await _seed_position(
+        auth_client, acct["id"], instr["id"], opened_at="2026-05-20T20:00:00+02:00"
+    )
+    response = await auth_client.patch(
+        f"/api/positions/{pos['id']}",
+        json={
+            "status": "closed",
+            "closed_at": "2026-05-20T18:00:00Z",
+        },
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["opened_at"].startswith("2026-05-20T18:00:00")
+    assert data["closed_at"].startswith("2026-05-20T18:00:00")

@@ -25,6 +25,7 @@ from trading_journal.models.position import Position
 from trading_journal.models.trade import Trade
 from trading_journal.models.user import User
 from trading_journal.schemas.trade import TradeCreate, TradeRead, TradeUpdate
+from trading_journal.services.positions import maintain_opened_at_from_active_trades
 from trading_journal.services.trades import create_trades_atomic
 
 router = APIRouter(prefix="/trades", tags=["trades"])
@@ -115,6 +116,8 @@ async def create_trades(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    await maintain_opened_at_from_active_trades(session, position)
+
     await session.commit()
     return trades
 
@@ -198,4 +201,6 @@ async def delete_trade(
     from sqlalchemy import func
 
     trade.archived_at = func.now()
+    await session.flush()
+    await maintain_opened_at_from_active_trades(session, position)
     await session.commit()

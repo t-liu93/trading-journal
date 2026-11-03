@@ -25,13 +25,13 @@ Priority is an ordering recommendation, not authorization. P1 = data correctness
 | DOC-01 | P2 | accepted | Documentation handoff accepted on 2026-11-03 with additional manual review omitted; prior targeted checks passed; no independent review or runtime walkthrough claimed |
 | [INS-01](milestone-option-entry.md#t3) | P2 | ready | Hide expired options by default; explicit historical access and minimal pagination; implementation not started |
 | [INS-02](milestone-option-entry.md#t4) | P2 | ready | Filter options by primary-underlying ID across entry points; prefill inline option creation; implementation not started |
-| [FIX-01](tasks/FIX-01.md) | P1 | ready | Agreed date/empty-set/close-order rules in M-OPT-01 T2; no historical backfill; implementation not started |
+| [FIX-01](tasks/FIX-01.md) | P1 | in-progress | Implementing M-OPT-01 T2; owner feature acceptance pending |
 | [UI-01](milestone-option-entry.md#t5) | P2 | ready | Trade-specific companion notes/editor rows; implementation not started |
 | [UI-02](milestone-option-entry.md#t6) | P2 | ready | Shared leg labels/help/errors and narrow-width layout; implementation not started |
 | UI-03 | P2 | needs-design | Suggest capital/risk/reward from strategy inputs; define formulas, units and manual override |
 | UI-04 | P2 | needs-design | Prefill multi-leg entries, especially Iron Condor; define templates without changing recorded intent |
 | UI-05 | P3 | needs-clarification | Filtering requests clarified and assigned to INS-01/INS-02; other kind/display complaints remain unclarified |
-| [QA-01](milestone-option-entry.md#t1) | P2 | in-progress | M-OPT-01 tooling/behavior-test slice only; implementation started; remaining ROI, cash-flow preview, grouping and failure-recovery coverage is deferred |
+| [QA-01](milestone-option-entry.md#t1) | P2 | implemented | Milestone slice implemented; checks and independent review passed; owner feature acceptance pending |
 | REL-01 | P2 | proposed | Gate tag publication on exact-source quality checks and runtime image validation; separate design required |
 | [MOPT-DOC](milestone-option-entry.md#t7) | P2 | accepted | T7 phase A design/status documentation delivered and accepted without additional manual review; phase B application documentation/integration is ready, not started |
 

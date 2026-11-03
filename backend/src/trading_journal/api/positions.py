@@ -36,8 +36,10 @@ from trading_journal.models.trade import Trade
 from trading_journal.models.trade_plan import TradePlan
 from trading_journal.models.user import User
 from trading_journal.schemas.position import PositionCreate, PositionRead, PositionUpdate
+from trading_journal.services.datetimes import to_utc_naive
 from trading_journal.services.positions import (
     compute_net_cash_flows,
+    earliest_active_trade_executed_at,
     freeze_pnl_realized,
     latest_trade_executed_at,
 )
@@ -51,9 +53,7 @@ def _to_utc(dt: datetime) -> datetime:
     SQLite/aiosqlite does not preserve timezone offsets, so we normalize
     before storing to ensure consistent month bucketing in aggregation queries.
     """
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(UTC).replace(tzinfo=None)
-    return dt
+    return to_utc_naive(dt)
 
 
 def _position_to_read(pos: Position, net_cash_flow: Decimal) -> PositionRead:
@@ -218,20 +218,40 @@ async def update_position(
     if "closed_at" in data and data["closed_at"] is not None:
         data["closed_at"] = _to_utc(data["closed_at"])
 
-    for field, value in data.items():
-        setattr(position, field, value)
-
+    final_opened_at = position.opened_at
+    final_closed_at = data.get("closed_at", position.closed_at)
     if transitioning_to_closed:
-        if position.closed_at is None:
-            # Derive the close date from the last fill (symmetric with
-            # opened_at = first fill). Fall back to now() only when the
-            # position has no trades to anchor the date to.
+        earliest = await earliest_active_trade_executed_at(session, position)
+        if earliest is not None:
+            final_opened_at = earliest
+        if final_closed_at is None:
             last_executed = await latest_trade_executed_at(session, position)
-            position.closed_at = (
+            final_closed_at = (
                 last_executed
                 if last_executed is not None
                 else _to_utc(datetime.now(UTC))
             )
+
+    validate_close_order = transitioning_to_closed or (
+        position.status is PositionStatus.CLOSED and "closed_at" in data
+    )
+    if (
+        validate_close_order
+        and final_closed_at is not None
+        and final_closed_at < final_opened_at
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="closed_at cannot be earlier than opened_at",
+        )
+
+    if transitioning_to_closed:
+        position.opened_at = final_opened_at
+        data["closed_at"] = final_closed_at
+    for field, value in data.items():
+        setattr(position, field, value)
+
+    if transitioning_to_closed:
         await freeze_pnl_realized(session, position)
 
     await session.commit()

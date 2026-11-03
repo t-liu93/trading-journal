@@ -69,6 +69,7 @@ async def _seed_trade(
     action: str = "buy",
     quantity: str = "10",
     price: str = "50",
+    executed_at: str = NOW.isoformat(),
 ) -> dict:
     """Create a single trade via the P9 API. cash_flow is server-computed."""
     body = {
@@ -79,7 +80,7 @@ async def _seed_trade(
         "price": price,
         "commission": "0",
         "fees": "0",
-        "executed_at": NOW.isoformat(),
+        "executed_at": executed_at,
     }
     resp = await client.post("/api/trades", json=body)
     assert resp.status_code == 201, resp.text
@@ -161,20 +162,26 @@ async def test_only_closed_single_currency(
     instr = await _seed_instrument(auth_client)
 
     # Winner: sell → positive pnl
-    pos1 = await _seed_position(auth_client, acct["id"], instr["id"])
+    pos1 = await _seed_position(
+        auth_client, acct["id"], instr["id"], opened_at="2026-03-01T00:00:00Z"
+    )
     t1a = await _seed_trade(
         auth_client, pos1["id"], instr["id"],
         action="sell", quantity="10", price="50",
+        executed_at="2026-03-01T00:00:00Z",
     )
     await _close_position(
         auth_client, pos1["id"], closed_at="2026-03-15T12:00:00Z",
     )
 
     # Loser: buy → negative pnl
-    pos2 = await _seed_position(auth_client, acct["id"], instr["id"])
+    pos2 = await _seed_position(
+        auth_client, acct["id"], instr["id"], opened_at="2026-04-01T00:00:00Z"
+    )
     t2a = await _seed_trade(
         auth_client, pos2["id"], instr["id"],
         action="buy", quantity="10", price="50",
+        executed_at="2026-04-01T00:00:00Z",
     )
     await _close_position(
         auth_client, pos2["id"], closed_at="2026-04-20T12:00:00Z",
@@ -241,10 +248,12 @@ async def test_mixed_open_closed_two_currencies(
     # Closed USD: winner
     closed_usd = await _seed_position(
         auth_client, acct_usd["id"], instr_usd["id"],
+        opened_at="2026-01-01T00:00:00Z",
     )
     t_closed_usd = await _seed_trade(
         auth_client, closed_usd["id"], instr_usd["id"],
         action="sell", quantity="3", price="100",
+        executed_at="2026-01-01T00:00:00Z",
     )
     await _close_position(
         auth_client, closed_usd["id"], closed_at="2026-01-10T00:00:00Z",
@@ -253,10 +262,12 @@ async def test_mixed_open_closed_two_currencies(
     # Closed EUR: loser
     closed_eur = await _seed_position(
         auth_client, eur_acct["id"], instr_eur["id"],
+        opened_at="2026-02-01T00:00:00Z",
     )
     t_closed_eur = await _seed_trade(
         auth_client, closed_eur["id"], instr_eur["id"],
         action="buy", quantity="1", price="50",
+        executed_at="2026-02-01T00:00:00Z",
     )
     await _close_position(
         auth_client, closed_eur["id"], closed_at="2026-02-10T00:00:00Z",
@@ -482,10 +493,13 @@ async def test_monthly_bucket_utc(auth_client: AsyncClient) -> None:
     """closed_at near month boundary → bucketed by UTC month."""
     acct = await _seed_account(auth_client)
     instr = await _seed_instrument(auth_client)
-    pos = await _seed_position(auth_client, acct["id"], instr["id"])
+    pos = await _seed_position(
+        auth_client, acct["id"], instr["id"], opened_at="2026-04-01T00:00:00Z"
+    )
     await _seed_trade(
         auth_client, pos["id"], instr["id"],
         action="sell", quantity="1", price="100",
+        executed_at="2026-04-01T00:00:00Z",
     )
 
     # 2026-04-30 23:30:00 UTC → bucket 2026-04
@@ -506,10 +520,13 @@ async def test_monthly_bucket_non_utc_offset(
     """closed_at with +02:00 offset normalizes to UTC before bucketing."""
     acct = await _seed_account(auth_client)
     instr = await _seed_instrument(auth_client)
-    pos = await _seed_position(auth_client, acct["id"], instr["id"])
+    pos = await _seed_position(
+        auth_client, acct["id"], instr["id"], opened_at="2026-04-01T00:00:00Z"
+    )
     await _seed_trade(
         auth_client, pos["id"], instr["id"],
         action="sell", quantity="1", price="100",
+        executed_at="2026-04-01T00:00:00Z",
     )
 
     # 2026-05-01 01:30:00+02:00 == 2026-04-30 23:30:00 UTC → bucket 2026-04

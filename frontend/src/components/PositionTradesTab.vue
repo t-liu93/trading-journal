@@ -20,6 +20,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'trade-saved'): void
+  (e: 'trades-changed'): void
 }>()
 
 const message = useMessage()
@@ -125,6 +126,7 @@ async function handleArchive(id: string) {
   if (props.readonly) return
   try {
     await archive(id)
+    emit('trades-changed')
     message.success('Trade archived')
   } catch (err) {
     message.error('Failed to archive trade')

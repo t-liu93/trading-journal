@@ -9,6 +9,7 @@ from trading_journal.models.instrument import Instrument, OptionContract
 from trading_journal.models.position import Position
 from trading_journal.models.trade import Trade
 from trading_journal.schemas.trade import TradeCreate
+from trading_journal.services.datetimes import to_utc_naive
 
 _SELL_SIDE_ACTIONS = {TradeAction.SELL, TradeAction.STO, TradeAction.STC}
 _OPTION_ACTIONS = {TradeAction.BTO, TradeAction.STO, TradeAction.BTC, TradeAction.STC}
@@ -107,7 +108,7 @@ async def create_trades_atomic(
                 commission=row.commission,
                 fees=row.fees,
                 cash_flow=cash_flow,
-                executed_at=row.executed_at,
+                executed_at=to_utc_naive(row.executed_at),
                 order_group_id=row.order_group_id,
                 notes=row.notes,
             )

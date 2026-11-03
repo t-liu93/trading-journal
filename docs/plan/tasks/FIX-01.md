@@ -4,11 +4,11 @@
 
 ## Identity and authoritative contract
 
-- Queue state: `ready` in the [roadmap](../roadmap.md); the owner confirmed the M-OPT-01 design on 2026-11-03. Application implementation has not started.
+- Queue state: `in-progress` in the [roadmap](../roadmap.md); the owner confirmed the M-OPT-01 design and subsequently authorized orchestrated application implementation on 2026-11-03.
 - Goal: archive-and-replace correction or earlier-fill backfill must not anchor an open Position's holding period to an obsolete first fill.
 - The full contract, dependencies, exact implementation files, acceptance, reviewer focus, checks and execution evidence now live in [M-OPT-01 T2](../milestone-option-entry.md#t2), together with shared decisions D07/D08 and the milestone walkthrough.
 - This file remains the stable FIX-01 entry point. Do not maintain a competing implementation or acceptance checklist here.
-- Current authorization covers documentation/status updates, commit and push. A ready design does not authorize application implementation, delegation, release/tag publication or deployment.
+- Current execution authorization covers M-OPT-01 implementation, independent review, repair and disposable verification. Git writes, publication and production deployment are not authorized.
 
 ## Incident and current evidence
 
@@ -24,4 +24,4 @@ Closed-Trade locks, frozen P&L and retained audit history remain. Historical clo
 
 ## Execution status
 
-Implementation not started; application checks not run; independent review not requested/performed; owner feature acceptance pending; no implementation candidate or local execution report. Update the milestone card and roadmap as these dimensions change, rather than duplicating their records here.
+Implementation in progress; application checks and independent review pending; owner feature acceptance pending. Update the milestone card and roadmap as these dimensions change, rather than duplicating their records here.

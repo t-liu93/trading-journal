@@ -135,6 +135,10 @@ function handleTradesTabSaved() {
   void refresh()
 }
 
+function handleTradesChanged() {
+  void refresh()
+}
+
 async function refreshWithInstrument() {
   await refresh()
   if (position.value) {
@@ -286,6 +290,7 @@ onMounted(() => { void refreshWithInstrument() })
               :readonly="position.status !== 'open'"
               :key="'tr-' + positionId"
               @trade-saved="handleTradesTabSaved"
+              @trades-changed="handleTradesChanged"
             />
           </n-tab-pane>
         </n-tabs>

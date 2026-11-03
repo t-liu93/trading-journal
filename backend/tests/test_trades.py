@@ -1277,3 +1277,76 @@ async def test_requires_auth(client: AsyncClient, method: str, path: str) -> Non
         } if method in {"POST", "PATCH"} else None,
     )
     assert resp.status_code == 401
+async def test_create_trades_normalizes_offsets_and_updates_opening_date(
+    auth_client: AsyncClient,
+) -> None:
+    acct, stock, _, pos = await _seed_full_setup(auth_client)
+    later_utc = "2026-05-20T01:30:00Z"
+    same_instant_offset = "2026-05-20T03:30:00+03:00"
+    same_instant_utc = "2026-05-20T00:30:00Z"
+    response = await auth_client.post(
+        "/api/trades",
+        json=[
+            _trade_row(pos["id"], stock["id"], executed_at=later_utc),
+            _trade_row(pos["id"], stock["id"], executed_at=same_instant_offset),
+            _trade_row(pos["id"], stock["id"], executed_at=same_instant_utc),
+        ],
+    )
+    assert response.status_code == 201, response.text
+    trades = response.json()
+    assert trades[0]["executed_at"].startswith("2026-05-20T01:30:00")
+    assert trades[1]["executed_at"].startswith("2026-05-20T00:30:00")
+    assert trades[2]["executed_at"].startswith("2026-05-20T00:30:00")
+    current = (await auth_client.get(f"/api/positions/{pos['id']}")).json()
+    assert current["opened_at"].startswith("2026-05-20T00:30:00")
+
+
+async def test_invalid_later_leg_keeps_trades_and_opening_date_unchanged(
+    auth_client: AsyncClient,
+) -> None:
+    _, stock, option, pos = await _seed_full_setup(auth_client)
+    response = await auth_client.post(
+        "/api/trades",
+        json=[
+            _trade_row(pos["id"], stock["id"], executed_at="2026-05-10T00:00:00Z"),
+            _trade_row(pos["id"], option["id"], action="buy"),
+        ],
+    )
+    assert response.status_code == 422
+    current = (await auth_client.get(f"/api/positions/{pos['id']}")).json()
+    trades = (await auth_client.get("/api/trades", params={"position_id": pos["id"]})).json()
+    assert current["opened_at"] == pos["opened_at"]
+    assert trades == []
+
+
+async def test_archival_maintains_earliest_active_date_and_preserves_empty_date(
+    auth_client: AsyncClient,
+) -> None:
+    _, stock, _, pos = await _seed_full_setup(auth_client)
+    first = (
+        await _create_single_trade(
+            auth_client, pos["id"], stock["id"], executed_at="2026-05-21T00:00:00Z"
+        )
+    ).json()[0]
+    second = (
+        await _create_single_trade(
+            auth_client, pos["id"], stock["id"], executed_at="2026-05-23T00:00:00Z"
+        )
+    ).json()[0]
+    assert (
+        (await auth_client.get(f"/api/positions/{pos['id']}"))
+        .json()["opened_at"]
+        .startswith("2026-05-21")
+    )
+    await auth_client.delete(f"/api/trades/{first['id']}")
+    current = (await auth_client.get(f"/api/positions/{pos['id']}")).json()
+    assert current["opened_at"].startswith("2026-05-23")
+    await auth_client.delete(f"/api/trades/{second['id']}")
+    current = (await auth_client.get(f"/api/positions/{pos['id']}")).json()
+    assert current["opened_at"].startswith("2026-05-23")
+    replacement = await _create_single_trade(
+        auth_client, pos["id"], stock["id"], executed_at="2026-05-19T00:00:00Z"
+    )
+    assert replacement.status_code == 201
+    current = (await auth_client.get(f"/api/positions/{pos['id']}")).json()
+    assert current["opened_at"].startswith("2026-05-19")
