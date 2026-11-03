@@ -14,6 +14,8 @@ Current verification infrastructure: backend Ruff/strict mypy/pytest, migrated i
 
 M-OPT-01 owns shared decisions, complete task cards and acceptance records. It covers expired-option visibility/history/pagination, primary-underlying filtering and contextual creation, FIX-01, UI-01/UI-02 and a bounded QA-01 slice. `ready` records an agreed contract, not authorization to start coding.
 
+Current execution update (2026-11-03): the owner separately authorized orchestration for T1–T6 and T7 phase B, including independent review/repair and isolated verification. Git writes and production operations remain unauthorized. T1 has started; owner feature acceptance is pending.
+
 ## Work queue
 
 Priority is an ordering recommendation, not authorization. P1 = data correctness; P2 = workflow/quality; P3 = requirement clarification or optional expansion. Queue state is maintained here; a linked task card owns its detailed contract and evidence.
@@ -29,7 +31,7 @@ Priority is an ordering recommendation, not authorization. P1 = data correctness
 | UI-03 | P2 | needs-design | Suggest capital/risk/reward from strategy inputs; define formulas, units and manual override |
 | UI-04 | P2 | needs-design | Prefill multi-leg entries, especially Iron Condor; define templates without changing recorded intent |
 | UI-05 | P3 | needs-clarification | Filtering requests clarified and assigned to INS-01/INS-02; other kind/display complaints remain unclarified |
-| [QA-01](milestone-option-entry.md#t1) | P2 | ready | M-OPT-01 tooling/behavior-test slice only; implementation not started; remaining ROI, cash-flow preview, grouping and failure-recovery coverage is deferred |
+| [QA-01](milestone-option-entry.md#t1) | P2 | in-progress | M-OPT-01 tooling/behavior-test slice only; implementation started; remaining ROI, cash-flow preview, grouping and failure-recovery coverage is deferred |
 | REL-01 | P2 | proposed | Gate tag publication on exact-source quality checks and runtime image validation; separate design required |
 | [MOPT-DOC](milestone-option-entry.md#t7) | P2 | accepted | T7 phase A design/status documentation delivered and accepted without additional manual review; phase B application documentation/integration is ready, not started |
 

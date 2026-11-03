@@ -3,7 +3,7 @@
 > **English** · [中文](milestone-option-entry.zh.md)
 
 - Design: the owner confirmed this design and product scope on 2026-11-03; the contract is `ready`.
-- Authorization updated on 2026-11-03: documentation/status updates, commit and push. The owner accepted documentation delivery without additional manual document review. Application implementation has not started; implementation, delegation, release/tag publication and deployment are not authorized by this request.
+- Execution authorization (2026-11-03): the owner subsequently requested orchestrated implementation of T1–T6 and T7 phase B, including implementation, independent review, repair and isolated verification. Git commits/pushes/history rewriting, publication and production deployment are not authorized. Phase A documentation acceptance remains valid.
 - Scheduling: [current roadmap](roadmap.md). This document owns shared decisions, atomic task cards and acceptance records.
 - Execution rules: [development guide](../development.md), [agent rules](../../AGENTS.md). Historical P/F plans and the original conversation are not needed to determine this milestone's contract.
 
@@ -431,7 +431,7 @@ All six implementation cards satisfy acceptance; backend quality/full tests, fro
 
 | Card | Implementation | Automated verification | Independent review | Owner feature acceptance |
 |---|---|---|---|---|
-| T1 / QA-01 slice | Not started | Not run | Not requested | Pending |
+| T1 / QA-01 slice | In progress | Not run | Requested; awaiting candidate | Pending |
 | T2 / FIX-01 | Not started | Not run | Not requested | Pending |
 | T3 / INS-01 | Not started | Not run | Not requested | Pending |
 | T4 / INS-02 | Not started | Not run | Not requested | Pending |
