@@ -13,7 +13,7 @@
 - 权威财务值使用后端 `Decimal` 和现有 SQL `Numeric` 精度。Trade 现金流为 `sign(action) × price × quantity × multiplier − commission − fees`。前端预览、持仓天数、ROI 和年化 ROI 仅展示，不同币种分开。
 - 按登录用户校验所有权，Trade 经 Position 判断归属，访问他人资源返回 404。Instrument 是按自然键 get-or-create 的共享参考数据。
 - Trade DELETE 是归档，统计排除归档行。PATCH 只接受 notes；未平仓仓位中其他字段纠错需归档后重新录入。已平仓仓位拒绝 Trade 写入，不能重新打开；没有支持的取消归档端点。
-- 平仓冻结已实现盈亏。无显式平仓时间时取最后一笔未归档成交时间；空仓位回退到当前时间。`opened_at` 当前不随后续 Trade 变化维护，[FIX-01](plan/tasks/FIX-01.zh.md) 只是提案，未实现修复。
+- 平仓冻结已实现盈亏。无显式平仓时间时取最后一笔未归档成交时间；空仓位回退到当前时间。`opened_at` 当前不随后续 Trade 变化维护，[FIX-01](plan/tasks/FIX-01.zh.md) 已在 M-OPT-01 确认设计，但修复尚未实现。
 - 多腿 Trade 写入保持原子性。Position 与首笔 Trade 当前由前端两次请求完成，含部分失败恢复，不是后端同事务。
 - TradePlan 只追加，保留修订唯一约束和重试。任何 Trade（包括归档历史）或计划修订都阻止删除 Position。
 - 已发布 schema 变化新增 Alembic 迁移。测试将迁移后的模板复制为每个测试独立的数据库。

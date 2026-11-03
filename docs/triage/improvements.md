@@ -8,7 +8,7 @@ Position 的 `opened_at` 只在创建时从首批 Trade 时间设置，后续新
 
 - 原始事故：2026-06-02 的 INTC wheel position。曾手动改 `data/app.db`，把开仓日期改为非归档 MIN(`executed_at`)，并删除归档孤儿 Trade；当时 `pnl_realized` 已正确排除归档记录。这是历史处置记录，不是建议复制的修复操作。
 - 当前限制：Trade PATCH 只改 notes；未平仓数字／日期纠错需归档后重新录入，已平仓 Trade 禁写，Position 也不能重新打开。
-- [FIX-01 任务草案](../plan/tasks/FIX-01.zh.md)提出同事务维护最早有效成交、空集回退和平仓日期顺序校验。方案待确认，旧的错误平仓历史需另定审计纠错路径，不自动修改真实库。
+- 2026-11-03 已确认的 [M-OPT-01 T2 契约](../plan/milestone-option-entry.zh.md#t2)规定同事务维护最早有效成交、空集回退和平仓日期顺序校验；[FIX-01 入口](../plan/tasks/FIX-01.zh.md)保留来源。应用修复尚未实现，旧的错误平仓历史需另定审计纠错路径，不自动修改真实库。
 
 ## UI-01 — Trade 备注的位置
 
@@ -39,3 +39,17 @@ Position 的 `opened_at` 只在创建时从首批 Trade 时间设置，后续新
 原始反馈：种类／显示方式有待调整。当前已有 stock／option／forex 分类与期权合约紧凑编码，不能把旧反馈直接当成全部尚未实现。
 
 待澄清：具体页面、现有显示、期望显示及合约识别问题；准备股票、同标的不同到期／行权价期权和外汇的合成样例后再定验收。
+
+2026-11-03 补充：下面两个明确的筛选诉求由 INS-01／INS-02 承接，不重复作为 UI-05 实现；其他类型／显示诉求仍待澄清。
+
+## INS-01 — 默认隐藏过期期权
+
+2026-11-03 用户反馈：长期使用后，同一股票下面积累大量期权合约，过期合约占据 Instruments 页面以及创建 Position／Trade 时的候选菜单。希望默认隐藏，需要时通过开关或折叠入口查看。
+
+已确认设计见 [M-OPT-01 T3](../plan/milestone-option-entry.zh.md#t3)：按 UTC 日期判断，保留到期当天；不删除历史，显式显示过期选项支持补录；查询先过滤再分页，避免旧合约占满前 50 条。设计已确认，功能未实现。
+
+## INS-02 — 期权选择关联 Primary Instrument
+
+2026-11-03 用户反馈：选好 Primary Instrument 后，录入期权仍需再次手动搜索，PMCC 等场景不应列出其他股票的期权。代码检查确认 First Trade／Add Trade 未传递主标的，PMCC LEAP 只在提交后由服务端校验 underlying。
+
+已确认设计见 [M-OPT-01 T4](../plan/milestone-option-entry.zh.md#t4)：按 underlying ID 联动全部入口，与过期过滤组合；创建合约自动带入上下文，保留股票／外汇能力和 PMCC 服务端校验。设计已确认，功能未实现。

@@ -4,13 +4,15 @@
 
 ## Baseline and scheduling
 
-As of 2026-11-02, this is the current scheduling entry point. The existing P/F plans are historical references, not active checklists. This baseline comes from source, migrations and workflow inspection, not a fresh execution of all tests or owner acceptance.
+The implementation baseline was established on 2026-11-02; scheduling and documentation acceptance were updated on 2026-11-03. Existing P/F plans are historical references, not active checklists. The implementation baseline comes from source, migrations and workflow inspection, not a fresh execution of all application tests or owner runtime acceptance.
 
 Already implemented: account/instrument/strategy configuration, Position and Trade workflows, strategy metadata, append-only plans, per-currency dashboard and account filtering, light/dark switching, generated API types, single-container Docker deployment, migrate-before-app Compose, database sessions and an automatically persisted token-signing secret.
 
 Current verification infrastructure: backend Ruff/strict mypy/pytest, migrated isolated test databases, codegen freshness, frontend type-check/build and conditional image build. Frontend automated behavior tests and release-quality/runtime gates remain gaps. SQLite is supported; PostgreSQL equivalence has not been demonstrated.
 
-**Current scope:** DOC-01 documentation organization is implemented and awaits owner acceptance. No application implementation, delegation, deployment, release or Git publication is started by this roadmap. FIX-01 is the recommended next design to confirm.
+**Current scope (2026-11-03):** [M-OPT-01: option selection and trade-entry improvements](milestone-option-entry.md) is the agreed next milestone; application work is ready but not started. Its design-document delivery and DOC-01 are accepted with the owner's additional manual document review omitted. The owner explicitly authorized documentation/status updates, a commit and a push; application implementation, delegation, release/tag publication and deployment remain outside this request.
+
+M-OPT-01 owns shared decisions, complete task cards and acceptance records. It covers expired-option visibility/history/pagination, primary-underlying filtering and contextual creation, FIX-01, UI-01/UI-02 and a bounded QA-01 slice. `ready` records an agreed contract, not authorization to start coding.
 
 ## Work queue
 
@@ -18,17 +20,20 @@ Priority is an ordering recommendation, not authorization. P1 = data correctness
 
 | ID | Priority | State | Scope / next action |
 |---|---|---|---|
-| DOC-01 | P2 | implemented | Documentation organization complete; targeted checks passed; independent review not requested; owner acceptance pending |
-| [FIX-01](tasks/FIX-01.md) | P1 | proposed | Maintain Position opening dates from active fills; confirm lifecycle/empty-set policy before implementation |
-| UI-01 | P2 | proposed | Display each Trade's notes beside its row; synthetic multi-leg examples and layout acceptance |
-| UI-02 | P2 | proposed | Improve First Trade labels/help placement; desktop/narrow-width acceptance |
+| DOC-01 | P2 | accepted | Documentation handoff accepted on 2026-11-03 with additional manual review omitted; prior targeted checks passed; no independent review or runtime walkthrough claimed |
+| [INS-01](milestone-option-entry.md#t3) | P2 | ready | Hide expired options by default; explicit historical access and minimal pagination; implementation not started |
+| [INS-02](milestone-option-entry.md#t4) | P2 | ready | Filter options by primary-underlying ID across entry points; prefill inline option creation; implementation not started |
+| [FIX-01](tasks/FIX-01.md) | P1 | ready | Agreed date/empty-set/close-order rules in M-OPT-01 T2; no historical backfill; implementation not started |
+| [UI-01](milestone-option-entry.md#t5) | P2 | ready | Trade-specific companion notes/editor rows; implementation not started |
+| [UI-02](milestone-option-entry.md#t6) | P2 | ready | Shared leg labels/help/errors and narrow-width layout; implementation not started |
 | UI-03 | P2 | needs-design | Suggest capital/risk/reward from strategy inputs; define formulas, units and manual override |
 | UI-04 | P2 | needs-design | Prefill multi-leg entries, especially Iron Condor; define templates without changing recorded intent |
-| UI-05 | P3 | needs-clarification | Clarify instrument types/display complaints against the existing compact option codes |
-| QA-01 | P2 | proposed | Meaningful tests for frontend date/ROI, cash-flow preview, grouping and failure recovery; choose minimal tooling |
+| UI-05 | P3 | needs-clarification | Filtering requests clarified and assigned to INS-01/INS-02; other kind/display complaints remain unclarified |
+| [QA-01](milestone-option-entry.md#t1) | P2 | ready | M-OPT-01 tooling/behavior-test slice only; implementation not started; remaining ROI, cash-flow preview, grouping and failure-recovery coverage is deferred |
 | REL-01 | P2 | proposed | Gate tag publication on exact-source quality checks and runtime image validation; separate design required |
+| [MOPT-DOC](milestone-option-entry.md#t7) | P2 | accepted | T7 phase A design/status documentation delivered and accepted without additional manual review; phase B application documentation/integration is ready, not started |
 
-Original reports and the 2026-06-02 incident remain in [triage](../triage/improvements.md). Later UI/QA/release work needs a bounded card before implementation; do not treat this queue as an approved batch.
+Original reports and the 2026-06-02 incident remain in [triage](../triage/improvements.md). Work outside M-OPT-01 needs a bounded card before implementation; do not treat this queue as an approved implementation batch. Atomic Position+first-Trade creation and an audited closed-record correction path are explicitly deferred by this milestone.
 
 ## Deferred product directions
 
@@ -44,4 +49,4 @@ Update the task and this concise queue together; do not also update historical m
 
 ## Documentation organization record
 
-DOC-01 is documentation/meta work, not completion of any queued bug or feature. Completed on 2026-11-02: documentation map, concise agent rules, development guide, roadmap, task template, FIX-01 draft, preserved triage, history notices, README entry points and isolated walkthrough. Local links/anchors, bilingual structure/commands, shell syntax, historical-content preservation, whitespace, symlink and ignore boundaries passed. The walkthrough Compose configuration was rendered and checked against isolated mounts, source context, loopback binding, HTTP cookies and migrate-before-app dependency. No container was built or started. Application tests/builds were not run for this documentation/meta change. No independent review or owner walkthrough is claimed; acceptance remains pending.
+DOC-01 is documentation/meta work, not completion of any queued bug or feature. Completed on 2026-11-02: documentation map, concise agent rules, development guide, roadmap, task template, FIX-01 draft, preserved triage, history notices, README entry points and isolated walkthrough. Local links/anchors, bilingual structure/commands, shell syntax, historical-content preservation, whitespace, symlink and ignore boundaries passed. The walkthrough Compose configuration was rendered and checked against isolated mounts, source context, loopback binding, HTTP cookies and migrate-before-app dependency. No container was built or started; application tests/builds and independent review were not performed. On 2026-11-03 the owner accepted the documentation handoff without further manual document review and requested status closure, commit and push. This accepts documentation with that omission; it does not establish runtime walkthrough or application acceptance.

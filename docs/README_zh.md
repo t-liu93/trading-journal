@@ -82,6 +82,7 @@ ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.0.0
 
 - [文档地图](index.zh.md)（[English](index.md)）—— 当前指导与历史参考。
 - [当前路线图](plan/roadmap.zh.md)（[English](plan/roadmap.md)）—— 优先级、任务契约、进度与验收。
+- [M-OPT-01 设计](plan/milestone-option-entry.zh.md)（[English](plan/milestone-option-entry.md)）—— 已接受的下个里程碑设计与完整实现任务卡，应用工作尚未开始。
 - [开发指南](development.zh.md)（[English](development.md)）—— 命令、领域规则、验证与评审。
 - [走查指南](walkthrough.zh.md)（[English](walkthrough.md)）—— 一次性构建与代表性功能检查。
 - [设计参考](design/README.zh.md)（[English](design/README.md)）和[发布记录](release-notes/)—— 历史计划与版本记录。

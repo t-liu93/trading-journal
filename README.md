@@ -82,6 +82,7 @@ Current scope and acceptance are tracked in the [roadmap](docs/plan/roadmap.md) 
 
 - [Documentation map](docs/index.md) ([中文](docs/index.zh.md)) — current guidance and historical references.
 - [Current roadmap](docs/plan/roadmap.md) ([中文](docs/plan/roadmap.zh.md)) — priorities, task contracts, progress and acceptance.
+- [M-OPT-01 design](docs/plan/milestone-option-entry.md) ([中文](docs/plan/milestone-option-entry.zh.md)) — accepted next-milestone design and complete implementation cards; application work has not started.
 - [Development guide](docs/development.md) ([中文](docs/development.zh.md)) — commands, domain rules, verification and review.
 - [Walkthrough](docs/walkthrough.md) ([中文](docs/walkthrough.zh.md)) — disposable build and representative feature checks.
 - [Design references](docs/design/README.md) ([中文](docs/design/README.zh.md)) and [release notes](docs/release-notes/) — historical plans and version-specific records.
