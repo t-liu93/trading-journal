@@ -2,6 +2,8 @@
 
 **Language:** English | [中文](./backend-expansion-plan.zh.md)
 
+> **Current guidance notice: historical planning record, superseded for scheduling.** Original status, commands and test counts are historical, not current progress. Use the [roadmap](../plan/roadmap.md) and [development guide](../development.md) for current work.
+
 > Status: **DRAFT v0.1** (2026-05-21). The macro roadmap for expanding the backend
 > beyond the Account tracer bullet, on `refactoring/rebuild`. Companion to
 > [mvp-implementation-plan.md](./mvp-implementation-plan.md) (backend Phase 0–5),

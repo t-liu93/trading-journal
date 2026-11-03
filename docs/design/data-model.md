@@ -2,6 +2,8 @@
 
 **Language:** English | [中文](./data-model.zh.md)
 
+> **Current guidance notice: domain design reference.** Original draft retained; source, migrations and tests establish implemented behavior. See the [current roadmap](../plan/roadmap.md) and task cards for intended changes.
+
 > Status: **DRAFT v0.4** (2026-05-18). Initial design for the rebuild on `refactoring/rebuild`. This document is the source of truth for schema discussion; iterate here before writing migrations. Changelog at the bottom.
 
 ## 1. Purpose and design principles

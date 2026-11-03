@@ -2,6 +2,8 @@
 
 **Language:** English | [中文](./frontend-implementation-plan.zh.md)
 
+> **Current guidance notice: historical planning record, superseded for scheduling.** Original status, commands and test counts are historical, not current progress. Use the [roadmap](../plan/roadmap.md) and [development guide](../development.md) for current work.
+
 > Status: **DRAFT v0.1** (2026-05-18). The execution plan for the first end-to-end slice of the frontend, on `refactoring/rebuild`. Companion document to [data-model.md](./data-model.md) and [mvp-implementation-plan.md](./mvp-implementation-plan.md) (backend). Iterate here before writing code.
 
 ## 1. Purpose and approach

@@ -2,6 +2,8 @@
 
 **Language:** English | [中文](./v1-implementation-plan-f6.zh.md)
 
+> **Current guidance notice: historical planning record, superseded for scheduling.** Original status, commands and test counts are historical, not current progress. Use the [roadmap](../plan/roadmap.md) and [development guide](../development.md) for current work.
+
 > Status: **DRAFT v0.2** (2026-05-30). The V1 closeout phase. Companion to
 > [v1-release-plan.md](./v1-release-plan.md) (V1 north star — see §6.5 F6, §8.1
 > CI gate, §8.2 Postgres parity, §8.3 walkthrough),

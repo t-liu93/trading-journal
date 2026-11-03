@@ -2,6 +2,8 @@
 
 **Language:** English | [中文](./frontend-implementation-plan-f3.zh.md)
 
+> **Current guidance notice: historical planning record, superseded for scheduling.** Original status, commands and test counts are historical, not current progress. Use the [roadmap](../plan/roadmap.md) and [development guide](../development.md) for current work.
+
 > Status: **DRAFT v0.1** (2026-05-28). Companion to
 > [frontend-expansion-plan.md](./frontend-expansion-plan.md) (macro roadmap),
 > [v1-release-plan.md](./v1-release-plan.md) (V1 north star),

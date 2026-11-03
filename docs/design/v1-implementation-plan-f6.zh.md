@@ -2,6 +2,8 @@
 
 **Language:** [English](./v1-implementation-plan-f6.md) | 中文
 
+> **当前指导说明：历史规划记录，已退出活动调度。** 原文状态、命令和测试数量保留为历史，不表示当前进度；当前工作统一见[路线图](../plan/roadmap.zh.md)，工程约定见[开发指南](../development.zh.md)。
+
 > 状态：**DRAFT v0.2**（2026-05-30）。V1 收尾 phase。配套
 > [v1-release-plan.zh.md](./v1-release-plan.zh.md)（V1 北极星 —— 见 §6.5 F6、§8.1
 > CI gate、§8.2 Postgres parity、§8.3 walkthrough）、

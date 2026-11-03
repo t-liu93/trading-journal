@@ -2,6 +2,8 @@
 
 **Language:** English | [中文](./backend-expansion-plan-p12.zh.md)
 
+> **Current guidance notice: historical planning record, superseded for scheduling.** Original status, commands and test counts are historical, not current progress. Use the [roadmap](../plan/roadmap.md) and [development guide](../development.md) for current work.
+
 > Status: **DONE v0.2** (2026-05-28) — shipped on `refactoring/rebuild` (commit
 > `6af39f0`, 406 backend tests passing, `ruff` + `mypy --strict` clean). Detailed
 > build plan for **P12** from the macro roadmap

@@ -2,6 +2,8 @@
 
 **Language:** English | [中文](./v1-release-plan.zh.md)
 
+> **Current guidance notice: historical planning record, superseded for scheduling.** Original status, commands and test counts are historical, not current progress. Use the [roadmap](../plan/roadmap.md) and [development guide](../development.md) for current work.
+
 > Status: **DRAFT v0.3** (2026-05-29). North-star scope document for the first deployable release of the trading journal on `refactoring/rebuild`. Consolidates the V1-cut content from [backend-expansion-plan.md](./backend-expansion-plan.md) and [frontend-expansion-plan.md](./frontend-expansion-plan.md). Companion to [data-model.md](./data-model.md). After V1 ships, this document remains as the V1 record; the two macro roadmaps are archived.
 
 ## 1. Purpose and maintenance

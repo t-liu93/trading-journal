@@ -1,220 +1,129 @@
-# Trading Journal — Manual Build & Feature Walkthrough
+# Disposable build and feature walkthrough
 
-**Language:** English | [中文](./walkthrough.zh.md)
+> **English** · [中文](walkthrough.zh.md)
 
-> A hands-on guide to **build the Docker image, run the single container, reach
-> it from your laptop over an SSH tunnel, and verify every V1 feature**. This is
-> the F6.C acceptance run-through (see
-> [v1-implementation-plan-f6.md](./design/v1-implementation-plan-f6.md)).
->
-> Setup assumed: you develop on a **remote server over SSH**; the container runs
-> on that server; you test from your **laptop's browser via `localhost`**.
+This is the current manual verification guide. Use synthetic data in a new temporary environment; it does not start or modify the normal deployment. Passing these checks records only the paths actually exercised, not acceptance of every deferred feature. See the [roadmap](plan/roadmap.md) and relevant task card for scope.
 
----
+## 1. Create an isolated environment
 
-## 0. Prerequisites
+Prerequisites: Docker with Compose, a checkout of the candidate to verify, a browser, and SSH only when testing a remote machine. Start a dedicated terminal at the repository root. Port 18000 must be free; if occupied, choose a different unused port in the copied mapping and tunnel. Do not stop the existing listener.
 
-On the **dev server**:
-- Docker + the Compose plugin (`docker compose version`).
-- This repo checked out; you're on `refactoring/rebuild`.
-
-On your **laptop**:
-- An SSH client that can reach the dev server.
-- A browser.
-
----
-
-## 1. Build & run the container (on the dev server)
+The commands copy the deployment template into a newly created directory, build from the candidate source, and give this run its own project/image name. They use neither the repo's `data/` nor its root Compose/`.env` files. The template already binds loopback. No manual `COOKIE_SECRET` is required; this local HTTP run explicitly sets `COOKIE_SECURE=false`.
 
 ```bash
-# The example compose lives in ./example. Run the container from there so its
-# relative ./data bind mount and .env sit next to the compose file.
-cd /path/to/trading-journal/example
+export TJ_SOURCE_DIR="$(pwd)"
+export TJ_CHECK_DIR="$(mktemp -d /tmp/tj-check-XXXXXX)"
+export TJ_CHECK_ID="$(basename "$TJ_CHECK_DIR" | tr '[:upper:]' '[:lower:]')"
+export PUID="$(id -u)"
+export PGID="$(id -g)"
+export COOKIE_SECURE=false
+export DEBUG=false
+mkdir "$TJ_CHECK_DIR/data"
 
-# 1. Create the data dir FIRST, owned by you. This is the #1 gotcha:
-#    the container runs as your UID (1000) and writes ./data/app.db here.
-#    If Docker auto-creates ./data it'll be root-owned and the migration fails.
-mkdir -p data
+sed 's/127.0.0.1:8000:8000/127.0.0.1:18000:8000/' \
+  example/docker-compose.yml > "$TJ_CHECK_DIR/compose.yml"
 
-# 2. Make a real .env (it's gitignored). The template lives at the repo root.
-cp ../.env.example .env
-#    Generate a real secret and put it in .env as COOKIE_SECRET=...
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-#    Edit .env: set COOKIE_SECRET=<that value>. Leave COOKIE_SECURE=false
-#    (we're on plain HTTP behind an SSH tunnel, not HTTPS yet).
+cat > "$TJ_CHECK_DIR/local.yml" <<'YAML'
+services:
+  migrate:
+    build:
+      context: $TJ_SOURCE_DIR
+      dockerfile: Dockerfile
+    image: trading-journal:$TJ_CHECK_ID
+  app:
+    build:
+      context: $TJ_SOURCE_DIR
+      dockerfile: Dockerfile
+    image: trading-journal:$TJ_CHECK_ID
+YAML
 
-# 3. The example compose pulls ghcr.io/t-liu93/trading-journal:latest. To run
-#    YOUR local build for acceptance, build that tag first (context = repo root):
-docker build -t ghcr.io/t-liu93/trading-journal:latest ..
-#    Then start the container (detached). Skip the build above to just pull the
-#    already-published image instead.
-docker compose up -d
+tj_check() {
+  docker compose --env-file /dev/null -p "$TJ_CHECK_ID" \
+    -f "$TJ_CHECK_DIR/compose.yml" -f "$TJ_CHECK_DIR/local.yml" "$@"
+}
 
-# 4. Confirm it came up healthy (give it ~10-15s for the healthcheck).
-docker compose ps
-#    STATUS should read "Up ... (healthy)".
-docker compose logs --tail=20 app
-#    You should see "alembic upgrade head" run, then uvicorn listening on :8000.
+tj_check config
 ```
 
-If `PUID`/`PGID` on your server aren't 1000, set them in `.env` (`PUID=$(id -u)`,
-`PGID=$(id -g)`) before `up`.
-
-**Security note (recommended for SSH dev):** by default Compose publishes
-`8000:8000` on the server's `0.0.0.0` (all interfaces). To keep it private and
-reachable *only* through your SSH tunnel, change the port line in
-`example/docker-compose.yml` to bind loopback:
-
-```yaml
-    ports:
-      - "127.0.0.1:8000:8000"
-```
-
----
-
-## 2. Reach it from your laptop via an SSH tunnel
-
-The container listens on the **server's** `localhost:8000`. Forward your laptop's
-`localhost:8000` to it. In a **laptop terminal**:
+Before `up`, inspect `config`: both database mounts must resolve inside `$TJ_CHECK_DIR/data`, the build context must be your checkout, and the only host binding must be `127.0.0.1:18000`. If they do not, stop and correct the temporary configuration.
 
 ```bash
-ssh -N -L 8000:localhost:8000 <user>@<dev-server>
-# -N: no remote command, just forward. Leave this running.
+tj_check up -d --build
+tj_check ps -a
+tj_check logs --tail=30 migrate app
 ```
 
-Or make it permanent in `~/.ssh/config` on your laptop:
+Expected: `migrate` exits successfully, then `app` becomes healthy. Migration logs belong to `migrate`; the app's `RUN_MIGRATIONS=false` skips a second migration. A failed migration must prevent app startup. The database/secret is created in the temporary data directory, owned by the selected host UID/GID. Never fix a permission issue by deleting an existing database.
 
-```
-Host devbox
-    HostName <dev-server>
-    User <user>
-    LocalForward 8000 localhost:8000
-```
+## 2. Browser access and infrastructure
 
-…then `ssh devbox`. (VS Code Remote-SSH forwards ports automatically — check the
-**PORTS** panel — so you may not need this at all.)
-
-Now open **http://localhost:8000** on your laptop.
-
-**Why `localhost` and not the server's IP:** cookies are keyed on the exact
-hostname, and `COOKIE_SECURE=false` cookies behave consistently on `localhost`
-(same hostname the dev setup uses on :5173). Browsers also treat `localhost` as a
-secure context. Using the raw server IP works but invites "I logged in but my
-session vanished" cookie surprises — stick to `localhost` over the tunnel.
-
----
-
-## 3. Infrastructure smoke check (do this before features)
-
-With the tunnel up, from your laptop browser:
-
-| Check | URL / action | Expected |
-|---|---|---|
-| SPA loads | `http://localhost:8000` | The app UI (login screen), not JSON |
-| API alive | `http://localhost:8000/api/health` | `{"status":"ok"}` |
-| API docs | `http://localhost:8000/docs` | Swagger UI |
-| **Deep-link refresh** | go to `http://localhost:8000/positions`, then hit **reload** | Still the SPA — **not** a 404. (Proves the catch-all fallback.) |
-| Unknown API 404 | `http://localhost:8000/api/nope` | JSON `{"detail":"Not Found"}`, not the SPA shell |
-
-Back on the **server**, confirm data ownership + persistence:
+Locally, open `http://localhost:18000`. For a remote dev machine, forward from the laptop:
 
 ```bash
-ls -l data/                       # app.db present, owned by YOU (not root)
-docker compose restart app        # bounce it
-# reload the browser -> your data is still there (DB survived the restart)
+ssh -N -L 18000:127.0.0.1:18000 <user>@<dev-server>
 ```
 
-If all of the above pass, the image and single-container wiring are correct.
-Move on to features.
+Use a separate browser profile/container for synthetic accounts. Cookies are keyed by hostname, not port, so another app/test on `localhost` can share the cookie namespace.
 
----
-
-## 4. Feature walkthrough (the acceptance script)
-
-Do these in order from your laptop browser. Each step lists the action and the
-**expected result**. (Use throwaway data — this is your real DB.)
-
-1. **Auth.** Register a new account → you're logged in. Log out → back to login.
-   Log back in.
-   *Expected:* session persists across reloads (cookie works over the tunnel).
-
-2. **Accounts (F1).** Create an account; edit it; archive it.
-   *Expected:* list updates after each; archived ones drop from the default view.
-
-3. **Instruments (F2 + F3).** Open `/instruments`. Create a **stock**, an
-   **option**, and a **forex** instrument via the form. Then in a Position-create
-   flow, use the **InstrumentPicker inline create** (`allowCreate`): type a brand
-   new symbol and create it without leaving the form; for an option, confirm the
-   **two-step** flow (pick underlying, then strike/expiry/type/multiplier).
-   *Expected:* duplicates silently resolve to the existing instrument (get-or-create).
-
-4. **Strategy config.** Go to `/settings/strategies`; set an exposure cap for a
-   strategy. *Expected:* value saves and reloads.
-
-5. **Position (F3).** Create a position (using the picker). Open its detail page
-   and visit all four tabs:
-   - **Overview** — edit manual fields (`capital_used`, `max_risk_at_open`, …);
-     derived values (`days_open`, `pnl_total`, ROI, result) display read-only.
-   - **Meta** — for a `wheel` position fill funding/loan/interest; for a `pmcc`
-     position pick the LEAP; other types show an empty state.
-   - **Plan** — append a TradePlan revision; the history table grows.
-   - **Trades** — currently a read pane (becomes live in the next step).
-
-6. **Trade entry (F4).** On the Trades tab, add trades:
-   - A **single** trade (e.g. a stock buy). *Expected:* it appears; per-row
-     `cash_flow` shown.
-   - A **Custom multi-leg** submission for each event in the
-     [§4.5.2 cheat-sheet](#appendix--multi-leg-event--rows) — iron-condor open
-     (4 legs), assignment (2), exercise (2), expiration (1) — all legs of one
-     submission sharing a single `order_group_id`.
-   *Expected:* legs render grouped by `order_group_id`, with the right
-   **pattern badge** (IC-open / Assignment / Exercise / Expiration).
-
-7. **Dashboard (F5).** Open `/dashboard`.
-   *Expected:* per-currency PnL cards, the open-positions table, the
-   closed-positions table, the **monthly realized-PnL chart**, and the win-rate
-   gauge — all reflecting the data you just entered.
-
-8. **Delete paths.** Try to delete a position that has trades/plans attached
-   → blocked with a clear 409 message. Soft-delete a trade, then view with
-   `?include_archived=true`. *Expected:* exactly as described.
-
-When all eight pass, F6.A + the manual acceptance are done.
-
----
-
-## 5. Teardown & troubleshooting
-
-```bash
-docker compose down        # stops + removes the container; ./data is KEPT
-docker compose up -d       # bring it back; your data is still there
-```
-
-| Symptom | Likely cause / fix |
+| Check | Expected |
 |---|---|
-| `up` fails: can't write `/data/app.db` / permission denied | `./data` is root-owned. `sudo chown -R $(id -u):$(id -g) data` (or remove it and `mkdir -p data` as yourself before `up`). |
-| `COOKIE_SECRET` error on `up` | Not set in `.env`. Generate one (step 1.2) and add it. |
-| `localhost:8000` refused on laptop | SSH tunnel not running, or the container isn't up/healthy. Re-check `ssh -N -L …` and `docker compose ps`. |
-| Logged in but session keeps dropping | You're hitting the server IP, not `localhost` over the tunnel. Use `localhost`. |
-| Port 8000 already in use on the server | Something else is bound. Change the host side of the ports mapping (e.g. `8001:8000`) and forward `8001` instead. |
-| Stale frontend after a code change | Rebuild: `docker build -t ghcr.io/t-liu93/trading-journal:latest .. && docker compose up -d` (the SPA is baked into the image at build time). |
+| `http://localhost:18000/` | Login/register UI |
+| `http://localhost:18000/api/health` | JSON `{"status":"ok"}` |
+| `http://localhost:18000/docs` | Swagger UI |
+| Authenticated `/positions` deep-link refresh | SPA route loads, rather than JSON or 404 |
+| `/api/nope` | JSON 404, not the SPA shell |
 
-Logs: `docker compose logs -f app`.
+## 3. Representative feature checks
 
----
+Use a synthetic email such as `walkthrough@example.test`. Record actions and observations; do not mark untested cases as passed.
 
-## Appendix — multi-leg event → rows
+1. **Auth/theme:** register, log in, reload, log out/in; toggle light/dark and reload. Expect the appropriate session and theme persistence.
+2. **Accounts:** create one account to keep for trades and a second to edit/archive. Expect archived accounts to disappear by default and remain visible with “Show archived”; this is not an unarchive action.
+3. **Instruments/config:** create stock, option and forex examples; exercise inline creation and duplicate get-or-create. Verify expiry/strike/type distinguish option contracts. Save/reload a strategy configuration.
+4. **Position/first Trade:** create a stock Position including its required First Trade. With no costs, buy quantity 10 at price 100; expect cash flow −1000. Visit Overview, Meta, Plan and Trades. Set capital used to 1000. For wheel/PMCC use separate synthetic examples to check their metadata; append two plan revisions and verify both remain.
+5. **Trade operations:** add a sell of 10 at 110 with zero costs and a later timestamp; expect +1100, total cash flow 100. In a separate open Position, edit notes, archive a Trade and toggle archived visibility. Archived rows remain stored and are excluded from totals. Record the known notes-placement/date issues from [triage](triage/improvements.md); this guide does not declare them fixed.
+6. **Multi-leg:** submit synthetic Iron Condor, assignment, exercise and expiration examples using the appendix. Multiple legs in one submission share an order group; pattern badges should match supported shapes. A one-row event need not have a group ID.
+7. **Close/dashboard:** close the stock Position from step 5 with both fills active. Expect frozen realized P&L 100 and the latest fill as default close time. Verify closed Trade actions are unavailable. Dashboard should show the closed result, monthly bucket, win rate and account filtering, keeping currencies separate.
+8. **Deletion/persistence:** deleting a Position with Trades/plans is rejected. In the test terminal run `tj_check restart app`; reload and verify the synthetic data remains. Inspect `ls -l "$TJ_CHECK_DIR/data"` for database ownership.
 
-The exact leg shapes for each synthetic event are defined in
-[data-model.md §4.5.2](./design/data-model.md#452-notion-event--atomic-trade-mapping)
-(Notion-event ↔ atomic-trade mapping). Quick reference for step 6:
+This is a representative walkthrough, not exhaustive regression coverage. For each task add its specific boundary cases and verify them before acceptance; independent review and automated checks have separate records.
 
-| Event | Rows in one `order_group_id` |
+## 4. Record results and clean up
+
+Record candidate identity, checks actually run, failures, skipped paths and explicit owner acceptance in the task record. Detailed Chinese summary/walkthrough evidence stays local under `development-notes/<run-id>/`. Automated completion is distinct from human acceptance.
+
+In the same test terminal, after collecting the necessary observations:
+
+```bash
+tj_check down
+docker image rm "trading-journal:$TJ_CHECK_ID"
+rm -r -- "$TJ_CHECK_DIR"
+unset -f tj_check
+unset TJ_SOURCE_DIR TJ_CHECK_DIR TJ_CHECK_ID PUID PGID COOKIE_SECURE DEBUG
+```
+
+This removes only the uniquely named test containers/image and directory created above. Close the SSH tunnel and synthetic browser profile. No existing deployment or data directory should be stopped or removed.
+
+## Troubleshooting
+
+| Symptom | Check |
 |---|---|
-| Iron-condor open | 4 option legs (sell + buy, both wings) |
-| Assignment | 2 (option closed at 0 + the stock fill at strike) |
-| Exercise | 2 (option closed at 0 + the stock fill at strike) |
-| Expiration | 1 (option closed at price 0) |
+| Migration fails | `tj_check logs migrate`; temporary data directory ownership and selected UID/GID |
+| Cannot connect | Free host port, matching SSH tunnel, `tj_check ps -a` |
+| Login does not persist | HTTP `COOKIE_SECURE=false`, consistent hostname, separate test browser, `/api/users/me` response |
+| Missing secret warning | Current app needs no env secret; check whether an old image/template is being used |
+| Stale UI | Re-run `tj_check up -d --build` on the intended candidate checkout |
+| A known issue appears | Record it against its triage/task ID; do not silently change data to make the walkthrough pass |
 
-Enter all rows of an event as a single multi-leg submission so they share one
-`order_group_id` and the Trades tab can detect the pattern.
+## Appendix — event rows
+
+See [original domain mapping](design/data-model.md#452-notion-event--atomic-trade-mapping) for exact examples.
+
+| Event | Rows submitted together |
+|---|---|
+| Iron Condor open | Four option legs: both credit-spread wings |
+| Assignment | Option closed at zero plus stock fill at strike |
+| Exercise | Option closed at zero plus stock fill at strike |
+| Expiration | One option closing fill at zero |
+
+The badge is inferred from the recorded shape, not a declaration of strategy or an instruction to execute a real trade.

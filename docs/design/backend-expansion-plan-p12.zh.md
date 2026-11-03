@@ -2,6 +2,8 @@
 
 **Language:** [English](./backend-expansion-plan-p12.md) | 中文
 
+> **当前指导说明：历史规划记录，已退出活动调度。** 原文状态、命令和测试数量保留为历史，不表示当前进度；当前工作统一见[路线图](../plan/roadmap.zh.md)，工程约定见[开发指南](../development.zh.md)。
+
 > 状态：**DONE v0.2**（2026-05-28）—— 已在 `refactoring/rebuild` 上交付（commit
 > `6af39f0`，后端 406 条测试全绿，`ruff` + `mypy --strict` clean）。宏观路线图
 > [backend-expansion-plan.zh.md](./backend-expansion-plan.zh.md) 中 **P12** 的详细建设计划。自洽 —— 实现者可直接执行。配套：

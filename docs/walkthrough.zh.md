@@ -1,208 +1,129 @@
-# Trading Journal —— 手工 Build 与功能验收 walkthrough
+# 一次性构建与功能走查
 
-**Language:** [English](./walkthrough.md) | 中文
+> [English](walkthrough.md) · **中文**
 
-> 手把手指南：**build Docker 镜像、跑单容器、从笔记本经 SSH 隧道访问、逐一验证每个
-> V1 功能**。这是 F6.C 的验收走查（见
-> [v1-implementation-plan-f6.zh.md](./design/v1-implementation-plan-f6.zh.md)）。
->
-> 假设的环境：你在**远程服务器上通过 SSH 开发**；容器跑在那台服务器上；你从
-> **笔记本浏览器经 `localhost` 测试**。
+这是当前手动验证指南。使用新建临时环境和合成数据，不启动或修改常规部署。通过只代表实际走过的路径，不代表验收所有延后功能。范围看[路线图](plan/roadmap.zh.md)与对应任务卡。
 
----
+## 1. 创建隔离环境
 
-## 0. 前置
+前提：Docker 和 Compose、待验候选的 checkout、浏览器；仅远程测试需要 SSH。使用独立终端，从仓库根目录开始。18000 端口须空闲；若占用，修改复制后的映射和隧道为其他空闲端口，不停已有监听服务。
 
-**dev 服务器**上：
-- Docker + Compose 插件（`docker compose version`）。
-- 已 checkout 本仓库；当前在 `refactoring/rebuild`。
-
-**笔记本**上：
-- 能 SSH 到 dev 服务器的客户端。
-- 一个浏览器。
-
----
-
-## 1. Build 并跑容器（在 dev 服务器上）
+命令把部署模板复制到新建目录，从候选源码构建，并为本轮生成独立项目／镜像名。不使用仓库 `data/` 或根目录 Compose／`.env`。模板本就只绑定 loopback。无需手工 `COOKIE_SECRET`；本地 HTTP 显式设 `COOKIE_SECURE=false`。
 
 ```bash
-# 示例 compose 在 ./example 下。从那里跑容器，让它相对的 ./data bind mount 和
-# .env 紧挨着 compose 文件。
-cd /path/to/trading-journal/example
+export TJ_SOURCE_DIR="$(pwd)"
+export TJ_CHECK_DIR="$(mktemp -d /tmp/tj-check-XXXXXX)"
+export TJ_CHECK_ID="$(basename "$TJ_CHECK_DIR" | tr '[:upper:]' '[:lower:]')"
+export PUID="$(id -u)"
+export PGID="$(id -g)"
+export COOKIE_SECURE=false
+export DEBUG=false
+mkdir "$TJ_CHECK_DIR/data"
 
-# 1. 先建 data 目录、属主是你。这是头号坑：
-#    容器以你的 UID（1000）运行、把 app.db 写进 ./data。
-#    若让 Docker 自动建 ./data，它会归 root，迁移会失败。
-mkdir -p data
+sed 's/127.0.0.1:8000:8000/127.0.0.1:18000:8000/' \
+  example/docker-compose.yml > "$TJ_CHECK_DIR/compose.yml"
 
-# 2. 造一个真实的 .env（它被 gitignore）。模板在仓库根目录。
-cp ../.env.example .env
-#    生成一个真实 secret，填进 .env 的 COOKIE_SECRET=...
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-#    编辑 .env：把 COOKIE_SECRET 设成上面那个值。COOKIE_SECURE 保持 false
-#    （现在是 SSH 隧道上的纯 HTTP，还不是 HTTPS）。
+cat > "$TJ_CHECK_DIR/local.yml" <<'YAML'
+services:
+  migrate:
+    build:
+      context: $TJ_SOURCE_DIR
+      dockerfile: Dockerfile
+    image: trading-journal:$TJ_CHECK_ID
+  app:
+    build:
+      context: $TJ_SOURCE_DIR
+      dockerfile: Dockerfile
+    image: trading-journal:$TJ_CHECK_ID
+YAML
 
-# 3. 示例 compose 拉取 ghcr.io/t-liu93/trading-journal:latest。要跑你自己的本地
-#    build 做验收，先 build 出这个 tag（context = 仓库根）：
-docker build -t ghcr.io/t-liu93/trading-journal:latest ..
-#    然后后台起容器。想直接用已发布镜像就跳过上面的 build。
-docker compose up -d
+tj_check() {
+  docker compose --env-file /dev/null -p "$TJ_CHECK_ID" \
+    -f "$TJ_CHECK_DIR/compose.yml" -f "$TJ_CHECK_DIR/local.yml" "$@"
+}
 
-# 4. 确认起来且健康（healthcheck 给它 ~10-15s）。
-docker compose ps
-#    STATUS 应显示 "Up ... (healthy)"。
-docker compose logs --tail=20 app
-#    应看到先跑 "alembic upgrade head"，然后 uvicorn 监听 :8000。
+tj_check config
 ```
 
-如果你服务器上的 `PUID`/`PGID` 不是 1000，先在 `.env` 里设（`PUID=$(id -u)`、
-`PGID=$(id -g)`）再 `up`。
-
-**安全提示（SSH 开发推荐）：** 默认 Compose 把 `8000:8000` 发布在服务器的 `0.0.0.0`
-（所有网卡）。要让它私有、**只**能经你的 SSH 隧道访问，把 `example/docker-compose.yml` 的端口
-行改成只绑 loopback：
-
-```yaml
-    ports:
-      - "127.0.0.1:8000:8000"
-```
-
----
-
-## 2. 从笔记本经 SSH 隧道访问
-
-容器监听的是**服务器**的 `localhost:8000`。把笔记本的 `localhost:8000` 转发过去。在
-**笔记本终端**：
+`up` 前检查 `config`：两个数据库挂载都应位于 `$TJ_CHECK_DIR/data`，构建上下文是当前 checkout，宿主绑定仅为 `127.0.0.1:18000`。不相符就先停下，修正临时配置。
 
 ```bash
-ssh -N -L 8000:localhost:8000 <user>@<dev-server>
-# -N：不执行远程命令，只转发。让它一直开着。
+tj_check up -d --build
+tj_check ps -a
+tj_check logs --tail=30 migrate app
 ```
 
-或在笔记本 `~/.ssh/config` 里固化：
+预期：`migrate` 成功退出，之后 `app` 变 healthy。迁移日志属于 `migrate`，app 的 `RUN_MIGRATIONS=false` 避免重复迁移。迁移失败应阻止 app 启动。数据库／密钥在临时数据目录创建，属主是选定的宿主 UID/GID。不通过删除已有数据库解决权限问题。
 
-```
-Host devbox
-    HostName <dev-server>
-    User <user>
-    LocalForward 8000 localhost:8000
-```
+## 2. 浏览器访问与基础设施
 
-……然后 `ssh devbox`。（VS Code Remote-SSH 会自动转发端口 —— 看 **PORTS** 面板 ——
-所以你可能根本不用手动开。）
-
-现在在笔记本打开 **http://localhost:8000**。
-
-**为什么用 `localhost` 而不是服务器 IP：** cookie 按确切的 hostname 存储，
-`COOKIE_SECURE=false` 的 cookie 在 `localhost` 上行为一致（和 dev 在 :5173 用的
-hostname 一致）。浏览器也把 `localhost` 当作 secure context。用服务器裸 IP 也能通，但
-容易撞上「登录了但 session 莫名消失」的 cookie 坑 —— 走隧道、用 `localhost`。
-
----
-
-## 3. 基础设施冒烟检查（先于功能）
-
-隧道开着，在笔记本浏览器：
-
-| 检查 | URL / 操作 | 预期 |
-|---|---|---|
-| SPA 加载 | `http://localhost:8000` | 出现 app UI（登录页），不是 JSON |
-| API 活着 | `http://localhost:8000/api/health` | `{"status":"ok"}` |
-| API 文档 | `http://localhost:8000/docs` | Swagger UI |
-| **深链刷新** | 进 `http://localhost:8000/positions`，再按**刷新** | 仍是 SPA —— **不是** 404。（证明 catch-all fallback 生效。） |
-| 未知 API 404 | `http://localhost:8000/api/nope` | JSON `{"detail":"Not Found"}`，不是 SPA 外壳 |
-
-回到**服务器**，确认数据属主 + 持久化：
+本地打开 `http://localhost:18000`。远程开发机从笔记本转发：
 
 ```bash
-ls -l data/                       # app.db 在，属主是你（不是 root）
-docker compose restart app        # 重启一下
-# 刷新浏览器 -> 数据还在（DB 跨重启存活）
+ssh -N -L 18000:127.0.0.1:18000 <user>@<dev-server>
 ```
 
-以上全过，说明镜像和单容器接线正确。进入功能验收。
+合成账户使用独立浏览器 profile／容器。Cookie 按 hostname 而不是端口隔离，其他 `localhost` 应用／测试可能共用 cookie 命名空间。
 
----
-
-## 4. 功能走查（验收脚本）
-
-在笔记本浏览器按顺序做。每步列出操作与**预期结果**。（用一次性测试数据 —— 这是你的真实
-DB。）
-
-1. **鉴权。** 注册一个新账号 → 登录态。登出 → 回到登录页。再登录。
-   *预期：* session 跨刷新保持（cookie 经隧道工作正常）。
-
-2. **Accounts（F1）。** 创建账户；编辑；归档。
-   *预期：* 每次操作后列表更新；归档的从默认视图消失。
-
-3. **Instruments（F2 + F3）。** 打开 `/instruments`。用表单创建一个 **stock**、一个
-   **option**、一个 **forex** instrument。然后在 Position 创建流程里，用
-   **InstrumentPicker 内嵌创建**（`allowCreate`）：输入一个全新 symbol，不离开表单就
-   创建；期权确认**两步式**流程（先选标的，再填 strike/expiry/type/multiplier）。
-   *预期：* 重复项静默命中已有 instrument（get-or-create）。
-
-4. **Strategy config。** 进 `/settings/strategies`；给某策略设曝光上限。
-   *预期：* 值保存并能重新加载。
-
-5. **Position（F3）。** 创建一个 position（用 picker）。打开详情页，走遍四个 tab：
-   - **Overview** —— 编辑手填字段（`capital_used`、`max_risk_at_open`…）；派生值
-     （`days_open`、`pnl_total`、ROI、result）只读展示。
-   - **Meta** —— `wheel` 仓位填 funding/loan/interest；`pmcc` 仓位选 LEAP；其他类型
-     显示空状态。
-   - **Plan** —— 追加一条 TradePlan revision；历史表增长。
-   - **Trades** —— 目前是只读面板（下一步变 live）。
-
-6. **Trade 录入（F4）。** 在 Trades tab 加 trade：
-   - 一条**单条** trade（如股票买入）。*预期：* 出现；每行 `cash_flow` 显示。
-   - 对[§4.5.2 速查表](#附录--多腿事件--录入行)里每个事件做一次 **Custom multi-leg**
-     提交 —— 开 iron condor（4 腿）、assignment（2）、exercise（2）、expire（1）——
-     一次提交的所有腿共享同一个 `order_group_id`。
-   *预期：* 各腿按 `order_group_id` 分组渲染，并打上正确的 **pattern badge**
-   （IC-open / Assignment / Exercise / Expiration）。
-
-7. **Dashboard（F5）。** 打开 `/dashboard`。
-   *预期：* 分币种 PnL 卡、开仓表、平仓表、**按月已实现 PnL 图**、胜率仪表 —— 都反映
-   你刚录入的数据。
-
-8. **删除路径。** 删一个挂了 trade/plan 的 position → 被拦、给出清晰的 409 提示。软删
-   一条 trade，再用 `?include_archived=true` 查看。*预期：* 与描述一致。
-
-八步全过，F6.A + 人工验收即完成。
-
----
-
-## 5. 收尾与排查
-
-```bash
-docker compose down        # 停止 + 删除容器；./data 保留
-docker compose up -d       # 再起来；数据还在
-```
-
-| 症状 | 可能原因 / 解法 |
+| 检查 | 预期 |
 |---|---|
-| `up` 失败：写不了 `/data/app.db` / permission denied | `./data` 归 root 了。`sudo chown -R $(id -u):$(id -g) data`（或删掉它、以你自己 `mkdir -p data` 再 `up`）。 |
-| `up` 时报 `COOKIE_SECRET` 错 | `.env` 没设。生成一个（步骤 1.2）填进去。 |
-| 笔记本 `localhost:8000` 连接被拒 | SSH 隧道没开，或容器没起/不健康。重查 `ssh -N -L …` 和 `docker compose ps`。 |
-| 登录后 session 老掉 | 你在用服务器 IP，而非经隧道的 `localhost`。改用 `localhost`。 |
-| 服务器上 8000 端口被占 | 有别的东西占了。改 ports 映射的宿主侧（如 `8001:8000`），转发 `8001`。 |
-| 改了代码但前端还是旧的 | 重新 build：`docker build -t ghcr.io/t-liu93/trading-journal:latest .. && docker compose up -d`（SPA 在 build 时烤进镜像）。 |
+| `http://localhost:18000/` | 登录／注册 UI |
+| `http://localhost:18000/api/health` | JSON `{"status":"ok"}` |
+| `http://localhost:18000/docs` | Swagger UI |
+| 登录后刷新 `/positions` 深链 | SPA 路由加载，不是 JSON 或 404 |
+| `/api/nope` | JSON 404，不是 SPA 外壳 |
 
-日志：`docker compose logs -f app`。
+## 3. 代表性功能检查
 
----
+使用 `walkthrough@example.test` 等合成邮箱，记录操作和观察，不把未测情况标成通过。
 
-## 附录 —— 多腿事件 → 录入行
+1. **鉴权／主题：** 注册、登录、刷新、登出／重登，切换明暗后刷新。预期 session 与主题按各自规则持久化。
+2. **账户：** 建一个保留用于交易的账户，再建一个编辑／归档。预期归档账户默认隐藏，“Show archived”仍可查看，这不等于取消归档。
+3. **品种／配置：** 创建股票、期权和外汇样例，检查内嵌创建和重复 get-or-create。确认到期／行权价／类型能区分期权合约。保存／重载策略配置。
+4. **仓位／首笔成交：** 创建股票 Position，包含必需 First Trade。零费用、买 10、价格 100，预期现金流 −1000。访问 Overview、Meta、Plan、Trades，资金占用设为 1000。另建合成 wheel／PMCC 检查元数据；追加两版计划并确认均保留。
+5. **成交操作：** 较晚时间零费用卖 10、价格 110，预期 +1100、总现金流 100。另一个未平仓 Position 中改 notes、归档 Trade、切换归档可见性；归档行保留但不计入统计。遇到 [triage](triage/improvements.md) 中已知备注布局／日期问题应记录，本指南不声称已修复。
+6. **多腿：** 按附录录入合成 Iron Condor、指派、行权和到期例子。同次多腿提交共享订单分组，pattern badge 匹配支持的形态；单行事件不必有 group ID。
+7. **平仓／仪表盘：** 对步骤 5 的股票 Position 平仓，两笔成交均有效。预期冻结已实现 P&L 为 100，默认平仓时间取最后成交。确认已平仓 Trade 操作不可用。仪表盘显示平仓结果、月度桶、胜率和账户筛选，币种分别统计。
+8. **删除／持久化：** 删除带 Trade／计划的 Position 应拒绝。在测试终端运行 `tj_check restart app`，刷新确认合成数据仍在。用 `ls -l "$TJ_CHECK_DIR/data"` 核对数据库属主。
 
-每个合成事件的确切腿形态定义在
-[data-model.zh.md §4.5.2](./design/data-model.zh.md#452-notion-event--atomic-trade-mapping)
-（Notion 事件 ↔ 原子 trade 映射）。步骤 6 的速查：
+这是代表性走查，不是完整回归。各任务还需补自己的边界并在验收前验证；独立评审与自动检查分别记录。
 
-| 事件 | 同一 `order_group_id` 内的行 |
+## 4. 记录与清理
+
+任务记录中写明候选身份、实际检查、失败、跳过路径和用户明确验收。详细中文总结／走查证据留在本地 `development-notes/<run-id>/`。自动化完成与人工接受分开。
+
+收集观察后，在同一个测试终端执行：
+
+```bash
+tj_check down
+docker image rm "trading-journal:$TJ_CHECK_ID"
+rm -r -- "$TJ_CHECK_DIR"
+unset -f tj_check
+unset TJ_SOURCE_DIR TJ_CHECK_DIR TJ_CHECK_ID PUID PGID COOKIE_SECURE DEBUG
+```
+
+只删除上方创建的独立测试容器／镜像和目录，关闭 SSH 隧道与合成浏览器 profile。不应停或删任何已有部署／数据目录。
+
+## 排查
+
+| 现象 | 检查 |
 |---|---|
-| 开 iron condor | 4 条期权腿（卖 + 买，两个翼） |
-| assignment（指派） | 2 条（期权按 0 平 + 股票按 strike 成交） |
-| exercise（行权） | 2 条（期权按 0 平 + 股票按 strike 成交） |
-| expire（到期） | 1 条（期权按价 0 平） |
+| 迁移失败 | `tj_check logs migrate`、临时数据目录属主和所选 UID/GID |
+| 连不上 | 空闲宿主端口、对应 SSH 隧道、`tj_check ps -a` |
+| 登录态不保持 | HTTP 的 `COOKIE_SECURE=false`、统一 hostname、独立测试浏览器、`/api/users/me` 响应 |
+| 提示缺密钥 | 当前 app 不需环境密钥，检查是否用了旧镜像／模板 |
+| UI 还是旧的 | 在目标候选 checkout 重跑 `tj_check up -d --build` |
+| 出现已知问题 | 按 triage／任务 ID 记录，不悄悄改数据把走查变通过 |
 
-把一个事件的所有行作为一次多腿提交录入，让它们共享一个 `order_group_id`，Trades tab
-才能识别出 pattern。
+## 附录 — 事件行
+
+准确样例见[原始领域映射](design/data-model.zh.md#452-notion-事件--原子-trade-映射)。
+
+| 事件 | 一起提交的行 |
+|---|---|
+| Iron Condor 开仓 | 四条期权腿，两侧 credit spread |
+| 指派 | 期权零价平仓，加按行权价成交的股票 |
+| 行权 | 期权零价平仓，加按行权价成交的股票 |
+| 到期 | 一条期权零价平仓 |
+
+Badge 从记录形态推断，不是策略声明，也不是执行真实交易的指令。

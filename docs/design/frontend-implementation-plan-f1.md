@@ -2,6 +2,8 @@
 
 **Language:** English | [中文](./frontend-implementation-plan-f1.zh.md)
 
+> **Current guidance notice: historical planning record, superseded for scheduling.** Original status, commands and test counts are historical, not current progress. Use the [roadmap](../plan/roadmap.md) and [development guide](../development.md) for current work.
+
 > Status: **DRAFT v0.1** (2026-05-19). Companion to [frontend-implementation-plan.md](./frontend-implementation-plan.md) (F0 base scaffold) and [data-model.md](./data-model.md). Iterate here before writing code.
 
 ## 1. Purpose

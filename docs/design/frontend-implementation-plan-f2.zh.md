@@ -2,6 +2,8 @@
 
 **语言：** [English](./frontend-implementation-plan-f2.md) | 中文
 
+> **当前指导说明：历史规划记录，已退出活动调度。** 原文状态、命令和测试数量保留为历史，不表示当前进度；当前工作统一见[路线图](../plan/roadmap.zh.md)，工程约定见[开发指南](../development.zh.md)。
+
 > 状态：**DRAFT v0.2**（2026-06-15）。配套文档：
 > [frontend-expansion-plan.zh.md](./frontend-expansion-plan.zh.md)（宏观路线图）、
 > [frontend-implementation-plan-f1.zh.md](./frontend-implementation-plan-f1.zh.md)（F1

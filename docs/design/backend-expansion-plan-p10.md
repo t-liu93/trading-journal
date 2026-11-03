@@ -2,6 +2,8 @@
 
 **Language:** English | [中文](./backend-expansion-plan-p10.zh.md)
 
+> **Current guidance notice: historical planning record, superseded for scheduling.** Original status, commands and test counts are historical, not current progress. Use the [roadmap](../plan/roadmap.md) and [development guide](../development.md) for current work.
+
 > Status: **DRAFT v0.1** (2026-05-26). Detailed build plan for **P10** from
 > the macro roadmap [backend-expansion-plan.md](./backend-expansion-plan.md).
 > Self-contained — an implementer can execute it directly. Companions:

@@ -2,6 +2,8 @@
 
 **语言：** [English](./frontend-expansion-plan.md) | 中文
 
+> **当前指导说明：历史规划记录，已退出活动调度。** 原文状态、命令和测试数量保留为历史，不表示当前进度；当前工作统一见[路线图](../plan/roadmap.zh.md)，工程约定见[开发指南](../development.zh.md)。
+
 > 状态：**DRAFT v0.5**（2026-05-29）。F0（认证脚手架）和 F1（Account CRUD UI）
 > 之后的前端扩展宏观路线图。与
 > [backend-expansion-plan.zh.md](./backend-expansion-plan.zh.md)（Phase P6+）配套，

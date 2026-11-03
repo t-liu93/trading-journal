@@ -2,6 +2,8 @@
 
 **语言：** [English](./backend-expansion-plan.md) | 中文
 
+> **当前指导说明：历史规划记录，已退出活动调度。** 原文状态、命令和测试数量保留为历史，不表示当前进度；当前工作统一见[路线图](../plan/roadmap.zh.md)，工程约定见[开发指南](../development.zh.md)。
+
 > 状态：**DRAFT v0.1**（2026-05-21）。`refactoring/rebuild` 分支上、在 Account
 > tracer bullet 之后继续横向扩展后端的宏观路线图。配套文档：
 > [mvp-implementation-plan.zh.md](./mvp-implementation-plan.zh.md)（后端 Phase 0–5）、

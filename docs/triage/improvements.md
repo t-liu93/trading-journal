@@ -1,17 +1,41 @@
-## 前端
+# 改进与问题登记
 
-- position-trades面板下，每个trade如果edit notes之后，notes显示的位置不对。
+本文件保留原始现象和需求历史；排期、优先级与状态统一见[当前路线图](../plan/roadmap.zh.md)。这里的记录不表示修复已完成。正式实现前按[任务卡模板](../plan/task-template.zh.md)确定契约与验收。
 
-- position创建的时候，first trade下的每个格子说明位置不好。
+## FIX-01 — 开仓日期不随后续成交变化维护
 
-- position创建的时候可以自动derive一些参数
+Position 的 `opened_at` 只在创建时从首批 Trade 时间设置，后续新增更早成交、归档错误首笔成交都不重算。平仓默认 `closed_at` 却按非归档 Trade 的 MAX(`executed_at`)推导，可能出现开仓晚于平仓、持仓天数为负。
 
-- position里添加trade尤其是iron condor可以考虑预填一些参数
+- 原始事故：2026-06-02 的 INTC wheel position。曾手动改 `data/app.db`，把开仓日期改为非归档 MIN(`executed_at`)，并删除归档孤儿 Trade；当时 `pnl_realized` 已正确排除归档记录。这是历史处置记录，不是建议复制的修复操作。
+- 当前限制：Trade PATCH 只改 notes；未平仓数字／日期纠错需归档后重新录入，已平仓 Trade 禁写，Position 也不能重新打开。
+- [FIX-01 任务草案](../plan/tasks/FIX-01.zh.md)提出同事务维护最早有效成交、空集回退和平仓日期顺序校验。方案待确认，旧的错误平仓历史需另定审计纠错路径，不自动修改真实库。
 
-- instrument的种类/显示方式还有待调整
+## UI-01 — Trade 备注的位置
 
-## 后端 / 逻辑（bug）
+原始反馈：position-trades 面板中，每笔 Trade 编辑 notes 后显示位置不对。当前备注统一显示在分组表格下方，和对应成交行分离。
 
-- **position 的 `opened_at` 不会重算（和 `closed_at` 不对称）。** `closed_at` 在平仓时按「非归档 trade 的 MAX(executed_at)」重算，但 `opened_at` 只在创建时由前端取「第一笔 trade 的 executed_at」定一次，之后归档/修改那笔 trade 时**不会跟着重算**。后果：如果第一笔 trade 日期填错（比如默认成"现在"）没发现，等后面交易都补录完、再回头归档那笔错的，`opened_at` 会卡在错误值上，可能晚于 `closed_at` → days held 变负。目前只能改数据库修。
-  - 已实际发生过一次：2026-06-02 的 INTC wheel position，手动改 `data/app.db` 修复（`opened_at` = 非归档 MIN(executed_at)，并删掉那笔归档的孤儿 trade；`pnl_realized` 本来就对，因为归档 trade 已被排除）。
-  - 修复方向（任选）：(a) 后端在 trade 增/改/归档后，把 `opened_at` 一并按「非归档 MIN(executed_at)」重算，与 `closed_at` 对称；(b) 前端允许对已关闭 position 的首笔 trade 纠错。
+验收方向：单腿、多腿和长备注都能明确对应成交，不把某条备注误读为整组说明；具体布局在任务卡中确认。
+
+## UI-02 — First Trade 标签与说明布局
+
+原始反馈：创建 Position 时，First Trade 每个格子的说明位置不好。
+
+验收方向：桌面及窄屏下字段标签、帮助和校验信息可辨识，保留键盘操作与多腿增删。需要界面走查，不以构建通过代替视觉验收。
+
+## UI-03 — 创建 Position 时推导参数
+
+原始反馈：可以自动 derive 一些参数。当前开仓时间已有首批成交推导，资金占用、最大风险和最大收益仍为手填。
+
+待设计：按策略定义推导字段、公式、单位、期权 multiplier、缺少输入时的行为和手动覆盖规则，避免把建议值当成权威财务结果。
+
+## UI-04 — 添加 Trade 时预填
+
+原始反馈：特别是 Iron Condor，可以预填部分参数。当前为通用 Custom multi-leg 表单，没有策略模板。
+
+待设计：明确开仓、平仓或续录场景，确定标的／合约／方向／数量的默认来源；模板须可检查和修改，不悄悄推断真实交易意图。
+
+## UI-05 — Instrument 类型与显示
+
+原始反馈：种类／显示方式有待调整。当前已有 stock／option／forex 分类与期权合约紧凑编码，不能把旧反馈直接当成全部尚未实现。
+
+待澄清：具体页面、现有显示、期望显示及合约识别问题；准备股票、同标的不同到期／行权价期权和外汇的合成样例后再定验收。

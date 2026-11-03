@@ -43,3 +43,6 @@ review notes/
 # Editor / OS
 .DS_Store
 .idea/
+
+# Local development evidence
+/development-notes/

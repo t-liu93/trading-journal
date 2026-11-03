@@ -2,6 +2,8 @@
 
 **Language:** English | [中文](./frontend-expansion-plan.zh.md)
 
+> **Current guidance notice: historical planning record, superseded for scheduling.** Original status, commands and test counts are historical, not current progress. Use the [roadmap](../plan/roadmap.md) and [development guide](../development.md) for current work.
+
 > Status: **DRAFT v0.5** (2026-05-29). Macro roadmap for expanding the frontend
 > beyond F0 (auth scaffold) and F1 (Account CRUD UI). Pairs with
 > [backend-expansion-plan.md](./backend-expansion-plan.md) (Phase P6+) and rolls each

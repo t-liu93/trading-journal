@@ -2,6 +2,8 @@
 
 **语言：** [English](./backend-expansion-plan-p8.md) | 中文
 
+> **当前指导说明：历史规划记录，已退出活动调度。** 原文状态、命令和测试数量保留为历史，不表示当前进度；当前工作统一见[路线图](../plan/roadmap.zh.md)，工程约定见[开发指南](../development.zh.md)。
+
 > 状态：**DRAFT v0.1**（2026-05-26）。来自宏观路线图
 > [backend-expansion-plan.zh.md](./backend-expansion-plan.zh.md) 中 **P8** 的详细
 > 实施 plan。自包含——实施者可直接执行。配套：

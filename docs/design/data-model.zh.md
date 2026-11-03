@@ -2,6 +2,8 @@
 
 **语言：** [English](./data-model.md) | 中文
 
+> **当前指导说明：领域设计参考。** 原始草案保留；已实现行为以源码、迁移与测试为准，后续变化见[当前路线图](../plan/roadmap.zh.md)与任务卡。
+
 > 状态：**DRAFT v0.4**（2026-05-18）。`refactoring/rebuild` 分支重构的初版设计。本文档是 schema 讨论的 source of truth；写 migration 之前在这里迭代。文末有 changelog。
 
 ## 1. 目的与设计原则

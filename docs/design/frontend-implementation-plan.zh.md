@@ -2,6 +2,8 @@
 
 **语言：** [English](./frontend-implementation-plan.md) | 中文
 
+> **当前指导说明：历史规划记录，已退出活动调度。** 原文状态、命令和测试数量保留为历史，不表示当前进度；当前工作统一见[路线图](../plan/roadmap.zh.md)，工程约定见[开发指南](../development.zh.md)。
+
 > 状态：**DRAFT v0.1**（2026-05-18）。`refactoring/rebuild` 分支前端第一刀端到端的执行计划。配套文档：[data-model.md](./data-model.md) 和 [mvp-implementation-plan.md](./mvp-implementation-plan.md)（后端）。写代码前先在这里迭代。
 
 ## 1. 目的与方法
