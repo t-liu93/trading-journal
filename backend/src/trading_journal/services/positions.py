@@ -12,8 +12,12 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from trading_journal.models._enums import PositionStatus, StrategyType
+from trading_journal.models.instrument import Instrument
 from trading_journal.models.position import Position
 from trading_journal.models.trade import Trade
+from trading_journal.services.datetimes import to_utc_naive
+from trading_journal.services.ownership import resolve_owned_account
 
 
 async def freeze_pnl_realized(session: AsyncSession, position: Position) -> Decimal:
@@ -95,6 +99,44 @@ async def compute_net_cash_flows(
     )
     rows = (await session.execute(stmt)).all()
     return {row.position_id: row.total for row in rows}
+
+
+async def create_position(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    account_id: uuid.UUID,
+    primary_instrument_id: uuid.UUID,
+    strategy_type: StrategyType,
+    opened_at: datetime,
+    capital_used: Decimal | None = None,
+    max_risk_at_open: Decimal | None = None,
+    max_reward_at_open: Decimal | None = None,
+    notes: str | None = None,
+) -> Position:
+    """Validate references and construct an open Position; caller commits."""
+    await resolve_owned_account(session, user_id, account_id)
+    instrument = await session.get(Instrument, primary_instrument_id)
+    if instrument is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=422, detail="Instrument not found")
+    position = Position(
+        user_id=user_id,
+        account_id=account_id,
+        primary_instrument_id=primary_instrument_id,
+        strategy_type=strategy_type,
+        status=PositionStatus.OPEN,
+        opened_at=to_utc_naive(opened_at),
+        capital_used=capital_used,
+        max_risk_at_open=max_risk_at_open,
+        max_reward_at_open=max_reward_at_open,
+        currency=instrument.currency,
+        notes=notes,
+    )
+    session.add(position)
+    await session.flush()
+    return position
 
 
 async def detect_auto_close(session: AsyncSession, position: Position) -> bool:

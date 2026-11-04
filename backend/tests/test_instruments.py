@@ -10,6 +10,7 @@ from datetime import date
 import pytest
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from trading_journal.main import app
 
@@ -539,6 +540,67 @@ async def test_create_forex_idempotent_returns_200(
     response = await auth_client.post("/api/instruments", json=FOREX_BODY)
     assert response.status_code == 200, response.text
     assert response.json()["id"] == first["id"]
+
+
+async def test_create_forex_retry_uses_persisted_numeric_precision(
+    auth_client: AsyncClient,
+    db_session_maker: async_sessionmaker[AsyncSession],
+) -> None:
+    from trading_journal.schemas.instrument import ForexCreate
+    from trading_journal.services.instruments import resolve_instrument_spec
+
+    cases = [
+        ("0.0001", "100000.12345"),
+        ("0.0001", "2.34565"),
+        ("0.0001", "2.67505"),
+        ("0.0001", "100000.12355"),
+        ("0.000100005", "100000"),
+        ("0.000100015", "100000"),
+        ("0.000000001", None),
+        ("0.123456789", "2.34565"),
+        ("0.0001", "1.23445"),
+        ("0.000100001", "100000.12345"),
+    ]
+    for index, (pip_size, contract_size) in enumerate(cases):
+        payload = {
+            "kind": "forex",
+            "symbol": f"PRECISIONRETRY{index}",
+            "base_currency": "EUR",
+            "quote_currency": "USD",
+            "pip_size": pip_size,
+            "contract_size": contract_size,
+        }
+        first = await auth_client.post("/api/instruments", json=payload)
+        assert first.status_code == 201, (index, first.text)
+        first_body = first.json()
+        if pip_size == "0.000100001" and contract_size == "100000.12345":
+            assert first_body["forex"]["pip_size"] == "0.00010000"
+            assert first_body["forex"]["contract_size"] == "100000.1234"
+        second = await auth_client.post("/api/instruments", json=payload)
+        assert second.status_code == 200, (index, second.text)
+        assert second.json()["id"] == first_body["id"]
+
+        async with db_session_maker() as session:
+            resolved = await resolve_instrument_spec(
+                session, ForexCreate.model_validate(payload)
+            )
+        assert resolved is not None, index
+        assert str(resolved.id) == first_body["id"]
+
+    payload = {
+        "kind": "forex",
+        "symbol": "PRECISIONCONFLICT",
+        "base_currency": "EUR",
+        "quote_currency": "USD",
+        "pip_size": "0.000100001",
+        "contract_size": "100000.12345",
+    }
+    first = await auth_client.post("/api/instruments", json=payload)
+    assert first.status_code == 201, first.text
+    changed_specification = await auth_client.post(
+        "/api/instruments", json={**payload, "contract_size": "100000.12346"}
+    )
+    assert changed_specification.status_code == 409
 
 
 async def test_create_forex_rejects_bad_quote_currency_422(

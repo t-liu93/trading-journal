@@ -25,6 +25,7 @@ from trading_journal.models.position import Position
 from trading_journal.models.trade import Trade
 from trading_journal.models.user import User
 from trading_journal.schemas.trade import TradeCreate, TradeRead, TradeUpdate
+from trading_journal.services.ownership import resolve_owned_position, resolve_owned_trade
 from trading_journal.services.positions import maintain_opened_at_from_active_trades
 from trading_journal.services.trades import create_trades_atomic
 
@@ -34,27 +35,13 @@ router = APIRouter(prefix="/trades", tags=["trades"])
 async def _resolve_position(
     session: AsyncSession, user: User, position_id: uuid.UUID
 ) -> Position:
-    stmt = select(Position).where(
-        Position.id == position_id, Position.user_id == user.id
-    )
-    pos = (await session.execute(stmt)).scalar_one_or_none()
-    if pos is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Position not found")
-    return pos
+    return await resolve_owned_position(session, user.id, position_id)
 
 
 async def _get_owned_trade(
     session: AsyncSession, user: User, trade_id: uuid.UUID
 ) -> Trade:
-    stmt = (
-        select(Trade)
-        .join(Position, Trade.position_id == Position.id)
-        .where(Trade.id == trade_id, Position.user_id == user.id)
-    )
-    trade = (await session.execute(stmt)).scalar_one_or_none()
-    if trade is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
-    return trade
+    return await resolve_owned_trade(session, user.id, trade_id)
 
 
 def _normalize_payload(

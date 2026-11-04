@@ -29,19 +29,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from trading_journal.auth.deps import current_active_user
 from trading_journal.db import get_session
 from trading_journal.models._enums import PositionStatus, StrategyType
-from trading_journal.models.account import Account
-from trading_journal.models.instrument import Instrument
 from trading_journal.models.position import Position
 from trading_journal.models.trade import Trade
 from trading_journal.models.trade_plan import TradePlan
 from trading_journal.models.user import User
 from trading_journal.schemas.position import PositionCreate, PositionRead, PositionUpdate
 from trading_journal.services.datetimes import to_utc_naive
+from trading_journal.services.ownership import resolve_owned_position
 from trading_journal.services.positions import (
     compute_net_cash_flows,
     earliest_active_trade_executed_at,
     freeze_pnl_realized,
     latest_trade_executed_at,
+)
+from trading_journal.services.positions import (
+    create_position as construct_position,
 )
 
 router = APIRouter(prefix="/positions", tags=["positions"])
@@ -66,36 +68,7 @@ def _position_to_read(pos: Position, net_cash_flow: Decimal) -> PositionRead:
 async def _get_owned_position(
     session: AsyncSession, user: User, position_id: uuid.UUID
 ) -> Position:
-    stmt = select(Position).where(
-        Position.id == position_id, Position.user_id == user.id
-    )
-    pos = (await session.execute(stmt)).scalar_one_or_none()
-    if pos is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Position not found")
-    return pos
-
-
-async def _resolve_account(
-    session: AsyncSession, user: User, account_id: uuid.UUID
-) -> Account:
-    stmt = select(Account).where(
-        Account.id == account_id,
-        Account.user_id == user.id,
-        Account.archived_at.is_(None),
-    )
-    acct = (await session.execute(stmt)).scalar_one_or_none()
-    if acct is None:
-        raise HTTPException(status_code=422, detail="Account not found or archived")
-    return acct
-
-
-async def _resolve_instrument(
-    session: AsyncSession, instrument_id: uuid.UUID
-) -> Instrument:
-    inst = await session.get(Instrument, instrument_id)
-    if inst is None:
-        raise HTTPException(status_code=422, detail="Instrument not found")
-    return inst
+    return await resolve_owned_position(session, user.id, position_id)
 
 
 @router.post(
@@ -108,23 +81,18 @@ async def create_position(
     user: Annotated[User, Depends(current_active_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> PositionRead:
-    await _resolve_account(session, user, payload.account_id)
-    instrument = await _resolve_instrument(session, payload.primary_instrument_id)
-
-    position = Position(
+    position = await construct_position(
+        session,
         user_id=user.id,
         account_id=payload.account_id,
         primary_instrument_id=payload.primary_instrument_id,
         strategy_type=payload.strategy_type,
-        status=PositionStatus.OPEN,
-        opened_at=_to_utc(payload.opened_at),
+        opened_at=payload.opened_at,
         capital_used=payload.capital_used,
         max_risk_at_open=payload.max_risk_at_open,
         max_reward_at_open=payload.max_reward_at_open,
-        currency=instrument.currency,
         notes=payload.notes,
     )
-    session.add(position)
     await session.commit()
     await session.refresh(position)
     return _position_to_read(position, Decimal("0"))

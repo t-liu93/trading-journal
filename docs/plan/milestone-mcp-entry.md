@@ -206,12 +206,12 @@ Execution order: **T7 phase A → T1 → T2 → T3 → T4 → T5 → T6 → T7 p
 
 **Acceptance:**
 
-- [ ] Successful REST behavior and financial results remain compatible.
-- [ ] Filters precede pagination; identical symbols with different currencies/exchanges remain distinguishable.
-- [ ] Another user's accounts/positions/trades remain inaccessible.
-- [ ] Read-only resolution never creates underlyings or contracts.
-- [ ] Independent database connections creating the same natural key produce one instrument.
-- [ ] Cross-connection protection does not depend on a process-local lock.
+- [x] Successful REST behavior and financial results remain compatible.
+- [x] Filters precede pagination; identical symbols with different currencies/exchanges remain distinguishable.
+- [x] Another user's accounts/positions/trades remain inaccessible.
+- [x] Read-only resolution never creates underlyings or contracts.
+- [x] Independent database connections creating the same natural key produce one instrument.
+- [x] Cross-connection protection does not depend on a process-local lock.
 
 **Checks:** Ruff/strict mypy/full pytest; concurrency tests use independent sessions and a real isolated SQLite file.
 
@@ -389,7 +389,7 @@ Surface material domain/scope changes before implementation; routine implementat
 |---|---|---|---|---|
 | T1 time/context | Implemented | Passed (card checks and isolated timezone integration) | Passed (T1-C00) | Pending |
 | T2 credentials | Implemented | Passed (full backend/frontend/migration/codegen; real HTTP isolation) | Passed (T2-C01; one repair) | Pending |
-| T3 shared services | Not started | Not run | Not requested | Pending |
+| T3 shared services | Implemented | Passed (447 backend tests; cross-process and precision HTTP integration) | Passed (T3-C02; two repairs) | Pending |
 | T4 preparation | Not started | Not run | Not requested | Pending |
 | T5 commit | Not started | Not run | Not requested | Pending |
 | T6 HTTP MCP | Not started | Not run | Not requested | Pending |

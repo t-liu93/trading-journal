@@ -22,7 +22,14 @@ def _reset_secret_cache() -> Iterator[None]:
 
 
 async def _count_rows(session: AsyncSession) -> int:
-    return await session.scalar(select(func.count()).select_from(AppConfig)) or 0
+    return (
+        await session.scalar(
+            select(func.count())
+            .select_from(AppConfig)
+            .where(AppConfig.key == COOKIE_SECRET_KEY)
+        )
+        or 0
+    )
 
 
 async def test_generates_and_persists_once(

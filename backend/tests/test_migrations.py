@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -128,6 +128,15 @@ def test_alembic_upgrade_creates_expected_columns(temp_db: tuple[str, str]) -> N
         actual = set(_columns(sync_url, table))
         missing = expected - actual
         assert not missing, f"{table}: missing columns after upgrade: {sorted(missing)}"
+
+    engine = create_engine(sync_url)
+    try:
+        value = engine.connect().execute(
+            text("SELECT value FROM app_config WHERE key = 'instrument_write_guard'")
+        ).scalar_one()
+        assert value == "0"
+    finally:
+        engine.dispose()
 
 
 def test_alembic_downgrade_roundtrip(temp_db: tuple[str, str]) -> None:
