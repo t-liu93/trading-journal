@@ -4,7 +4,7 @@
 
 This is the current manual verification guide. Use synthetic data in a new temporary environment; it does not start or modify the normal deployment. Passing these checks records only the paths actually exercised, not owner acceptance. See the [roadmap](plan/roadmap.md) and relevant task card for scope.
 
-Future MCP verification is specified in [M-MCP-01 section 4](plan/milestone-mcp-entry.md#4-verification-walkthrough-and-cleanup). MCP is not implemented yet. Its T7 phase B will add executable client/credential/timezone steps after the application cards; this documentation delivery does not change the current setup commands.
+MCP is implemented in the current source candidate, not in the already published `latest` or `v1.1.0` images. Its isolated walkthrough below uses the section 1 checkout build overlay; it does not publish or deploy the candidate. No existing client configuration or live journal data is reused.
 
 ## 1. Create an isolated environment
 
@@ -74,6 +74,128 @@ Use a separate browser profile/container for synthetic accounts. Cookies are key
 | `http://localhost:18000/docs` | Swagger UI |
 | Authenticated `/positions` deep-link refresh | SPA route loads, rather than JSON or 404 |
 | `/api/nope` | JSON 404, not the SPA shell |
+
+## MCP client setup and walkthrough
+
+The server uses the same app and database at exactly `/api/mcp`. Local clients use `http://localhost:18000/api/mcp`. A remote client uses `https://<journal-host>/api/mcp` through the HTTPS reverse proxy; keep the app port bound to loopback. Do not expose port 8000/18000 directly to the network.
+
+For a same-host HTTPS reverse proxy, configure the app's `MCP_ALLOWED_HOSTS` and `MCP_ALLOWED_ORIGINS` on the `app` service. Preserve the localhost/loopback defaults and add the exact public host (including port if present) and origin. These variables are JSON arrays. For example, in the temporary `local.yml` overlay from section 1:
+
+```yaml
+services:
+  app:
+    environment:
+      JOURNAL_TIMEZONE: Europe/Amsterdam
+      MCP_ALLOWED_HOSTS: '["127.0.0.1","127.0.0.1:*","localhost","localhost:*","[::1]","[::1]:*","journal.example.net"]'
+      MCP_ALLOWED_ORIGINS: '["http://127.0.0.1","http://127.0.0.1:*","http://localhost","http://localhost:*","http://[::1]","http://[::1]:*","https://journal.example.net"]'
+```
+
+Replace `journal.example.net` with the actual public hostname. Normal MCP requests without an `Origin` header are allowed; do not add a wildcard. A proxy must terminate TLS, route `/api/mcp` to `http://127.0.0.1:18000/api/mcp` without stripping or rewriting the path, and preserve `Host`, `Authorization`, `Accept`, `Content-Type`, and MCP headers such as `MCP-Protocol-Version`, `MCP-Session-Id`, and `Last-Event-ID`. Disable response buffering for this endpoint. For an illustrative Nginx location on the same host:
+
+```nginx
+location = /api/mcp {
+    proxy_pass http://127.0.0.1:18000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header Origin $http_origin;
+    proxy_buffering off;
+}
+```
+
+Create three credentials in the disposable website at Settings → MCP: a `read` credential for a read-only check, plus separate `entry` credentials for Codex and Hermes. Name them to identify the client. The secret appears once; copy it directly into a hidden prompt and never paste it into a command, shell history, tracked file, or chat. Credentials default to 90-day expiry. Revoke the disposable credentials before cleanup if the environment is retained; deleting the temporary database also removes them.
+
+Use the following Bash commands in a terminal that has the temporary service running. They read the secret without echo and only place the variable in the process environment. Codex runs from a new temporary working directory with temporary `log_dir` and `sqlite_home`, command-only MCP settings, `--ignore-user-config`, and `--ephemeral`; `HOME`, `CODEX_HOME`, and existing client config remain unchanged. Since user config is ignored, select any required model/provider settings yourself as additional command-level `-c` overrides and provide required auth through environment variables; do not copy settings from the existing config. No external model call is needed for a protocol preflight.
+
+**Codex read-only query with command-level temporary settings:**
+
+```bash
+export TJ_CODEX_TMP="$(mktemp -d /tmp/tj-codex-XXXXXX)"
+mkdir -p "$TJ_CODEX_TMP/cwd" "$TJ_CODEX_TMP/logs" "$TJ_CODEX_TMP/sqlite"
+read -r -s -p 'Codex read token: ' TJ_CODEX_TOKEN
+printf '\n'
+export TJ_CODEX_TOKEN
+tj_codex() {
+  codex exec --ignore-user-config --ephemeral --skip-git-repo-check \
+    -C "$TJ_CODEX_TMP/cwd" \
+    -c "log_dir=\"$TJ_CODEX_TMP/logs\"" \
+    -c "sqlite_home=\"$TJ_CODEX_TMP/sqlite\"" \
+    -c 'mcp_servers.trading_journal.url="http://localhost:18000/api/mcp"' \
+    -c 'mcp_servers.trading_journal.bearer_token_env_var="TJ_CODEX_TOKEN"' \
+    "$@"
+}
+tj_codex 'Use get_context and list_accounts only. Do not prepare or commit entries.'
+```
+
+For a synthetic Codex entry, replace the read credential with its separately issued `entry` credential, then make a first one-shot `exec` that only prepares:
+
+```bash
+unset TJ_CODEX_TOKEN
+read -r -s -p 'Codex entry token: ' TJ_CODEX_TOKEN
+printf '\n'
+export TJ_CODEX_TOKEN
+tj_codex 'Use the paper account named MCP walkthrough and a synthetic USD stock named MCPTEST (create it if absent). Prepare a new spot_stock Position with one buy leg: quantity 1, price USD 1.00, at the exact execution date/time I provide. If I have not supplied the concrete date/time or any required detail, ask and stop. Show the complete preview and returned request_id and draft_id, then stop. Do not call commit_entry.'
+```
+
+Review the preview printed by that command. If it is correct, explicitly approve it in the terminal before starting a second `exec`; the second run can only commit the displayed draft:
+
+```bash
+read -r -p 'Displayed draft_id: ' TJ_DRAFT_ID
+read -r -p 'After reviewing and explicitly approving that preview, type CONFIRM: ' TJ_APPROVAL
+if [ "$TJ_APPROVAL" = CONFIRM ]; then
+  tj_codex "The owner explicitly confirmed the displayed preview. Call commit_entry only with this exact draft_id: $TJ_DRAFT_ID. Do not prepare or change the batch."
+else
+  printf '%s\n' 'Not confirmed; no commit requested.'
+fi
+```
+
+Each `codex exec` invocation is one-shot. If it asks a clarifying question, answer it in a new `tj_codex` invocation with the complete explicit details; do not approve or commit until you receive the complete preview. The first successful preparation stops after `prepare_entry`; keep its `draft_id` and run the second command only after explicit approval. If a commit response is uncertain, retry `commit_entry` with that same ID. A pending preview expires after 24 hours. Do not create a replacement draft to retry.
+
+**Hermes with an isolated config directory:**
+
+```bash
+export TJ_HERMES_HOME="$(mktemp -d /tmp/tj-hermes-XXXXXX)"
+mkdir -p "$TJ_HERMES_HOME"
+cat > "$TJ_HERMES_HOME/config.yaml" <<'YAML'
+mcp_servers:
+  trading_journal:
+    url: http://localhost:18000/api/mcp
+    headers:
+      Authorization: "Bearer ${TJ_HERMES_TOKEN}"
+YAML
+read -r -s -p 'Hermes read token: ' TJ_HERMES_TOKEN
+printf '\n'
+export TJ_HERMES_TOKEN HERMES_HOME="$TJ_HERMES_HOME"
+hermes chat
+```
+
+This example uses the separate `read` credential. For entry, replace it at the hidden prompt with Hermes's own `entry` credential. Hermes expands `${VAR}` in string configuration values; the YAML stores the variable reference, not the token. `HERMES_HOME` points at the fresh temporary directory so the existing `~/.hermes/config.yaml` is untouched. See the [Hermes MCP configuration guide](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp), [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), and [Codex config reference](https://learn.chatgpt.com/docs/config-file/config-reference) for client options and temporary runtime paths. These documented commands are setup instructions, not evidence that either installed client connected successfully.
+
+In either client, a `read` credential must be used only for queries; direct write-tool calls are denied server-side. Only the user's explicit approval of the displayed draft counts as confirmation; the original trade description or ordinary follow-up text is not approval. For entries, have the agent clarify account, instrument/contract, action, quantity, price, execution time and option open/close intent; then show the server preview, including fees/defaults, timezone interpretation and cash flow. The owner must explicitly confirm that draft before the agent commits.
+
+### Seven-step owner walkthrough
+
+These steps follow [M-MCP-01 §4.2](plan/milestone-mcp-entry.md#42-owner-walkthrough). Use only the temporary database and synthetic records created from this checkout:
+
+1. In the temporary website, create a synthetic `paper` account named `MCP walkthrough`, separate Codex and Hermes `entry` credentials, and one `read` credential. Keep each secret only for the hidden prompts above.
+2. In Codex, use the first one-shot command to prepare a `spot_stock` Position and first fill for a synthetic USD stock (`MCPTEST`, create it if absent): `buy` one share at USD 1.00, with a concrete execution date/time you supply. Verify preparation alone creates no Position or Trade; inspect the full preview, explicitly approve it, then run a second one-shot command with the exact same `draft_id` and inspect the website records. The agent must ask if any requested value is missing rather than invent it.
+3. In Hermes, use its separate `entry` credential to query that Position, add a Trade, and add an earlier-dated fill. Confirm `opened_at` follows the earliest active fill.
+4. Prepare a multi-leg entry that creates a missing option. Before confirming, inspect its complete specifications, default multiplier/style, default fees, and per-leg cash flow.
+5. Compare a timezone-less fill using the server default with a fill using an explicit IANA timezone. Inspect the preview UTC time and website browser-local display.
+6. Retry the same committed `draft_id`; verify Trade counts and returned IDs do not change. Revoke an entry credential and confirm its next MCP request is rejected.
+7. With the `read` credential, verify context/list queries work and `prepare_entry` plus `commit_entry` are denied, including direct tool calls.
+
+Record skipped steps as unrun. This is a walkthrough plan; setup instructions and protocol preflight do not imply owner acceptance.
+
+After collecting the walkthrough observations, revoke the three tokens in the website, stop only the temporary Compose project with the cleanup commands in section 4, remove the temporary Codex/Hermes directories and unset the variables:
+
+```bash
+rm -r -- "$TJ_HERMES_HOME" "$TJ_CODEX_TMP"
+unset -f tj_codex
+unset TJ_HERMES_HOME HERMES_HOME TJ_HERMES_TOKEN TJ_CODEX_TOKEN TJ_CODEX_TMP TJ_DRAFT_ID TJ_APPROVAL
+```
+
+If the Hermes command exits before connecting because its local dependency environment is unavailable, record the client check as unrun and retain the exact error. Do not repair, install, or alter an existing Hermes installation as part of this walkthrough.
 
 ## 3. Representative feature checks
 

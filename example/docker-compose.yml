@@ -4,7 +4,9 @@
 # See the repo's docs/walkthrough.md for the full guide.
 #
 # No COOKIE_SECRET needed: the app generates one on first boot and persists it in
-# the database. The only optional knobs are PUID/PGID, COOKIE_SECURE, DEBUG.
+# the database. Optional app settings include PUID/PGID, COOKIE_SECURE, DEBUG,
+# JOURNAL_TIMEZONE, MCP_ALLOWED_HOSTS, and MCP_ALLOWED_ORIGINS. The MCP lists
+# are JSON arrays when overridden in this deployment's .env.
 services:
   # One-shot: bring the schema to head, then exit. `app` waits for this to
   # succeed (see depends_on below), so a failed migration is fail-closed — the
@@ -39,6 +41,12 @@ services:
       DEBUG: ${DEBUG:-false}
       DATABASE_URL: sqlite+aiosqlite:////data/app.db
       STATIC_DIR: /app/static
+      JOURNAL_TIMEZONE: ${JOURNAL_TIMEZONE:-UTC}
+      # Defaults preserve local loopback access. For remote HTTPS proxy access,
+      # set both values to JSON arrays with the exact external Host (include a
+      # port when present) and Origin values. Requests without Origin remain OK.
+      MCP_ALLOWED_HOSTS: '${MCP_ALLOWED_HOSTS:-["127.0.0.1","127.0.0.1:*","localhost","localhost:*","[::1]","[::1]:*"]}'
+      MCP_ALLOWED_ORIGINS: '${MCP_ALLOWED_ORIGINS:-["http://127.0.0.1","http://127.0.0.1:*","http://localhost","http://localhost:*","http://[::1]","http://[::1]:*"]}'
       # The migrate service already brought the schema to head.
       RUN_MIGRATIONS: "false"
     volumes:

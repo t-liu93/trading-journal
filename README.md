@@ -16,6 +16,7 @@ Trading Journal is a web app for logging and analyzing your trades — spot stoc
 - **Instruments** — stocks, options, and forex pairs; expired-option visibility, paginated candidates, primary-stock filtering and contextual inline creation with deduplication.
 - **Positions** — one model for every strategy (`spot_stock`, `spot_forex`, `wheel`, `iron_condor`, `pmcc`); a detail page with **Overview / Meta / Plan / Trades** tabs.
 - **Trades** — single or multi-leg entry sharing one order group, server-computed cash flow, and audit-friendly soft-delete with retained history.
+- **Agent entry (current source candidate)** — Codex/Hermes can use separate MCP read-only or entry credentials at `/api/mcp`; entry batches are previewed before confirmation and committed atomically.
 - **Dashboard** — per-currency realized P&L cards, open/closed position tables, a monthly realized-P&L chart, and a win-rate gauge.
 - **Deployment** — one container; SQLite by default (PostgreSQL portability is a design goal); cookie-based auth; runs as your host user.
 
@@ -61,12 +62,17 @@ ghcr.io/t-liu93/trading-journal:latest   # or pin a version, e.g. :1.1.0
 | `COOKIE_SECURE` | `true` | Cookies are HTTPS-only by default. Set `false` only for plain-HTTP local access. |
 | `PUID` / `PGID` | `1000` | Host user/group the container runs as, so `./data` stays owned by you. |
 | `DEBUG` | `false` | Verbose backend logging. |
+| `JOURNAL_TIMEZONE` | `UTC` | IANA timezone used for MCP entry times without an offset or per-leg timezone. |
+| `MCP_ALLOWED_HOSTS` | Localhost/loopback defaults | JSON array of allowed HTTP Host values for the MCP endpoint. Extend with the exact external proxy Host when using HTTPS. |
+| `MCP_ALLOWED_ORIGINS` | Localhost/loopback defaults | JSON array of allowed browser Origin values. Normal MCP requests without Origin are accepted. |
 
 There is **no `COOKIE_SECRET`** to manage: the token-signing secret is generated on first boot and persisted in `app_config`. Login sessions use opaque database tokens. For repeat plain-HTTP starts, keep `COOKIE_SECURE=false` in the deployment directory’s `.env`; HTTPS deployments should keep the secure default.
 
 **Data & backups.** The SQLite database lives at `./data/app.db` on the host. Use a consistent SQLite backup, or stop writes before copying the database; verify restoration in an isolated directory. The container runs as a non-root host user and restarts unless stopped.
 
 **HTTPS / remote access.** The example binds to loopback (`127.0.0.1:8000`), which pairs well with an SSH tunnel. For public access, put a reverse proxy in front to terminate TLS — and leave `COOKIE_SECURE=true` (the default).
+
+**MCP clients (current source candidate).** MCP is implemented in this checkout but is not included in the already published `latest` or `v1.1.0` images. The normal Quick Start above remains for those published images. To try MCP, build an isolated service from a source checkout using the [MCP walkthrough](docs/walkthrough.md#mcp-client-setup-and-walkthrough); this is not a release or production deployment. The endpoint is `https://<journal-host>/api/mcp` behind HTTPS (or `http://localhost:18000/api/mcp` in the isolated local walkthrough). Create separate `read` and `entry` credentials in Settings → MCP; the secret is shown once. `read` can query context and journal records; `entry` can also prepare and commit a batch. A preview expires after 24 hours; retries reuse the original `request_id` during preparation and the original `draft_id` during commit. MCP uses atomic Position-plus-first-Trades creation; the website still creates those through two requests with recovery.
 
 See the full build-and-verify guide in [`docs/walkthrough.md`](docs/walkthrough.md) ([中文](docs/walkthrough.zh.md)).
 
@@ -82,7 +88,7 @@ Current scope and acceptance are tracked in the [roadmap](docs/plan/roadmap.md) 
 
 - [Documentation map](docs/index.md) ([中文](docs/index.zh.md)) — current guidance and historical references.
 - [Current roadmap](docs/plan/roadmap.md) ([中文](docs/plan/roadmap.zh.md)) — priorities, task contracts, progress and acceptance.
-- [M-MCP-01 milestone](docs/plan/milestone-mcp-entry.md) ([中文](docs/plan/milestone-mcp-entry.zh.md)) — planned Codex/Hermes MCP entry, shared contracts and atomic implementation cards; application work has not started.
+- [M-MCP-01 milestone](docs/plan/milestone-mcp-entry.md) ([中文](docs/plan/milestone-mcp-entry.zh.md)) — MCP entry contracts, implementation/check/review/owner status; consult the roadmap for current status.
 - [M-OPT-01 milestone](docs/plan/milestone-option-entry.md) ([中文](docs/plan/milestone-option-entry.zh.md)) — completed option-entry work, verification and five-step owner acceptance.
 - [v1.1.0 release notes](docs/release-notes/v1.1.0.md) ([中文](docs/release-notes/v1.1.0.zh.md)) — changes, upgrade notes and validation scope.
 - [Development guide](docs/development.md) ([中文](docs/development.zh.md)) — commands, domain rules, verification and review.

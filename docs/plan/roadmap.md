@@ -14,7 +14,7 @@ Current verification infrastructure: backend Ruff/strict mypy/pytest, migrated i
 
 M-OPT-01 owns shared decisions, complete task cards and acceptance records. It covers expired-option visibility/history/pagination, primary-underlying filtering and contextual creation, FIX-01, UI-01/UI-02 and a bounded QA-01 slice. `ready` records an agreed contract, not authorization to start coding.
 
-**Active milestone (2026-11-04):** [M-MCP-01: agent-driven trade entry](milestone-mcp-entry.md) is `ready` as a design contract. It covers Codex/Hermes queries, dedicated credentials, immutable entry previews, atomic new-Position/Trade entry and safe retries, with an explicitly configured server default entry timezone and local/remote HTTP MCP. Screenshot/model integration is deferred. After the documentation-only delivery, the owner separately authorized application implementation, delegated orchestration, checks and isolated integration verification. T1–T6 technical delivery is complete; T7 phase B is next; no application Git writes or production deployment are authorized.
+**Active milestone (2026-11-04):** [M-MCP-01: agent-driven trade entry](milestone-mcp-entry.md) is `ready` as a design contract. It covers Codex/Hermes queries, dedicated credentials, immutable entry previews, atomic new-Position/Trade entry and safe retries, with an explicitly configured server default entry timezone and local/remote HTTP MCP. Screenshot/model integration is deferred. After the documentation-only delivery, the owner separately authorized application implementation, delegated orchestration, checks and isolated integration verification. T1–T6 and T7 phase B technical delivery, checks and independent reviews are complete; actual owner walkthrough remains pending; no application Git writes or production deployment are authorized.
 
 Each milestone's section 5.2 owns candidate identity and separate implementation, automated-check, independent-review and owner-acceptance records. M-MCP-01 T7 phase A is documentation delivery; it does not establish application or runtime acceptance.
 
@@ -24,7 +24,7 @@ Priority is an ordering recommendation, not authorization. P1 = data correctness
 
 | ID | Priority | State | Scope / next action |
 |---|---|---|---|
-| [M-MCP-01](milestone-mcp-entry.md) | P2 | in-progress | T7 phase A preserved; T1–T6 technical delivery complete; T7 phase B next; owner acceptance pending |
+| [M-MCP-01](milestone-mcp-entry.md) | P2 | implemented | T7 phase A preserved; T1–T6 and T7 phase B implemented, checked and independently reviewed; complete Codex/Hermes and owner walkthrough pending |
 | DOC-01 | P2 | accepted | Documentation handoff accepted on 2026-11-03 with additional manual review omitted; prior targeted checks passed; no independent review or runtime walkthrough claimed |
 | [INS-01](milestone-option-entry.md#t3) | P2 | accepted | Milestone slice checks, independent review and owner expiry/pagination walkthrough passed |
 | [INS-02](milestone-option-entry.md#t4) | P2 | accepted | Original task/R1 independently reviewed; label follow-up checked; owner steps 3/4 accepted, follow-up not separately reviewed |
@@ -38,7 +38,7 @@ Priority is an ordering recommendation, not authorization. P1 = data correctness
 | REL-01 | P2 | proposed | Gate tag publication on exact-source quality checks and runtime image validation; separate design required |
 | [MOPT-DOC](milestone-option-entry.md#t7) | P2 | accepted | Phase A documentation acceptance retained; phase B integration/original-candidate review and five-step owner walkthrough passed |
 
-Original reports and the 2026-06-02 incident remain in [triage](../triage/improvements.md). Work outside a milestone needs a bounded card before implementation; do not treat this queue as an approved implementation batch. M-OPT-01 deferred atomic Position+first-Trade creation; M-MCP-01 now plans that capability only for MCP entry. Migrating the existing website creation flow and an audited closed-record correction path remain deferred.
+Original reports and the 2026-06-02 incident remain in [triage](../triage/improvements.md). Work outside a milestone needs a bounded card before implementation; do not treat this queue as an approved implementation batch. M-OPT-01 deferred atomic Position+first-Trade creation; M-MCP-01 implements that capability only for MCP entry. Migrating the existing website creation flow and an audited closed-record correction path remain deferred.
 
 ## Deferred product directions
 

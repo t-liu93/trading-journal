@@ -21,8 +21,12 @@
 - TradePlan 只追加，保留修订唯一约束和重试。任何 Trade（包括归档历史）或计划修订都阻止删除 Position。
 - 已发布 schema 变化新增 Alembic 迁移。测试将迁移后的模板复制为每个测试独立的数据库。
 - 自动持久化的 `app_config` 密钥用于 token 签名，session 使用数据库不透明 token，无需运维提供 `COOKIE_SECRET`。
+- MCP 以 Streamable HTTP 挂载在同一 app 的精确 `/api/mcp` 路径，使用 Bearer 凭证。共八个工具：`get_context`、`list_accounts`、`search_instruments`、`list_positions`、`get_position`、`list_trades`、`prepare_entry`、`commit_entry`。`read` 凭证可调用前六个；`entry` 可调用全部八个。每个客户端使用独立凭证，默认 90 天过期，明文只在“设置 → MCP”创建时返回一次。
+- MCP 录入使用不可变预览草稿，待提交草稿 24 小时过期。同一凭证、`request_id` 和未改变的请求重试会返回同一草稿；修改内容会冲突。提交重试只使用原 `draft_id`，并返回已保存结果。MCP 路径的新 Position 与首批 Trade 原子提交；网站仍是两次请求并带部分失败恢复，不要把网站录入说成原子操作。
+- MCP 查询和写入执行所有权检查，Trade 通过 Position 校验归属；其他用户的记录不可访问。录入保留现有账户可用性、币种分离、有效成交日期和已平仓 Position 的 Trade 写入锁。Instrument 搜索默认包含过期期权，以支持补录。它不提供平仓／重新开仓／归档／纠错工具。
+- `JOURNAL_TIMEZONE` 默认 `UTC`，且必须是已安装的 IANA 时区。MCP 无时区偏移的录入时间使用单腿时区或该默认值；显式偏移会保留，DST 重复／不存在的本地时间要求显式偏移。持久化仍为 UTC。`MCP_ALLOWED_HOSTS` 与 `MCP_ALLOWED_ORIGINS` 为 JSON 数组；应用默认覆盖 localhost／loopback。没有 `Origin` 的请求允许通过。HTTPS 反代需允许准确外部 Host（有端口时包含端口）和 Origin，并原样代理 `/api/mcp`，保留 `Authorization`、`Host` 和 MCP 协议头。app 发布端口继续绑定 loopback。
 
-规划中的工作：[M-MCP-01](plan/milestone-mcp-entry.zh.md) 定义独立 Agent 凭证、显式默认录入时区、预览草稿及仅供 MCP 的 Position＋首批 Trade 原子创建。文档交付没有实现这些能力。以上 Cookie 鉴权、REST 时间解释和网站创建／恢复行为仍为当前基线，目标变化以里程碑任务卡为准。
+[M-MCP-01 里程碑](plan/milestone-mcp-entry.zh.md) 记录完整契约以及实现、检查、评审、用户验收的独立状态。SDK 协议检查不代表真实 Codex/Hermes 客户端验收。网站 Cookie 鉴权、REST 时间解释和 Position／首笔 Trade 两请求恢复流程保持不变。
 
 ## 命令与环境
 
@@ -36,6 +40,7 @@
 | `backend/` | `uv run pytest` | 隔离后端测试 |
 | `backend/` | `uv run alembic upgrade head` | 迁移配置指定数据库，先检查目标 |
 | `backend/` | `COOKIE_SECURE=false uv run uvicorn trading_journal.main:app --reload` | 本地 HTTP 后端 |
+| `backend/` | `JOURNAL_TIMEZONE=Europe/Amsterdam uv run uvicorn trading_journal.main:app --reload` | MCP 默认录入时区示例（本地 HTTP 还需搭配隔离数据库和 `COOKIE_SECURE=false`） |
 | `frontend/` | `npm ci` | 锁定依赖，保留 `.npmrc` |
 | `frontend/` | `npm run dev` | Vite，`http://localhost:5173` |
 | `frontend/` | `npm run build` | 类型检查与生产构建 |

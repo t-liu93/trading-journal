@@ -4,7 +4,7 @@
 
 这是当前手动验证指南。使用新建临时环境和合成数据，不启动或修改常规部署。通过只代表实际走过的路径，不代表用户验收。范围看[路线图](plan/roadmap.zh.md)与对应任务卡。
 
-未来 MCP 验证见 [M-MCP-01 第 4 节](plan/milestone-mcp-entry.zh.md#4-验证走查与清理)。MCP 尚未实现，T7 阶段 B 将在应用任务完成后补充可执行的客户端／凭证／时区步骤；本次文档交付不改变当前环境命令。
+MCP 已在当前源码候选中实现，尚未包含在已发布的 `latest` 或 `v1.1.0` 镜像中。以下隔离走查使用第 1 节从 checkout 构建的 overlay，不发布或部署候选；不复用现有客户端配置或真实日志数据。
 
 ## 1. 创建隔离环境
 
@@ -74,6 +74,128 @@ ssh -N -L 18000:127.0.0.1:18000 <user>@<dev-server>
 | `http://localhost:18000/docs` | Swagger UI |
 | 登录后刷新 `/positions` 深链 | SPA 路由加载，不是 JSON 或 404 |
 | `/api/nope` | JSON 404，不是 SPA 外壳 |
+
+## MCP 客户端设置与走查
+
+服务使用同一个 app 和数据库，在精确的 `/api/mcp` 路径提供 MCP。本机客户端连接 `http://localhost:18000/api/mcp`；远程客户端经 HTTPS 反代连接 `https://<journal-host>/api/mcp`。app 端口继续绑定 loopback，不要直接向网络开放 8000／18000。
+
+同机 HTTPS 反代需在 `app` 服务配置 `MCP_ALLOWED_HOSTS` 与 `MCP_ALLOWED_ORIGINS`。保留 localhost／loopback 默认值，并加入准确公网 Host（有端口时也包含）与 Origin。这两个变量都是 JSON 数组。以下内容放在第 1 节临时 `local.yml` 覆盖文件中：
+
+```yaml
+services:
+  app:
+    environment:
+      JOURNAL_TIMEZONE: Europe/Amsterdam
+      MCP_ALLOWED_HOSTS: '["127.0.0.1","127.0.0.1:*","localhost","localhost:*","[::1]","[::1]:*","journal.example.net"]'
+      MCP_ALLOWED_ORIGINS: '["http://127.0.0.1","http://127.0.0.1:*","http://localhost","http://localhost:*","http://[::1]","http://[::1]:*","https://journal.example.net"]'
+```
+
+将 `journal.example.net` 替换为实际公网主机名。没有 `Origin` 的正常 MCP 请求允许通过，不要设通配符。反代需终结 TLS，将 `/api/mcp` 原样转发到 `http://127.0.0.1:18000/api/mcp`，不得去除或改写路径；保留 `Host`、`Authorization`、`Accept`、`Content-Type` 及 MCP 头，例如 `MCP-Protocol-Version`、`MCP-Session-Id` 和 `Last-Event-ID`。该端点应关闭响应缓冲。以下是同机 Nginx 示例：
+
+```nginx
+location = /api/mcp {
+    proxy_pass http://127.0.0.1:18000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header Origin $http_origin;
+    proxy_buffering off;
+}
+```
+
+在临时网站“设置 → MCP”创建三个凭证：一个只读 `read` 用于只读检查，以及 Codex、Hermes 各自独立的 `entry` 凭证。名称注明客户端。密钥只显示一次；直接粘贴到隐藏输入提示，绝不写入命令、shell 历史、受版本控制文件或聊天。凭证默认 90 天过期。若保留环境，清理前先撤销临时凭证；删除临时数据库也会移除凭证。
+
+临时服务运行期间，在 Bash 终端执行以下命令。它们会静默读取密钥，只将变量放进进程环境。Codex 从新建临时工作目录运行，使用临时 `log_dir`／`sqlite_home`、命令级 MCP 设置、`--ignore-user-config` 与 `--ephemeral`；不修改 `HOME`、`CODEX_HOME` 或现有客户端配置。由于忽略用户配置，如需模型／提供商设置，由你自行用命令级 `-c` 覆盖并通过环境变量提供所需鉴权；不要从现有配置复制设置。MCP 协议预检不需要调用外部模型。
+
+**Codex 使用命令级临时设置做只读查询：**
+
+```bash
+export TJ_CODEX_TMP="$(mktemp -d /tmp/tj-codex-XXXXXX)"
+mkdir -p "$TJ_CODEX_TMP/cwd" "$TJ_CODEX_TMP/logs" "$TJ_CODEX_TMP/sqlite"
+read -r -s -p 'Codex read token: ' TJ_CODEX_TOKEN
+printf '\n'
+export TJ_CODEX_TOKEN
+tj_codex() {
+  codex exec --ignore-user-config --ephemeral --skip-git-repo-check \
+    -C "$TJ_CODEX_TMP/cwd" \
+    -c "log_dir=\"$TJ_CODEX_TMP/logs\"" \
+    -c "sqlite_home=\"$TJ_CODEX_TMP/sqlite\"" \
+    -c 'mcp_servers.trading_journal.url="http://localhost:18000/api/mcp"' \
+    -c 'mcp_servers.trading_journal.bearer_token_env_var="TJ_CODEX_TOKEN"' \
+    "$@"
+}
+tj_codex 'Use get_context and list_accounts only. Do not prepare or commit entries.'
+```
+
+Codex 合成录入需换成单独签发的 `entry` 凭证，先做只准备的一次性执行：
+
+```bash
+unset TJ_CODEX_TOKEN
+read -r -s -p 'Codex entry token: ' TJ_CODEX_TOKEN
+printf '\n'
+export TJ_CODEX_TOKEN
+tj_codex 'Use the paper account named MCP walkthrough and a synthetic USD stock named MCPTEST (create it if absent). Prepare a new spot_stock Position with one buy leg: quantity 1, price USD 1.00, at the exact execution date/time I provide. If I have not supplied the concrete date/time or any required detail, ask and stop. Show the complete preview and returned request_id and draft_id, then stop. Do not call commit_entry.'
+```
+
+检查该命令输出的预览。若确认正确，先在终端明确批准，再启动第二次 `exec`；第二次运行只提交刚才显示的草稿：
+
+```bash
+read -r -p 'Displayed draft_id: ' TJ_DRAFT_ID
+read -r -p 'After reviewing and explicitly approving that preview, type CONFIRM: ' TJ_APPROVAL
+if [ "$TJ_APPROVAL" = CONFIRM ]; then
+  tj_codex "The owner explicitly confirmed the displayed preview. Call commit_entry only with this exact draft_id: $TJ_DRAFT_ID. Do not prepare or change the batch."
+else
+  printf '%s\n' 'Not confirmed; no commit requested.'
+fi
+```
+
+每个 `codex exec` 调用只运行一次。如果它提出澄清问题，就在新的 `tj_codex` 调用中补充完整且明确的信息；收到完整预览前不要批准或提交。首次成功准备会在 `prepare_entry` 后停止并保留 `draft_id`；只有用户明确批准后才执行第二条。提交响应不确定时用同一个 `draft_id` 重试。待提交预览 24 小时过期；不要为重试新建替代草稿。
+
+**Hermes 使用隔离配置目录：**
+
+```bash
+export TJ_HERMES_HOME="$(mktemp -d /tmp/tj-hermes-XXXXXX)"
+mkdir -p "$TJ_HERMES_HOME"
+cat > "$TJ_HERMES_HOME/config.yaml" <<'YAML'
+mcp_servers:
+  trading_journal:
+    url: http://localhost:18000/api/mcp
+    headers:
+      Authorization: "Bearer ${TJ_HERMES_TOKEN}"
+YAML
+read -r -s -p 'Hermes read token: ' TJ_HERMES_TOKEN
+printf '\n'
+export TJ_HERMES_TOKEN HERMES_HOME="$TJ_HERMES_HOME"
+hermes chat
+```
+
+示例使用独立的 `read` 凭证；录入时，在隐藏提示中输入 Hermes 自己的 `entry` 凭证。Hermes 会展开配置字符串中的 `${VAR}`；YAML 保存的是变量引用而非令牌。`HERMES_HOME` 指向新建临时目录，因此不会改动已有 `~/.hermes/config.yaml`。客户端参数与临时运行目录见 [Hermes MCP 配置指南](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp)、[Codex MCP 文档](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) 和 [Codex 配置参考](https://learn.chatgpt.com/docs/config-file/config-reference)。这里的命令是配置说明，不代表已成功连接任一已安装客户端。
+
+两个客户端都应遵循：`read` 凭证只用于查询，服务端会拒绝直接调用写入工具。只有用户明确批准已展示的该草稿才构成确认；原始交易描述或普通后续文字不算批准。录入时，Agent 需先澄清账户、品种／合约、动作、数量、价格、成交时间和期权开／平仓意图，再展示包含费用／默认值、时区解释与现金流的服务器预览；用户必须明确确认该草稿后才可提交。
+
+### 七步用户走查
+
+以下步骤对应 [M-MCP-01 §4.2](plan/milestone-mcp-entry.zh.md#42-用户走查)。只使用本 checkout 隔离环境中新建的数据库和合成记录：
+
+1. 在临时网站创建一个名为 `MCP walkthrough` 的合成 `paper` 账户、Codex 与 Hermes 各自独立的 `entry` 凭证，以及一个 `read` 凭证。每个密钥只通过上方隐藏提示输入。
+2. 在 Codex 用第一条一次性命令准备 `spot_stock` Position 和第一笔成交：使用合成 USD 股票（`MCPTEST`，若不存在则创建），`buy` 1 股，价格 USD 1.00，成交日期／时间由你提供明确值。确认只准备草稿时没有创建 Position 或 Trade；检查完整预览、明确批准，然后用准确相同的 `draft_id` 执行第二条命令，并在网站核对记录。缺字段时 Agent 必须先问，不能自行编造。
+3. Hermes 用自己的 `entry` 凭证查询该 Position、追加 Trade，并录入更早日期成交。确认 `opened_at` 随最早有效成交变化。
+4. 准备一个需要新建缺失期权的多腿录入。确认前检查完整合约规格、默认 multiplier/style、默认费用及每腿现金流。
+5. 比较使用服务器默认值的无时区成交时间与显式 IANA 时区时间，核对预览 UTC 时间和网站浏览器本地显示。
+6. 重试已提交的同一个 `draft_id`，确认 Trade 数量和返回 ID 不变。撤销一个 entry 凭证，确认后续 MCP 请求被拒绝。
+7. 用 `read` 凭证确认上下文／列表查询成功；`prepare_entry` 和 `commit_entry`（包括直接调用工具）都应被拒绝。
+
+任何跳过步骤都记录为未运行。这是走查计划；配置说明和协议预检不代表用户已验收。
+
+完成走查并记录观察后，在网站撤销三个凭证，按第 4 节命令停止本轮 Compose 项目，删除临时 Codex／Hermes 目录并清除环境变量：
+
+```bash
+rm -r -- "$TJ_HERMES_HOME" "$TJ_CODEX_TMP"
+unset -f tj_codex
+unset TJ_HERMES_HOME HERMES_HOME TJ_HERMES_TOKEN TJ_CODEX_TOKEN TJ_CODEX_TMP TJ_DRAFT_ID TJ_APPROVAL
+```
+
+如果 Hermes 因本机依赖环境不可用而在连接前退出，记录确切错误并将客户端检查标为未运行。不要在本走查中修复、安装或改动已有 Hermes 安装。
 
 ## 3. 代表性功能检查
 

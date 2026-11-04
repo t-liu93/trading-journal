@@ -8,7 +8,7 @@
 |---|---|
 | [项目 README](README_zh.md) | 产品概览与常规部署 |
 | [当前路线图](plan/roadmap.zh.md) | 当前调度、进度与任务契约 |
-| [M-MCP-01 里程碑](plan/milestone-mcp-entry.zh.md) | 已就绪的 Agent 录入设计与原子任务卡；仅文档交付，应用实现未开始 |
+| [M-MCP-01 里程碑](plan/milestone-mcp-entry.zh.md) | Agent 录入契约及实现／检查／评审／用户验收状态 |
 | [M-OPT-01 里程碑](plan/milestone-option-entry.zh.md) | 已确认的期权选择／录入设计、任务卡，以及当前实现／检查／评审／用户验收状态 |
 | [v1.1.0 发布说明](release-notes/v1.1.0.zh.md) | 已交付变更、升级说明及验证范围 |
 | [开发指南](development.zh.md) | 架构、领域规则、命令、检查、评审与验收 |

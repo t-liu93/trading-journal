@@ -67,3 +67,7 @@ Position 的 `opened_at` 只在创建时从首批 Trade 时间设置，后续新
 时间诉求：不提时区时按 Trading Journal 服务器口径；明确时区时转换。最终采用显式服务器默认录入时区（默认 UTC），数据库仍存 UTC，不依赖宿主机与容器系统时区一致。
 
 共享契约、七张原子任务卡及逐项状态统一见 [M-MCP-01](../plan/milestone-mcp-entry.zh.md)。用户授权将设计及关联文档落盘、提交和推送；应用实现、编排、客户端运行验收及生产部署尚未授权或发生。截图和应用内模型接入保留为延后方向，不作为本轮缺失验收项。
+
+2026-11-04 后续授权与状态（更新上面的初始记录）：T1–T6 应用实现及 T7 阶段 B 文档／集成已获单独授权。阶段 B 文档／示例按已实现源码补充 `/api/mcp`、八个工具、`read`／`entry` 凭证、一次性密钥、默认 90 天凭证有效期、24 小时预览、`JOURNAL_TIMEZONE`、Host／Origin JSON 配置、原 `request_id`／`draft_id` 重试、Codex/Hermes 隔离接入和 HTTPS 反代说明。MCP 的新仓位与首批成交是原子写入；网站现有两请求创建及恢复行为没有迁移。当前集成检查尚未代表真实客户端或用户验收。已尝试在全新临时 `HERMES_HOME` 和 `HERMES_DISABLE_LAZY_INSTALLS=1` 下运行真实 `hermes --version`，因该安装没有可用依赖环境而退出 1（提示需 `hermes pm repair`）；未执行修复／安装／改动已有安装，真实 Hermes MCP 连接未运行。Codex 实际客户端预检与完整集成由总交接继续记录，不能据配置说明或 SDK 测试推定已通过。
+
+2026-11-04 客户端预检后续：真实 Codex CLI 0.166.0 使用临时 cwd、log/state 目录和命令级 MCP 设置，成功初始化本地 `/api/mcp` 并发现八个工具；本地刻意不可用的测试模型 provider 返回 503，CLI 因此退出 1。没有外部模型请求、自然语言录入、提交或用户验收。Hermes 的依赖环境仍不可用，真实 Hermes MCP 初始化／发现／查询／录入均未运行。Codex 与 Hermes 的完整自然语言用户走查仍待完成；以上不是验收通过。

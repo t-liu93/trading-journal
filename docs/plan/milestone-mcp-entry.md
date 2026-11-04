@@ -4,7 +4,7 @@
 
 - Design: on 2026-11-04 the owner requested this revised design be saved with related guidance, committed and pushed. The contract was delivered as `ready`; application execution started on 2026-11-04 under a separate explicit owner request.
 - Authorization: the original delivery covered documentation and its commit/push only. On 2026-11-04 the owner separately authorized T1–T6 and T7 phase B implementation, delegated independent review/repair, automated checks and isolated integration verification. No application commit/push/tag/release, history rewriting or production deployment is authorized.
-- Baseline: `0b86da31d4fc0a7893c4b8dc6956408e5ca0c70b` (v1.1.0). Source/configuration inspection establishes the design baseline, not a new application verification run.
+- Design baseline: `0b86da31d4fc0a7893c4b8dc6956408e5ca0c70b` (v1.1.0). Source/configuration inspection established the original design facts. Application execution began from the clean documentation-delivery HEAD `8c84fe160cbc2449065702226f1ef60c86ce9785`; no reset to the older baseline occurred.
 - Scheduling: [current roadmap](roadmap.md). This document owns shared decisions, atomic task cards and separate implementation/check/review/owner-acceptance records.
 - Execution rules: [development guide](../development.md), [agent rules](../../AGENTS.md) and [task template](task-template.md). A new agent should not need the original conversation or historical P/F plans to execute an authorized card.
 
@@ -18,7 +18,9 @@ The journal does not call a model in this milestone. External agents interpret l
 
 Typical flow: describe a trade → query accounts/positions/instruments → resolve missing details → prepare a preview draft → confirm in chat → commit the draft → receive record IDs and a journal link.
 
-### 1.2 Current facts
+### 1.2 Design baseline facts
+
+These facts describe the pre-implementation design baseline. Current delivery and verification are recorded separately in section 5.2.
 
 - Account, Instrument, Position and Trade APIs exist; browser authentication uses cookies and database sessions.
 - There are no dedicated agent credentials, MCP service or entry drafts.
@@ -129,7 +131,7 @@ Keep local loopback port mapping. Remote clients use the same endpoint through H
 
 Preserve server ownership, cross-user 404, archival exclusion, closed-Trade locks, frozen P&L, append-only plans, numeric precision and currency separation. New atomic Position + first-Trade entry serves MCP; the existing website's two-request creation/recovery flow is not migrated in this milestone.
 
-Extracted services must preserve existing successful REST requests, responses, statuses and business behavior. Schema additions use new Alembic migrations; no edits to shipped migrations, historical backfill or real-data correction. Proposed application paths below do not yet exist. Only disposable databases and synthetic data may be used for implementation checks.
+Extracted services must preserve existing successful REST requests, responses, statuses and business behavior. Schema additions use new Alembic migrations; no edits to shipped migrations, historical backfill or real-data correction. At phase A, the proposed application paths below did not yet exist. Current implementation status is in section 5.2. Only disposable databases and synthetic data may be used for implementation checks.
 
 ## 3. Complete atomic task cards
 
@@ -320,9 +322,9 @@ Execution order: **T7 phase A → T1 → T2 → T3 → T4 → T5 → T6 → T7 p
 - [x] Phase A: EN/ZH contracts/defaults/tasks/states match; links/anchors work.
 - [x] Phase A: a fresh agent can establish scope without the conversation; planned features are not described as implemented.
 - [x] Phase A: temporary evidence/secrets remain outside Git and image contexts.
-- [ ] Phase B: local/remote setup is reproducible and contains no real secrets.
-- [ ] Phase B: integration checks and actual Codex/Hermes outcomes are recorded separately.
-- [ ] Phase B: missing client checks remain pending; cleanup and actual owner acceptance are recorded.
+- [x] Phase B: local/remote setup is reproducible and contains no real secrets.
+- [x] Phase B: integration checks and actual Codex/Hermes outcomes are recorded separately.
+- [x] Phase B: missing client checks remain pending; cleanup and actual owner acceptance are recorded.
 
 **Checks:** phase A links/anchors, bilingual parity and `git diff --check`; phase B full integration checks and Compose rendering against the disposable setup.
 
@@ -381,7 +383,7 @@ Follow T7 phase A → T1–T6 → T7 phase B. Complete each card's checks and fr
 
 Only a later explicit orchestration request invokes the then-current installed skill; do not copy its model choices, review loop or repair budget here. Independent initial review receives the original design/card and complete candidate, without implementation/fix reports or desired verdicts. Follow repository rules for rereview.
 
-Surface material domain/scope changes before implementation; routine implementation details are the executing agent's responsibility. This documentation request does not start application work, delegation, release publication or deployment.
+Surface material domain/scope changes before implementation; routine implementation details are the executing agent's responsibility. Phase A documentation authorization did not start application work or delegation. The separate application authorization above covers implementation and isolated checks; release publication and production deployment remain unauthorized.
 
 ### 5.2 Status and completion
 
@@ -394,11 +396,17 @@ Surface material domain/scope changes before implementation; routine implementat
 | T5 commit | Implemented | Passed (465 backend tests; atomic/retry/lock-expiry integration) | Passed (T5-C01; one repair) | Pending |
 | T6 HTTP MCP | Implemented | Passed (472 backend tests; real HTTP/SDK, restart and discarded-response retry) | Passed (T6-C01; one repair) | Pending |
 | T7 phase A documentation | Implemented | Passed (targeted documentation checks) | Not requested | Pending |
-| T7 phase B integration | Not started | Not run | Not requested | Pending |
+| T7 phase B integration | Implemented | Passed (full checks/image/migrations/HTTPS; client limits recorded below) | Passed (T7B-C00; no repairs) | Pending |
+
+Application execution evidence (2026-11-04): the working tree remains uncommitted at HEAD `8c84fe160cbc2449065702226f1ef60c86ce9785`. Immutable snapshots include all relevant untracked files in local ignored `development-notes/mcp-entry-20261104-01/`; card candidates, checks, reviews and finalization evidence are recorded there as execution proceeds. The latest independently reviewed application boundary is `T6-C01` (manifest `afd801b664bea1e04fc8d101b9166ab22a7a3edde5401f8bdac4cf42655ef384`); phase-B documentation/Compose and integration independently passed as `T7B-C00` (manifest `1520d185d14c9deba3e2720cb1da81a24996dec7d01b691c9cad9a64dde25059`). No application commit, publication or production deployment occurred.
+
+Phase-B checks: frozen backend/frontend dependencies, Ruff, strict mypy, 472 backend tests, 59 frontend tests, frontend build and exact regenerated OpenAPI type freshness passed. The actual candidate image passed fresh `0006` migration, a synthetic `0003` upgrade preserving original rows, runtime timezone-data fallback, health/login/SPA/restart persistence, and HTTP MCP. A verified TLS proxy and client in a private Docker network on this host passed the same endpoint, including allowed/denied Host/Origin checks; this is not a second-machine owner walkthrough.
+
+Actual clients: Codex CLI 0.166.0 completed initialization and discovered all eight tools with temporary command settings; its model endpoint was deliberately local and unavailable, so no natural-language query/entry/confirmation workflow was run. Hermes could not start under temporary configuration because its installed dependency environment was missing; actual Hermes MCP checks remain unrun. SDK/native HTTP integration is recorded separately. Both complete client walkthroughs, browser interaction checks and actual owner acceptance remain pending; no omission is represented as owner-approved.
 
 Completion requires the shared contract and card acceptance criteria, relevant automated checks, accurate review status, and actual Codex/Hermes owner walkthrough or explicitly accepted omissions. Implementation is not automatically `accepted`.
 
-2026-11-04 documentation delivery: the owner authorized persisting this revised design/related guidance and committing/pushing the documentation. Phase A is implemented. Targeted checks passed for local links/anchors, paired structure/checklists/commands/technical literals, complete task cards, preserved historical content, whitespace, documentation-only scope and ignored evidence boundaries. Application source, dependencies, executable configuration, generated types and databases are unchanged; application tests/builds, independent review and runtime/owner acceptance were not performed. The candidate is the documentation commit containing this record, against the baseline above, including both new milestone files. Reproducible file hashes and command/results are retained locally in `development-notes/mcp-design-20261104-01/`; actual commit/push results are established by Git history, not inferred from this record.
+Phase A historical record — 2026-11-04 documentation delivery: the owner authorized persisting this revised design/related guidance and committing/pushing the documentation. Phase A is implemented. Targeted checks passed for local links/anchors, paired structure/checklists/commands/technical literals, complete task cards, preserved historical content, whitespace, documentation-only scope and ignored evidence boundaries. Application source, dependencies, executable configuration, generated types and databases are unchanged; application tests/builds, independent review and runtime/owner acceptance were not performed. The candidate is the documentation commit containing this record, against the baseline above, including both new milestone files. Reproducible file hashes and command/results are retained locally in `development-notes/mcp-design-20261104-01/`; actual commit/push results are established by Git history, not inferred from this record.
 
 ### 5.3 Deferred work
 

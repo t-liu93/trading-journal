@@ -21,8 +21,12 @@ Preserve these contracts unless the task explicitly changes them:
 - TradePlan is append-only, protected by revision uniqueness and retry handling. Any Trade, including archived history, or plan revision prevents Position deletion.
 - Add Alembic migrations for shipped schema changes. Tests exercise a migrated template copied into an isolated database for each test.
 - The automatically persisted `app_config` secret is for token signing; sessions use opaque database tokens. No operator-provided `COOKIE_SECRET` is needed.
+- MCP is mounted in the same app at the exact `/api/mcp` path using Streamable HTTP and Bearer credentials. It has eight tools: `get_context`, `list_accounts`, `search_instruments`, `list_positions`, `get_position`, `list_trades`, `prepare_entry`, and `commit_entry`. `read` credentials can call the first six; `entry` credentials can call all eight. Credentials are separate per client, expire after 90 days by default, and plaintext is returned only once by Settings → MCP.
+- MCP entry uses an immutable preview draft. Pending drafts expire after 24 hours. A preparation retry with the same credential, `request_id`, and unchanged request returns the same draft; changed content conflicts. Commit retries use only the original `draft_id` and return the saved result. New Position plus first Trades are atomic on this MCP path; website creation remains two requests with partial-failure recovery. Do not describe website entry as atomic.
+- MCP queries and writes enforce owner checks, including Trade ownership through Position; another user's resource is inaccessible. Entry preserves existing account availability, currency separation, active-fill dates and closed-Position Trade locks. Instrument search includes expired options by default for backfills. It does not expose close/reopen/archive/correction tools.
+- `JOURNAL_TIMEZONE` defaults to `UTC` and must be an installed IANA timezone. MCP timezone-less entry timestamps use a per-leg timezone or this default; explicit offsets are preserved, and ambiguous/nonexistent DST local times require an explicit offset. Persisted times remain UTC. `MCP_ALLOWED_HOSTS` and `MCP_ALLOWED_ORIGINS` are JSON arrays; application defaults cover localhost/loopback. Requests without `Origin` are allowed. For HTTPS proxy access, allow the exact external Host (including port if present) and Origin, and proxy `/api/mcp` without changing its path or dropping `Authorization`, `Host`, or MCP protocol headers. Keep the app's published port bound to loopback.
 
-Planned work: [M-MCP-01](plan/milestone-mcp-entry.md) defines dedicated agent credentials, an explicit default entry timezone, preview drafts and MCP-only atomic Position + first-Trade creation. These are not implemented by its documentation delivery. Current cookie authentication, REST datetime interpretation and website creation/recovery behavior above remain the baseline; use the milestone cards for intended changes.
+The [M-MCP-01 milestone](plan/milestone-mcp-entry.md) records its complete contract and separate implementation, check, review and owner-acceptance status. SDK-level protocol checks do not establish actual Codex/Hermes client acceptance. The current website's cookie authentication, REST datetime interpretation and two-request Position/first-Trade recovery behavior remain unchanged.
 
 ## Commands and environments
 
@@ -36,6 +40,7 @@ Current CI/Docker use Python 3.12 and Node 22. Consult manifests, lockfiles, `Do
 | `backend/` | `uv run pytest` | Isolated backend tests |
 | `backend/` | `uv run alembic upgrade head` | Migrate configured DB; inspect target first |
 | `backend/` | `COOKIE_SECURE=false uv run uvicorn trading_journal.main:app --reload` | Local HTTP backend |
+| `backend/` | `JOURNAL_TIMEZONE=Europe/Amsterdam uv run uvicorn trading_journal.main:app --reload` | Example MCP default entry timezone (combine with isolated DB and `COOKIE_SECURE=false` for local HTTP) |
 | `frontend/` | `npm ci` | Locked dependencies; preserve `.npmrc` |
 | `frontend/` | `npm run dev` | Vite at `http://localhost:5173` |
 | `frontend/` | `npm run build` | Type-check and production bundle |
