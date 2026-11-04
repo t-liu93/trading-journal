@@ -16,7 +16,7 @@ Trading Journal is a web app for logging and analyzing your trades — spot stoc
 - **Instruments** — stocks, options, and forex pairs; expired-option visibility, paginated candidates, primary-stock filtering and contextual inline creation with deduplication.
 - **Positions** — one model for every strategy (`spot_stock`, `spot_forex`, `wheel`, `iron_condor`, `pmcc`); a detail page with **Overview / Meta / Plan / Trades** tabs.
 - **Trades** — single or multi-leg entry sharing one order group, server-computed cash flow, and audit-friendly soft-delete with retained history.
-- **Agent entry (current source candidate)** — Codex/Hermes can use separate MCP read-only or entry credentials at `/api/mcp`; entry batches are previewed before confirmation and committed atomically.
+- **Agent entry** — Codex/Hermes can use separate MCP read-only or entry credentials at `/api/mcp`; entry batches are previewed before confirmation and committed atomically.
 - **Dashboard** — per-currency realized P&L cards, open/closed position tables, a monthly realized-P&L chart, and a win-rate gauge.
 - **Deployment** — one container; SQLite by default (PostgreSQL portability is a design goal); cookie-based auth; runs as your host user.
 
@@ -52,7 +52,7 @@ The published image serves the SPA and the API together. The compose file runs m
 **Images** (GitHub Container Registry, multi-arch `linux/amd64` + `linux/arm64`):
 
 ```
-ghcr.io/t-liu93/trading-journal:latest   # or pin a version, e.g. :1.1.0
+ghcr.io/t-liu93/trading-journal:latest   # or pin a version, e.g. :1.2.0
 ```
 
 **Configuration** (all optional, via a `.env` next to the compose file):
@@ -72,7 +72,7 @@ There is **no `COOKIE_SECRET`** to manage: the token-signing secret is generated
 
 **HTTPS / remote access.** The example binds to loopback (`127.0.0.1:8000`), which pairs well with an SSH tunnel. For public access, put a reverse proxy in front to terminate TLS — and leave `COOKIE_SECURE=true` (the default).
 
-**MCP clients (current source candidate).** MCP is implemented in this checkout but is not included in the already published `latest` or `v1.1.0` images. The normal Quick Start above remains for those published images. To try MCP, build an isolated service from a source checkout using the [MCP walkthrough](docs/walkthrough.md#mcp-client-setup-and-walkthrough); this is not a release or production deployment. The endpoint is `https://<journal-host>/api/mcp` behind HTTPS (or `http://localhost:18000/api/mcp` in the isolated local walkthrough). Create separate `read` and `entry` credentials in Settings → MCP; the secret is shown once. `read` can query context and journal records; `entry` can also prepare and commit a batch. A preview expires after 24 hours; retries reuse the original `request_id` during preparation and the original `draft_id` during commit. MCP uses atomic Position-plus-first-Trades creation; the website still creates those through two requests with recovery.
+**MCP clients (v1.2.0+).** Use the `1.2.0` or newer image; `v1.1.0` does not include MCP. Follow the [MCP walkthrough](docs/walkthrough.md#mcp-client-setup-and-walkthrough) for isolated source verification and temporary client configuration. The endpoint is `https://<journal-host>/api/mcp` behind HTTPS (or `http://localhost:18000/api/mcp` in the isolated local walkthrough). Create separate `read` and `entry` credentials in Settings → MCP; the secret is shown once. `read` can query context and journal records; `entry` can also prepare and commit a batch. A preview expires after 24 hours; retries reuse the original `request_id` during preparation and the original `draft_id` during commit. MCP uses atomic Position-plus-first-Trades creation; the website still creates those through two requests with recovery.
 
 See the full build-and-verify guide in [`docs/walkthrough.md`](docs/walkthrough.md) ([中文](docs/walkthrough.zh.md)).
 
@@ -90,7 +90,7 @@ Current scope and acceptance are tracked in the [roadmap](docs/plan/roadmap.md) 
 - [Current roadmap](docs/plan/roadmap.md) ([中文](docs/plan/roadmap.zh.md)) — priorities, task contracts, progress and acceptance.
 - [M-MCP-01 milestone](docs/plan/milestone-mcp-entry.md) ([中文](docs/plan/milestone-mcp-entry.zh.md)) — MCP entry contracts, implementation/check/review/owner status; consult the roadmap for current status.
 - [M-OPT-01 milestone](docs/plan/milestone-option-entry.md) ([中文](docs/plan/milestone-option-entry.zh.md)) — completed option-entry work, verification and five-step owner acceptance.
-- [v1.1.0 release notes](docs/release-notes/v1.1.0.md) ([中文](docs/release-notes/v1.1.0.zh.md)) — changes, upgrade notes and validation scope.
+- [v1.2.0 release notes](docs/release-notes/v1.2.0.md) ([中文](docs/release-notes/v1.2.0.zh.md)) — changes, upgrade notes and validation scope.
 - [Development guide](docs/development.md) ([中文](docs/development.zh.md)) — commands, domain rules, verification and review.
 - [Walkthrough](docs/walkthrough.md) ([中文](docs/walkthrough.zh.md)) — disposable build and representative feature checks.
 - [Design references](docs/design/README.md) ([中文](docs/design/README.zh.md)) and [release notes](docs/release-notes/) — historical plans and version-specific records.

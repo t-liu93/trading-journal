@@ -10,7 +10,7 @@
 | [当前路线图](plan/roadmap.zh.md) | 当前调度、进度与任务契约 |
 | [M-MCP-01 里程碑](plan/milestone-mcp-entry.zh.md) | Agent 录入契约及实现／检查／评审／用户验收状态 |
 | [M-OPT-01 里程碑](plan/milestone-option-entry.zh.md) | 已确认的期权选择／录入设计、任务卡，以及当前实现／检查／评审／用户验收状态 |
-| [v1.1.0 发布说明](release-notes/v1.1.0.zh.md) | 已交付变更、升级说明及验证范围 |
+| [v1.2.0 发布说明](release-notes/v1.2.0.zh.md) | MCP 变更、迁移、客户端设置与验证范围 |
 | [开发指南](development.zh.md) | 架构、领域规则、命令、检查、评审与验收 |
 | [任务卡模板](plan/task-template.zh.md) | 一个可独立评审步骤的完整契约 |
 | [走查指南](walkthrough.zh.md) | 一次性完整环境验证与用户操作 |

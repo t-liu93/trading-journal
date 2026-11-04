@@ -4,7 +4,7 @@
 
 This is the current manual verification guide. Use synthetic data in a new temporary environment; it does not start or modify the normal deployment. Passing these checks records only the paths actually exercised, not owner acceptance. See the [roadmap](plan/roadmap.md) and relevant task card for scope.
 
-MCP is implemented in the current source candidate, not in the already published `latest` or `v1.1.0` images. Its isolated walkthrough below uses the section 1 checkout build overlay; it does not publish or deploy the candidate. No existing client configuration or live journal data is reused.
+MCP is available from v1.2.0; v1.1.0 does not include it. The isolated walkthrough below uses the section 1 checkout build overlay to verify the selected source, without publishing it or changing a running deployment. No existing client configuration or live journal data is reused.
 
 ## 1. Create an isolated environment
 

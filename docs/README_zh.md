@@ -16,7 +16,7 @@ Trading Journal 是一个用来**记录与分析交易**的 Web 应用 —— �
 - **品种** —— 股票、期权、外汇对；支持过期期权显示开关、候选分页、主股票关联及带上下文的内嵌创建，重复项自动去重。
 - **仓位** —— 一套模型覆盖所有策略（`spot_stock`、`spot_forex`、`wheel`、`iron_condor`、`pmcc`）；详情页含 **Overview / Meta / Plan / Trades** 四个 tab。
 - **Trade（成交）** —— 单腿或多腿录入、同一订单共享一个 order group，cash flow 由服务端计算，软删除并保留历史（审计友好）。
-- **Agent 录入（当前源码候选）** —— Codex/Hermes 可通过 `/api/mcp` 使用独立只读或录入凭证；批次先预览、经确认后原子提交。
+- **Agent 录入** —— Codex/Hermes 可通过 `/api/mcp` 使用独立只读或录入凭证；批次先预览、经确认后原子提交。
 - **Dashboard** —— 分币种的已实现盈亏卡片、开仓/平仓仓位表、按月已实现盈亏图、胜率仪表。
 - **部署** —— 单容器；默认 SQLite（PostgreSQL 可移植性是设计目标）；基于 cookie 的鉴权；以你的宿主用户身份运行。
 
@@ -52,7 +52,7 @@ COOKIE_SECURE=false docker compose up -d
 **镜像**（GitHub Container Registry，多架构 `linux/amd64` + `linux/arm64`）：
 
 ```
-ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.1.0
+ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.2.0
 ```
 
 **配置**（全部可选，写在 compose 文件旁边的 `.env`）：
@@ -72,7 +72,7 @@ ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.1.0
 
 **HTTPS / 远程访问。** 示例只绑定 loopback（`127.0.0.1:8000`），适合配合 SSH 隧道使用。要对外公开，请在前面加一个反向代理来终结 TLS —— 并保持 `COOKIE_SECURE=true`（默认值）。
 
-**MCP 客户端（当前源码候选）。** MCP 已在本 checkout 实现，但尚未包含在已发布的 `latest` 或 `v1.1.0` 镜像中。上面的 Quick Start 仍适用于这些已发布镜像。要尝试 MCP，请按 [MCP 客户端走查](walkthrough.zh.md#mcp-客户端设置与走查)从源码 checkout 构建隔离服务；这不是发布或生产部署。HTTPS 端点为 `https://<journal-host>/api/mcp`；隔离本机走查使用 `http://localhost:18000/api/mcp`。到“设置 → MCP”创建独立的 `read` 与 `entry` 凭证，密钥只显示一次。`read` 可查询上下文与日志；`entry` 还可准备、提交批次。预览 24 小时过期；准备重试沿用原 `request_id`，提交重试沿用原 `draft_id`。MCP 的新仓位及首批成交为原子创建；网站仍使用两次请求并带恢复流程。
+**MCP 客户端（v1.2.0+）。** 使用 `1.2.0` 或更新镜像；`v1.1.0` 不包含 MCP。按 [MCP 客户端走查](walkthrough.zh.md#mcp-客户端设置与走查)进行源码隔离验证及临时客户端配置。HTTPS 端点为 `https://<journal-host>/api/mcp`；隔离本机走查使用 `http://localhost:18000/api/mcp`。到“设置 → MCP”创建独立的 `read` 与 `entry` 凭证，密钥只显示一次。`read` 可查询上下文与日志；`entry` 还可准备、提交批次。预览 24 小时过期；准备重试沿用原 `request_id`，提交重试沿用原 `draft_id`。MCP 的新仓位及首批成交为原子创建；网站仍使用两次请求并带恢复流程。
 
 完整的构建与验收指南见 [`docs/walkthrough.zh.md`](walkthrough.zh.md)（[English](walkthrough.md)）。
 
@@ -90,7 +90,7 @@ ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.1.0
 - [当前路线图](plan/roadmap.zh.md)（[English](plan/roadmap.md)）—— 优先级、任务契约、进度与验收。
 - [M-MCP-01 里程碑](plan/milestone-mcp-entry.zh.md)（[English](plan/milestone-mcp-entry.md)）—— MCP 录入契约、实现／检查／评审／用户验收状态；当前状态以路线图为准。
 - [M-OPT-01 里程碑](plan/milestone-option-entry.zh.md)（[English](plan/milestone-option-entry.md)）—— 已完成的期权录入改进、检查及五步用户验收。
-- [v1.1.0 发布说明](release-notes/v1.1.0.zh.md)（[English](release-notes/v1.1.0.md)）—— 变更、升级说明及验证范围。
+- [v1.2.0 发布说明](release-notes/v1.2.0.zh.md)（[English](release-notes/v1.2.0.md)）—— 变更、升级说明及验证范围。
 - [开发指南](development.zh.md)（[English](development.md)）—— 命令、领域规则、验证与评审。
 - [走查指南](walkthrough.zh.md)（[English](walkthrough.md)）—— 一次性构建与代表性功能检查。
 - [设计参考](design/README.zh.md)（[English](design/README.md)）和[发布记录](release-notes/)—— 历史计划与版本记录。
