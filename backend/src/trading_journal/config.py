@@ -1,7 +1,9 @@
 """Application settings loaded from environment variables / .env file."""
 
 from functools import lru_cache
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,6 +37,17 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
     session_lifetime_seconds: int = 60 * 60 * 24 * 7  # 7 days
     min_password_length: int = 8
+    journal_timezone: str = "UTC"
+
+    @field_validator("journal_timezone")
+    @classmethod
+    def validate_journal_timezone(cls, value: str) -> str:
+        """Require an installed IANA timezone for entry-time interpretation."""
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError("journal_timezone must be a valid IANA timezone") from exc
+        return value
 
 
 @lru_cache

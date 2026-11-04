@@ -2,8 +2,8 @@
 
 > **English** · [中文](milestone-mcp-entry.zh.md)
 
-- Design: on 2026-11-04 the owner requested this revised design be saved with related guidance, committed and pushed. The contract is `ready`; application implementation has not started.
-- Authorization: this delivery covers documentation and its commit/push only. Application implementation, delegated review/repair, release publication and production deployment are not authorized by that request.
+- Design: on 2026-11-04 the owner requested this revised design be saved with related guidance, committed and pushed. The contract was delivered as `ready`; application execution started on 2026-11-04 under a separate explicit owner request.
+- Authorization: the original delivery covered documentation and its commit/push only. On 2026-11-04 the owner separately authorized T1–T6 and T7 phase B implementation, delegated independent review/repair, automated checks and isolated integration verification. No application commit/push/tag/release, history rewriting or production deployment is authorized.
 - Baseline: `0b86da31d4fc0a7893c4b8dc6956408e5ca0c70b` (v1.1.0). Source/configuration inspection establishes the design baseline, not a new application verification run.
 - Scheduling: [current roadmap](roadmap.md). This document owns shared decisions, atomic task cards and separate implementation/check/review/owner-acceptance records.
 - Execution rules: [development guide](../development.md), [agent rules](../../AGENTS.md) and [task template](task-template.md). A new agent should not need the original conversation or historical P/F plans to execute an authorized card.
@@ -151,10 +151,10 @@ Execution order: **T7 phase A → T1 → T2 → T3 → T4 → T5 → T6 → T7 p
 
 **Acceptance:**
 
-- [ ] Default UTC and explicit server timezone work independently of the container system timezone.
-- [ ] Naive, offset and IANA inputs satisfy D04, including mismatch/nonexistent/ambiguous cases.
-- [ ] Context returns UTC/local now and supported enums using one clock reference.
-- [ ] Existing REST datetime regressions remain unchanged.
+- [x] Default UTC and explicit server timezone work independently of the container system timezone.
+- [x] Naive, offset and IANA inputs satisfy D04, including mismatch/nonexistent/ambiguous cases.
+- [x] Context returns UTC/local now and supported enums using one clock reference.
+- [x] Existing REST datetime regressions remain unchanged.
 
 **Checks:** Ruff/strict mypy; `test_journal_context.py`, `test_trades.py`, `test_positions.py`.
 
@@ -387,7 +387,7 @@ Surface material domain/scope changes before implementation; routine implementat
 
 | Task | Implementation | Automated checks | Independent review | Owner acceptance |
 |---|---|---|---|---|
-| T1 time/context | Not started | Not run | Not requested | Pending |
+| T1 time/context | Implemented | Passed (card checks and isolated timezone integration) | Passed (T1-C00) | Pending |
 | T2 credentials | Not started | Not run | Not requested | Pending |
 | T3 shared services | Not started | Not run | Not requested | Pending |
 | T4 preparation | Not started | Not run | Not requested | Pending |
