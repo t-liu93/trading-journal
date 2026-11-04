@@ -49,6 +49,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/settings/mcp',
+    name: 'settings-mcp',
+    component: () => import('../views/SettingsMcpView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/settings/strategies',
     name: 'settings-strategies',
     component: () => import('../views/SettingsStrategiesView.vue'),

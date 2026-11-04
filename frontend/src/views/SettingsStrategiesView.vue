@@ -208,7 +208,10 @@ const columns = computed<DataTableColumns<RowData>>(() => [
 <template>
   <AuthenticatedLayout>
     <header class="strategies-header">
-      <n-h1 style="margin: 0;">Strategy Exposure Caps</n-h1>
+      <n-space align="center">
+        <n-h1 style="margin: 0;">Strategy Exposure Caps</n-h1>
+        <n-button secondary tag="a" href="/settings/mcp">MCP credentials</n-button>
+      </n-space>
     </header>
     <n-text depth="3" style="display: block; margin-bottom: 1.5rem;">
       Set a maximum aggregate max_risk_at_open per strategy. Manual for MVP — broker API

@@ -41,6 +41,7 @@ const menuOptions = computed<MenuOption[]>(() => [
 const activeKey = computed(() => {
   const name = (route.name as string | undefined) ?? ''
   if (name === 'position-detail') return 'positions'
+  if (name === 'settings-mcp') return 'settings'
   return name
 })
 

@@ -21,6 +21,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mcp-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Mcp Tokens */
+        get: operations["list_mcp_tokens_api_mcp_tokens_get"];
+        put?: never;
+        /** Create Mcp Token */
+        post: operations["create_mcp_token_api_mcp_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mcp-tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Mcp Token */
+        delete: operations["revoke_mcp_token_api_mcp_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/register": {
         parameters: {
             query?: never;
@@ -582,6 +617,72 @@ export interface components {
             created_at: string;
             option?: components["schemas"]["OptionContractRead"] | null;
             forex?: components["schemas"]["ForexPairRead"] | null;
+        };
+        /** McpTokenCreate */
+        McpTokenCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Profile
+             * @enum {string}
+             */
+            profile: "read" | "entry";
+            /** Expires At */
+            expires_at?: string | null;
+        };
+        /** McpTokenIssued */
+        McpTokenIssued: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Profile
+             * @enum {string}
+             */
+            profile: "read" | "entry";
+            /** Token Prefix */
+            token_prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Token */
+            token: string;
+        };
+        /** McpTokenRead */
+        McpTokenRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Profile
+             * @enum {string}
+             */
+            profile: "read" | "entry";
+            /** Token Prefix */
+            token_prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
         };
         /** MonthCurrencyAmount */
         MonthCurrencyAmount: {
@@ -1156,6 +1257,88 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    list_mcp_tokens_api_mcp_tokens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpTokenRead"][];
+                };
+            };
+        };
+    };
+    create_mcp_token_api_mcp_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpTokenCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpTokenIssued"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_mcp_token_api_mcp_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

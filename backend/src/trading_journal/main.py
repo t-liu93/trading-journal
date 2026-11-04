@@ -24,6 +24,7 @@ from trading_journal.api import (
     dashboard,
     health,
     instruments,
+    mcp_tokens,
     positions,
     strategy_configs,
     strategy_meta,
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
 
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(health.router)
+    api.include_router(mcp_tokens.router)
 
     # Auth: POST /api/auth/register, POST /api/auth/login, POST /api/auth/logout.
     # Email-verify and password-reset routers are intentionally not mounted —

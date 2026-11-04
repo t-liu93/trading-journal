@@ -19,6 +19,7 @@ EXPECTED_DOMAIN_TABLES = {
     "users",
     "access_tokens",
     "app_config",
+    "mcp_tokens",
     "accounts",
     "instruments",
     "option_contracts",
@@ -96,6 +97,10 @@ EXPECTED_COLUMNS = {
         "created_at",
     },
     "access_tokens": {"token", "user_id", "created_at"},
+    "mcp_tokens": {
+        "id", "user_id", "name", "profile", "token_prefix", "token_digest",
+        "created_at", "expires_at", "revoked_at",
+    },
 }
 
 

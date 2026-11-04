@@ -7,6 +7,7 @@ table so Alembic autogenerate can see the full schema.
 from trading_journal.models.account import Account
 from trading_journal.models.app_config import AppConfig
 from trading_journal.models.instrument import ForexPair, Instrument, OptionContract
+from trading_journal.models.mcp_token import McpToken
 from trading_journal.models.position import Position
 from trading_journal.models.strategy_config import StrategyConfig
 from trading_journal.models.strategy_meta import PmccCycleMeta, WheelCycleMeta
@@ -20,6 +21,7 @@ __all__ = [
     "AppConfig",
     "ForexPair",
     "Instrument",
+    "McpToken",
     "OptionContract",
     "PmccCycleMeta",
     "Position",

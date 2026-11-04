@@ -180,11 +180,11 @@ Execution order: **T7 phase A → T1 → T2 → T3 → T4 → T5 → T6 → T7 p
 
 **Acceptance:**
 
-- [ ] Named `read`/`entry` credentials can be issued, listed as metadata and revoked.
-- [ ] Plaintext appears once, never in database/list/logs or after frontend refresh.
-- [ ] Expiry, revocation and disabled users fail verification; cross-user token access returns 404.
-- [ ] MCP Bearer credentials cannot call cookie-authenticated management endpoints.
-- [ ] UI failures are visible; existing login/settings/navigation still work.
+- [x] Named `read`/`entry` credentials can be issued, listed as metadata and revoked.
+- [x] Plaintext appears once, never in database/list/logs or after frontend refresh.
+- [x] Expiry, revocation and disabled users fail verification; cross-user token access returns 404.
+- [x] MCP Bearer credentials cannot call cookie-authenticated management endpoints.
+- [x] UI failures are visible; existing login/settings/navigation still work.
 
 **Checks:** full backend checks; frontend tests/build; OpenAPI/codegen freshness.
 
@@ -388,7 +388,7 @@ Surface material domain/scope changes before implementation; routine implementat
 | Task | Implementation | Automated checks | Independent review | Owner acceptance |
 |---|---|---|---|---|
 | T1 time/context | Implemented | Passed (card checks and isolated timezone integration) | Passed (T1-C00) | Pending |
-| T2 credentials | Not started | Not run | Not requested | Pending |
+| T2 credentials | Implemented | Passed (full backend/frontend/migration/codegen; real HTTP isolation) | Passed (T2-C01; one repair) | Pending |
 | T3 shared services | Not started | Not run | Not requested | Pending |
 | T4 preparation | Not started | Not run | Not requested | Pending |
 | T5 commit | Not started | Not run | Not requested | Pending |
