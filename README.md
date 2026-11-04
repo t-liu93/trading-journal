@@ -82,6 +82,7 @@ Current scope and acceptance are tracked in the [roadmap](docs/plan/roadmap.md) 
 
 - [Documentation map](docs/index.md) ([中文](docs/index.zh.md)) — current guidance and historical references.
 - [Current roadmap](docs/plan/roadmap.md) ([中文](docs/plan/roadmap.zh.md)) — priorities, task contracts, progress and acceptance.
+- [M-MCP-01 milestone](docs/plan/milestone-mcp-entry.md) ([中文](docs/plan/milestone-mcp-entry.zh.md)) — planned Codex/Hermes MCP entry, shared contracts and atomic implementation cards; application work has not started.
 - [M-OPT-01 milestone](docs/plan/milestone-option-entry.md) ([中文](docs/plan/milestone-option-entry.zh.md)) — completed option-entry work, verification and five-step owner acceptance.
 - [v1.1.0 release notes](docs/release-notes/v1.1.0.md) ([中文](docs/release-notes/v1.1.0.zh.md)) — changes, upgrade notes and validation scope.
 - [Development guide](docs/development.md) ([中文](docs/development.zh.md)) — commands, domain rules, verification and review.

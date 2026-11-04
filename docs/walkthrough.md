@@ -4,6 +4,8 @@
 
 This is the current manual verification guide. Use synthetic data in a new temporary environment; it does not start or modify the normal deployment. Passing these checks records only the paths actually exercised, not owner acceptance. See the [roadmap](plan/roadmap.md) and relevant task card for scope.
 
+Future MCP verification is specified in [M-MCP-01 section 4](plan/milestone-mcp-entry.md#4-verification-walkthrough-and-cleanup). MCP is not implemented yet. Its T7 phase B will add executable client/credential/timezone steps after the application cards; this documentation delivery does not change the current setup commands.
+
 ## 1. Create an isolated environment
 
 Prerequisites: Docker with Compose, a checkout of the candidate to verify, a browser, and SSH only when testing a remote machine. Start a dedicated terminal at the repository root. Port 18000 must be free; if occupied, choose a different unused port in the copied mapping and tunnel. Do not stop the existing listener.

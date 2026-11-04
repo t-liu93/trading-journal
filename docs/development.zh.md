@@ -22,6 +22,8 @@
 - 已发布 schema 变化新增 Alembic 迁移。测试将迁移后的模板复制为每个测试独立的数据库。
 - 自动持久化的 `app_config` 密钥用于 token 签名，session 使用数据库不透明 token，无需运维提供 `COOKIE_SECRET`。
 
+规划中的工作：[M-MCP-01](plan/milestone-mcp-entry.zh.md) 定义独立 Agent 凭证、显式默认录入时区、预览草稿及仅供 MCP 的 Position＋首批 Trade 原子创建。文档交付没有实现这些能力。以上 Cookie 鉴权、REST 时间解释和网站创建／恢复行为仍为当前基线，目标变化以里程碑任务卡为准。
+
 ## 命令与环境
 
 当前 CI／Docker 使用 Python 3.12、Node 22。变更版本时核对依赖清单、锁文件、`Dockerfile` 和 `.github/workflows/ci.yml`。

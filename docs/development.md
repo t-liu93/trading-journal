@@ -22,6 +22,8 @@ Preserve these contracts unless the task explicitly changes them:
 - Add Alembic migrations for shipped schema changes. Tests exercise a migrated template copied into an isolated database for each test.
 - The automatically persisted `app_config` secret is for token signing; sessions use opaque database tokens. No operator-provided `COOKIE_SECRET` is needed.
 
+Planned work: [M-MCP-01](plan/milestone-mcp-entry.md) defines dedicated agent credentials, an explicit default entry timezone, preview drafts and MCP-only atomic Position + first-Trade creation. These are not implemented by its documentation delivery. Current cookie authentication, REST datetime interpretation and website creation/recovery behavior above remain the baseline; use the milestone cards for intended changes.
+
 ## Commands and environments
 
 Current CI/Docker use Python 3.12 and Node 22. Consult manifests, lockfiles, `Dockerfile` and `.github/workflows/ci.yml` when changing versions.

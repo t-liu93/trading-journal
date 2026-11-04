@@ -472,3 +472,5 @@ Latest evidence: all 426 backend tests, Ruff/strict mypy, all 57 frontend tests/
 ### 5.3 Remaining work
 
 Retain UI-03 parameter derivation; UI-04 multi-leg templates; remaining UI-05 kind/display requests; QA-01 ROI/grouping/failure-recovery coverage outside this milestone; REL-01 release gates; atomic Position+first-Trade creation; audited closed-record corrections; and import, quotes, FX, archival extensions, Greeks, i18n and complete mobile adaptation.
+
+Subsequent scheduling (2026-11-04): [M-MCP-01](milestone-mcp-entry.md) now plans atomic Position+first-Trade creation for MCP entry only. This does not change M-OPT-01's scope/acceptance or migrate the existing website creation flow; application implementation has not started.

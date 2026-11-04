@@ -82,6 +82,7 @@ ghcr.io/t-liu93/trading-journal:latest   # 也可固定版本，如 :1.1.0
 
 - [文档地图](index.zh.md)（[English](index.md)）—— 当前指导与历史参考。
 - [当前路线图](plan/roadmap.zh.md)（[English](plan/roadmap.md)）—— 优先级、任务契约、进度与验收。
+- [M-MCP-01 里程碑](plan/milestone-mcp-entry.zh.md)（[English](plan/milestone-mcp-entry.md)）—— 规划中的 Codex／Hermes MCP 录入、共享契约与原子实现任务卡；应用工作未开始。
 - [M-OPT-01 里程碑](plan/milestone-option-entry.zh.md)（[English](plan/milestone-option-entry.md)）—— 已完成的期权录入改进、检查及五步用户验收。
 - [v1.1.0 发布说明](release-notes/v1.1.0.zh.md)（[English](release-notes/v1.1.0.md)）—— 变更、升级说明及验证范围。
 - [开发指南](development.zh.md)（[English](development.md)）—— 命令、领域规则、验证与评审。
