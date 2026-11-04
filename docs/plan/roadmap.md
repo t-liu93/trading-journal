@@ -14,7 +14,7 @@ Current verification infrastructure: backend Ruff/strict mypy/pytest, migrated i
 
 M-OPT-01 owns shared decisions, complete task cards and acceptance records. It covers expired-option visibility/history/pagination, primary-underlying filtering and contextual creation, FIX-01, UI-01/UI-02 and a bounded QA-01 slice. `ready` records an agreed contract, not authorization to start coding.
 
-**Active milestone (2026-11-04):** [M-MCP-01: agent-driven trade entry](milestone-mcp-entry.md) is `ready` as a design contract. It covers Codex/Hermes queries, dedicated credentials, immutable entry previews, atomic new-Position/Trade entry and safe retries, with an explicitly configured server default entry timezone and local/remote HTTP MCP. Screenshot/model integration is deferred. After the documentation-only delivery, the owner separately authorized application implementation, delegated orchestration, checks and isolated integration verification. T1–T6 and T7 phase B technical delivery, checks and independent reviews are complete; actual owner walkthrough remains pending; no application Git writes or production deployment are authorized.
+**Accepted milestone (2026-11-04):** [M-MCP-01: agent-driven trade entry](milestone-mcp-entry.md) is `accepted` after T1–T6/T7 phase B implementation, automated checks, independent reviews and the nine-step local owner walkthrough with actual Codex/Hermes clients. It provides dedicated read/entry credentials, immutable previews, atomic new-Position/Trade entry, safe retries and explicit server-default/override timezones through HTTP MCP. All test credentials were revoked and the isolated environment was cleaned up; the original development database and existing deployment remained unchanged. Real second-machine remote owner interaction remains unrun; same-host HTTPS routing passed automated checks. The owner deferred MCP navigation improvements to `MCP-NAV`. Screenshot/model integration remains deferred. Application Git writes, release publication and production deployment remain unauthorized.
 
 Each milestone's section 5.2 owns candidate identity and separate implementation, automated-check, independent-review and owner-acceptance records. M-MCP-01 T7 phase A is documentation delivery; it does not establish application or runtime acceptance.
 
@@ -24,7 +24,8 @@ Priority is an ordering recommendation, not authorization. P1 = data correctness
 
 | ID | Priority | State | Scope / next action |
 |---|---|---|---|
-| [M-MCP-01](milestone-mcp-entry.md) | P2 | implemented | T7 phase A preserved; T1–T6 and T7 phase B implemented, checked and independently reviewed; complete Codex/Hermes and owner walkthrough pending |
+| [M-MCP-01](milestone-mcp-entry.md) | P2 | accepted | Implementation/checks/reviews passed; actual Codex/Hermes and nine-step local owner walkthrough accepted; cleanup complete; real second-machine remote owner interaction unrun |
+| MCP-NAV | P2 | proposed | Clarify Settings/MCP Credentials navigation; owner explicitly deferred this observed issue, with no implementation authorized |
 | DOC-01 | P2 | accepted | Documentation handoff accepted on 2026-11-03 with additional manual review omitted; prior targeted checks passed; no independent review or runtime walkthrough claimed |
 | [INS-01](milestone-option-entry.md#t3) | P2 | accepted | Milestone slice checks, independent review and owner expiry/pagination walkthrough passed |
 | [INS-02](milestone-option-entry.md#t4) | P2 | accepted | Original task/R1 independently reviewed; label follow-up checked; owner steps 3/4 accepted, follow-up not separately reviewed |
