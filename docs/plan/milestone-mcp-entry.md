@@ -260,13 +260,13 @@ Execution order: **T7 phase A → T1 → T2 → T3 → T4 → T5 → T6 → T7 p
 
 **Acceptance:**
 
-- [ ] New Position + first fills, existing-position additions and multi-leg fills commit correctly.
-- [ ] Invalid later legs or injected failures leave no new instruments, empty Positions, partial Trades or consumed drafts.
-- [ ] Repeat/concurrent commits and retries after lost success responses return the same IDs.
-- [ ] Independent-connection tests establish atomicity and concurrency behavior.
-- [ ] Closing the Position, revoking credentials or disabling the user after preview prevents a new commit.
-- [ ] Expired pending drafts reject; committed results remain retrievable under D06.
-- [ ] Cash flow, opening dates, archival exclusion and closed locks do not regress.
+- [x] New Position + first fills, existing-position additions and multi-leg fills commit correctly.
+- [x] Invalid later legs or injected failures leave no new instruments, empty Positions, partial Trades or consumed drafts.
+- [x] Repeat/concurrent commits and retries after lost success responses return the same IDs.
+- [x] Independent-connection tests establish atomicity and concurrency behavior.
+- [x] Closing the Position, revoking credentials or disabling the user after preview prevents a new commit.
+- [x] Expired pending drafts reject; committed results remain retrievable under D06.
+- [x] Cash flow, opening dates, archival exclusion and closed locks do not regress.
 
 **Checks:** Ruff/strict mypy/full pytest.
 
@@ -391,7 +391,7 @@ Surface material domain/scope changes before implementation; routine implementat
 | T2 credentials | Implemented | Passed (full backend/frontend/migration/codegen; real HTTP isolation) | Passed (T2-C01; one repair) | Pending |
 | T3 shared services | Implemented | Passed (447 backend tests; cross-process and precision HTTP integration) | Passed (T3-C02; two repairs) | Pending |
 | T4 preparation | Implemented | Passed (455 backend tests; immutable/precision/currency boundary integration) | Passed (T4-C05; five repairs) | Pending |
-| T5 commit | Not started | Not run | Not requested | Pending |
+| T5 commit | Implemented | Passed (465 backend tests; atomic/retry/lock-expiry integration) | Passed (T5-C01; one repair) | Pending |
 | T6 HTTP MCP | Not started | Not run | Not requested | Pending |
 | T7 phase A documentation | Implemented | Passed (targeted documentation checks) | Not requested | Pending |
 | T7 phase B integration | Not started | Not run | Not requested | Pending |

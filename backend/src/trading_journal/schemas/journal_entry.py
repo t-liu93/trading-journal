@@ -68,3 +68,15 @@ class EntryPreview(BaseModel):
     expires_at: datetime
     preview: dict[str, object]
     defaults: dict[str, object]
+
+
+class EntryCommitResult(BaseModel):
+    """Persisted result returned for the first commit and every safe retry."""
+
+    model_config = ConfigDict(extra="forbid")
+    draft_id: uuid.UUID
+    position_id: uuid.UUID
+    trade_ids: list[uuid.UUID]
+    position_url: str
+    trade_urls: list[str]
+    committed_at: datetime

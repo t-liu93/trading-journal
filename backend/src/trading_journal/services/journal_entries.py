@@ -9,7 +9,7 @@ from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,34 +18,56 @@ from trading_journal.models._enums import InstrumentKind, PositionStatus
 from trading_journal.models.account import Account
 from trading_journal.models.instrument import ForexPair, Instrument, OptionContract
 from trading_journal.models.journal_entry_draft import JournalEntryDraft
+from trading_journal.models.mcp_token import McpToken
 from trading_journal.models.position import Position
 from trading_journal.models.trade import Trade
+from trading_journal.models.user import User
 from trading_journal.schemas.instrument import InstrumentCreate
 from trading_journal.schemas.journal_entry import (
+    EntryCommitResult,
     EntryLeg,
     ExistingInstrument,
     PendingInstrument,
     PrepareEntryRequest,
 )
+from trading_journal.schemas.trade import TradeCreate
 from trading_journal.services.datetimes import parse_entry_datetime
 from trading_journal.services.instruments import (
     _database_numeric_bind_value,
     _database_numeric_value,
+    get_or_create_instrument,
     instrument_read,
     resolve_instrument_spec,
 )
 from trading_journal.services.journal_context import get_journal_context
 from trading_journal.services.mcp_tokens import McpPrincipal
 from trading_journal.services.ownership import resolve_owned_position
+from trading_journal.services.positions import (
+    create_position,
+    maintain_opened_at_from_active_trades,
+)
 from trading_journal.services.trades import (
     compute_cash_flow,
+    create_trades_atomic,
     normalize_order_group_ids,
     resolve_multiplier,
     validate_action_kind,
     validate_option_quantity_integer,
 )
+from trading_journal.services.write_guard import acquire_instrument_write_guard
 
 DRAFT_LIFETIME = timedelta(hours=24)
+
+
+def _retryable_contention(exc: OperationalError) -> HTTPException | None:
+    message = str(exc.orig).lower()
+    if "locked" not in message and "busy" not in message:
+        return None
+    return HTTPException(
+        status_code=503,
+        detail={"code": "entry_commit_retryable", "retryable": True},
+        headers={"Retry-After": "1"},
+    )
 
 
 async def _entry_currency(
@@ -372,7 +394,11 @@ def _freeze_resolved_reference(
 async def _resolve_entry_account(
     session: AsyncSession, user_id: uuid.UUID, account_id: uuid.UUID
 ) -> Account:
-    account = await session.get(Account, account_id)
+    account = await session.scalar(
+        select(Account)
+        .where(Account.id == account_id)
+        .execution_options(populate_existing=True)
+    )
     if account is None or account.user_id != user_id:
         raise HTTPException(status_code=404, detail="Account not found")
     if account.archived_at is not None:
@@ -707,3 +733,229 @@ async def prepare_entry(
             raise _request_conflict() from exc
         raise
     return draft
+
+
+async def _current_entry_principal(
+    session: AsyncSession, principal: McpPrincipal, now: datetime
+) -> McpToken:
+    """Read current credential and user state from the database, bypassing identity map."""
+    token = await session.scalar(
+        select(McpToken)
+        .where(McpToken.id == principal.credential_id)
+        .execution_options(populate_existing=True)
+    )
+    if token is None or token.user_id != principal.user_id:
+        raise HTTPException(status_code=401, detail="MCP credential is no longer valid")
+    expiry = token.expires_at
+    if expiry is not None:
+        expiry = expiry.replace(tzinfo=UTC) if expiry.tzinfo is None else expiry.astimezone(UTC)
+    if token.revoked_at is not None or (expiry is not None and expiry <= now):
+        raise HTTPException(status_code=401, detail="MCP credential is no longer valid")
+    user = await session.scalar(
+        select(User)
+        .where(User.id == token.user_id)
+        .execution_options(populate_existing=True)
+    )
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="MCP credential is no longer valid")
+    if token.profile != "entry" or principal.profile != "entry":
+        raise HTTPException(status_code=403, detail="entry credential required")
+    return token
+
+
+async def _commit_instrument_reference(
+    session: AsyncSession,
+    reference: dict[str, Any],
+    field_path: str,
+) -> Instrument:
+    if "instrument_id" in reference:
+        instrument_id = uuid.UUID(str(reference["instrument_id"]))
+        instrument = await session.get(Instrument, instrument_id, populate_existing=True)
+        if instrument is None:
+            raise HTTPException(status_code=409, detail={field_path: "instrument no longer exists"})
+        return instrument
+    pending = reference.get("pending")
+    if not isinstance(pending, dict):
+        raise HTTPException(
+            status_code=409, detail={field_path: "invalid frozen instrument reference"}
+        )
+    try:
+        descriptor: InstrumentCreate = TypeAdapter(InstrumentCreate).validate_python(pending)
+        instrument, _ = await get_or_create_instrument(session, descriptor)
+    except (ValueError, ValidationError) as exc:
+        raise HTTPException(status_code=422, detail={field_path: str(exc)}) from exc
+    return instrument
+
+
+def _frozen_decimal(value: object, field_path: str) -> Decimal:
+    try:
+        return Decimal(str(value))
+    except (DecimalException, ValueError) as exc:
+        raise HTTPException(status_code=409, detail={field_path: "invalid frozen decimal"}) from exc
+
+
+async def commit_entry(
+    session: AsyncSession,
+    principal: McpPrincipal,
+    draft_id: uuid.UUID,
+    *,
+    clock: datetime | None = None,
+) -> EntryCommitResult:
+    """Atomically commit an immutable draft; this service owns commit/rollback.
+
+    Any read-only transaction opened by transport authentication is ended first.
+    The shared app_config write guard then reserves SQLite's database write slot
+    before the draft and credentials are reread, so separate sessions serialize.
+    """
+    await session.rollback()
+    try:
+        await acquire_instrument_write_guard(session)
+        # Expiry must be checked against the time this transaction actually
+        # obtained its write slot, not a timestamp captured before lock wait.
+        now = clock or datetime.now(UTC)
+        now = now.replace(tzinfo=UTC) if now.tzinfo is None else now.astimezone(UTC)
+        await _current_entry_principal(session, principal, now)
+        draft = await session.scalar(
+            select(JournalEntryDraft)
+            .where(JournalEntryDraft.id == draft_id)
+            .execution_options(populate_existing=True)
+        )
+        if draft is None or draft.user_id != principal.user_id:
+            raise HTTPException(status_code=404, detail="Entry draft not found")
+        if draft.credential_id != principal.credential_id:
+            raise HTTPException(status_code=404, detail="Entry draft not found")
+        if draft.state == "committed":
+            saved = draft.source.get("result")
+            if not isinstance(saved, dict):
+                raise HTTPException(status_code=500, detail="Committed draft result is missing")
+            result = EntryCommitResult.model_validate(saved)
+            await session.rollback()
+            return result
+        deadline = draft.expires_at
+        deadline = (
+            deadline.replace(tzinfo=UTC) if deadline.tzinfo is None else deadline.astimezone(UTC)
+        )
+        if deadline <= now:
+            raise HTTPException(status_code=409, detail="Entry draft expired")
+
+        frozen = PrepareEntryRequest.model_validate(draft.normalized_input)
+        normalized = draft.normalized_input
+        normalized_legs = normalized.get("legs")
+        assert isinstance(normalized_legs, list)
+        preview_legs = draft.preview.get("legs")
+        assert isinstance(preview_legs, list)
+        position_data = normalized.get("position")
+        if frozen.kind == "open_position":
+            assert isinstance(position_data, dict)
+            assert frozen.position is not None
+            account_id = uuid.UUID(str(position_data["account_id"]))
+            # New entries must still target a currently available owned account.
+            await _resolve_entry_account(session, principal.user_id, account_id)
+            primary_data = position_data["primary_instrument"]
+            assert isinstance(primary_data, dict)
+            primary = await _commit_instrument_reference(
+                session, primary_data, "position.primary_instrument"
+            )
+            position = await create_position(
+                session,
+                user_id=principal.user_id,
+                account_id=account_id,
+                primary_instrument_id=primary.id,
+                strategy_type=frozen.position.strategy_type,
+                opened_at=datetime.fromisoformat(str(position_data["opened_at"])),
+                capital_used=(
+                    _frozen_decimal(position_data["capital_used"], "position.capital_used")
+                    if position_data.get("capital_used") is not None
+                    else None
+                ),
+                max_risk_at_open=(
+                    _frozen_decimal(position_data["max_risk_at_open"], "position.max_risk_at_open")
+                    if position_data.get("max_risk_at_open") is not None
+                    else None
+                ),
+                max_reward_at_open=(
+                    _frozen_decimal(
+                        position_data["max_reward_at_open"], "position.max_reward_at_open"
+                    )
+                    if position_data.get("max_reward_at_open") is not None
+                    else None
+                ),
+                notes=position_data.get("notes"),
+            )
+        else:
+            assert frozen.position_id is not None
+            position = await resolve_owned_position(session, principal.user_id, frozen.position_id)
+            # Refresh explicitly: a stale identity-map Position cannot authorize a write.
+            await session.refresh(position)
+            if position.status is not PositionStatus.OPEN:
+                raise HTTPException(status_code=409, detail="closed Position is read-only")
+
+        rows: list[TradeCreate] = []
+        for index, leg in enumerate(frozen.legs):
+            leg_data = normalized_legs[index]
+            assert isinstance(leg_data, dict)
+            reference = leg_data["instrument"]
+            assert isinstance(reference, dict)
+            instrument = await _commit_instrument_reference(
+                session, reference, f"legs.{index}.instrument"
+            )
+            # The preview froze the outcome; these are the original Decimal
+            # operands from normalized_input, with only defaults applied by T4.
+            preview_leg = preview_legs[index]
+            assert isinstance(preview_leg, dict)
+            rows.append(
+                TradeCreate(
+                    position_id=position.id,
+                    instrument_id=instrument.id,
+                    action=leg.action,
+                    quantity=leg.quantity,
+                    price=leg.price,
+                    commission=(
+                        _frozen_decimal(preview_leg["commission"], f"legs.{index}.commission")
+                        if leg.commission is None
+                        else leg.commission
+                    ),
+                    fees=(
+                        _frozen_decimal(preview_leg["fees"], f"legs.{index}.fees")
+                        if leg.fees is None
+                        else leg.fees
+                    ),
+                    executed_at=leg.executed_at,
+                    order_group_id=leg.order_group_id,
+                    notes=leg.notes,
+                )
+            )
+        try:
+            trades = await create_trades_atomic(session, position, rows)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        await maintain_opened_at_from_active_trades(session, position)
+        result = EntryCommitResult(
+            draft_id=draft.id,
+            position_id=position.id,
+            trade_ids=[trade.id for trade in trades],
+            position_url=f"/positions/{position.id}",
+            trade_urls=[f"/positions/{position.id}?trade_id={trade.id}" for trade in trades],
+            committed_at=now,
+        )
+        draft.source = {
+            **draft.source,
+            "commit": {
+                "credential_id": str(principal.credential_id),
+                "committed_at": now.isoformat(),
+            },
+            "result": result.model_dump(mode="json"),
+        }
+        draft.state = "committed"
+        await session.flush()
+        await session.commit()
+        return result
+    except OperationalError as exc:
+        await session.rollback()
+        retryable = _retryable_contention(exc)
+        if retryable is not None:
+            raise retryable from exc
+        raise
+    except Exception:
+        await session.rollback()
+        raise
