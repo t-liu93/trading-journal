@@ -6,6 +6,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from fastapi import HTTPException
 from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -15,10 +16,24 @@ from trading_journal.models.instrument import Instrument
 from trading_journal.schemas.instrument import ForexCreate, OptionCreate, StockCreate
 from trading_journal.services.instruments import get_or_create_instrument, resolve_instrument_spec
 from trading_journal.services.journal_queries import (
+    _page,
     list_accounts,
     list_positions,
     search_instruments,
 )
+
+
+@pytest.mark.parametrize(
+    ("limit", "offset", "path"),
+    [(0, 0, "limit"), (201, 0, "limit"), (50, -1, "offset")],
+)
+def test_invalid_pagination_has_structured_field_path(limit: int, offset: int, path: str) -> None:
+    with pytest.raises(HTTPException) as raised:
+        _page(limit, offset)
+
+    assert raised.value.status_code == 422
+    assert raised.value.detail["code"] == "invalid_fields"
+    assert raised.value.detail["fields"][0]["path"] == path
 
 
 async def test_pending_option_lookup_is_read_only(db_session_maker) -> None:

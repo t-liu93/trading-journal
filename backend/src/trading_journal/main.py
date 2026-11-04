@@ -13,11 +13,13 @@ stay at the root (FastAPI manages them; consumers expect them there).
 """
 
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 
-from fastapi import APIRouter, FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.routing import Route
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from trading_journal.api import (
     accounts,
@@ -32,9 +34,11 @@ from trading_journal.api import (
     trades,
 )
 from trading_journal.auth.backend import auth_backend, fastapi_users
+from trading_journal.auth.mcp import authenticate_bearer_header
 from trading_journal.auth.secret import ensure_cookie_secret
 from trading_journal.config import get_settings
 from trading_journal.db import get_session_maker
+from trading_journal.mcp.server import ExactMountRoot, sdk_transport, session_manager_lifespan
 from trading_journal.schemas.user import UserCreate, UserRead, UserUpdate
 
 API_PREFIX = "/api"
@@ -52,12 +56,62 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     async with get_session_maker()() as session:
         await ensure_cookie_secret(session)
-    yield
+    async with AsyncExitStack() as stack:
+        await stack.enter_async_context(session_manager_lifespan())
+        yield
+
+
+class McpBoundaryMiddleware:
+    """Enforce exact path and Bearer authentication on every MCP HTTP request."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        request = Request(scope, receive)
+        if request.url.path == "/api/mcp" or request.url.path.startswith("/api/mcp/"):
+            if request.url.path != "/api/mcp":
+                response = JSONResponse({"detail": "Not found"}, status_code=404)
+                await response(scope, receive, send)
+                return
+            settings = get_settings()
+            host = request.headers.get("host", "")
+            host_allowed = any(
+                host == allowed or (allowed.endswith(":*") and host.startswith(allowed[:-2] + ":"))
+                for allowed in settings.mcp_allowed_hosts
+            )
+            if not host_allowed:
+                response = JSONResponse({"detail": "Disallowed MCP Host"}, status_code=421)
+                await response(scope, receive, send)
+                return
+            origin = request.headers.get("origin")
+            if origin and not any(
+                origin == allowed
+                or (allowed.endswith(":*") and origin.startswith(allowed[:-2] + ":"))
+                for allowed in settings.mcp_allowed_origins
+            ):
+                response = JSONResponse({"detail": "Disallowed MCP Origin"}, status_code=403)
+                await response(scope, receive, send)
+                return
+            try:
+                async with get_session_maker()() as session:
+                    await authenticate_bearer_header(session, request.headers.get("authorization"))
+            except HTTPException as exc:
+                response = JSONResponse(
+                    {"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 def create_app() -> FastAPI:
     """Build the FastAPI app. Factory style so tests can construct fresh instances."""
     app = FastAPI(title="Trading Journal", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(McpBoundaryMiddleware)
 
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(health.router)
@@ -102,6 +156,14 @@ def create_app() -> FastAPI:
     api.include_router(dashboard.router)
 
     app.include_router(api)
+    app.router.routes.append(
+        Route(
+            "/api/mcp",
+            endpoint=ExactMountRoot(sdk_transport),
+            methods=["GET", "POST", "DELETE"],
+            name="mcp",
+        )
+    )
 
     # Production single-container: also serve the built frontend SPA from
     # STATIC_DIR. In dev this is unset (Vite serves the SPA on :5173 and proxies

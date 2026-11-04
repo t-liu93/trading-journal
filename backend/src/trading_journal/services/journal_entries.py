@@ -520,7 +520,16 @@ async def prepare_entry(
     try:
         request = PrepareEntryRequest.model_validate(submitted)
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        fields = [
+            {
+                "path": ".".join(str(part) for part in item["loc"]),
+                "message": item["msg"],
+            }
+            for item in exc.errors()
+        ]
+        raise HTTPException(
+            status_code=422, detail={"code": "invalid_fields", "fields": fields}
+        ) from exc
     await _validate_pending_descriptor_batch(session, request)
     if (request.kind == "open_position") != (
         request.position is not None and request.position_id is None
@@ -662,7 +671,10 @@ async def prepare_entry(
         assert request.position_id is not None
         target = await resolve_owned_position(session, principal.user_id, request.position_id)
         if target.status is not PositionStatus.OPEN:
-            raise HTTPException(status_code=409, detail="closed Position is read-only")
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "position_closed", "message": "closed Position is read-only"},
+            )
         position_currency = target.currency
         preview["position"] = {
             "position_id": str(target.id),
@@ -836,7 +848,10 @@ async def commit_entry(
             deadline.replace(tzinfo=UTC) if deadline.tzinfo is None else deadline.astimezone(UTC)
         )
         if deadline <= now:
-            raise HTTPException(status_code=409, detail="Entry draft expired")
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "draft_expired", "message": "Entry draft expired"},
+            )
 
         frozen = PrepareEntryRequest.model_validate(draft.normalized_input)
         normalized = draft.normalized_input
@@ -888,7 +903,10 @@ async def commit_entry(
             # Refresh explicitly: a stale identity-map Position cannot authorize a write.
             await session.refresh(position)
             if position.status is not PositionStatus.OPEN:
-                raise HTTPException(status_code=409, detail="closed Position is read-only")
+                raise HTTPException(
+                    status_code=409,
+                    detail={"code": "position_closed", "message": "closed Position is read-only"},
+                )
 
         rows: list[TradeCreate] = []
         for index, leg in enumerate(frozen.legs):

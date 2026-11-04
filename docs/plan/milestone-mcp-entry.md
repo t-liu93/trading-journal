@@ -288,14 +288,14 @@ Execution order: **T7 phase A → T1 → T2 → T3 → T4 → T5 → T6 → T7 p
 
 **Acceptance:**
 
-- [ ] HTTP initialization/discovery/query/prepare/commit complete successfully.
-- [ ] Missing/invalid/expired/revoked credentials fail at the protocol boundary.
-- [ ] Direct write-tool calls cannot bypass read-only permissions.
-- [ ] Errors distinguish invalid fields, missing resources, closed Positions, expired drafts, request conflicts and retryable contention.
-- [ ] Disallowed Host/Origin rejects; normal agents without Origin work.
-- [ ] Multiple connections and a process restart preserve pending-draft usability.
-- [ ] Endpoint errors produce no SPA/login HTML/internal exception leakage.
-- [ ] Existing health/login/SPA deep links continue working.
+- [x] HTTP initialization/discovery/query/prepare/commit complete successfully.
+- [x] Missing/invalid/expired/revoked credentials fail at the protocol boundary.
+- [x] Direct write-tool calls cannot bypass read-only permissions.
+- [x] Errors distinguish invalid fields, missing resources, closed Positions, expired drafts, request conflicts and retryable contention.
+- [x] Disallowed Host/Origin rejects; normal agents without Origin work.
+- [x] Multiple connections and a process restart preserve pending-draft usability.
+- [x] Endpoint errors produce no SPA/login HTML/internal exception leakage.
+- [x] Existing health/login/SPA deep links continue working.
 
 **Checks:** Ruff/strict mypy/full pytest; a separately started HTTP MCP client verifies real protocol requests.
 
@@ -392,7 +392,7 @@ Surface material domain/scope changes before implementation; routine implementat
 | T3 shared services | Implemented | Passed (447 backend tests; cross-process and precision HTTP integration) | Passed (T3-C02; two repairs) | Pending |
 | T4 preparation | Implemented | Passed (455 backend tests; immutable/precision/currency boundary integration) | Passed (T4-C05; five repairs) | Pending |
 | T5 commit | Implemented | Passed (465 backend tests; atomic/retry/lock-expiry integration) | Passed (T5-C01; one repair) | Pending |
-| T6 HTTP MCP | Not started | Not run | Not requested | Pending |
+| T6 HTTP MCP | Implemented | Passed (472 backend tests; real HTTP/SDK, restart and discarded-response retry) | Passed (T6-C01; one repair) | Pending |
 | T7 phase A documentation | Implemented | Passed (targeted documentation checks) | Not requested | Pending |
 | T7 phase B integration | Not started | Not run | Not requested | Pending |
 

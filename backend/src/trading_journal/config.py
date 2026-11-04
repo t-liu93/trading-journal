@@ -38,6 +38,22 @@ class Settings(BaseSettings):
     session_lifetime_seconds: int = 60 * 60 * 24 * 7  # 7 days
     min_password_length: int = 8
     journal_timezone: str = "UTC"
+    mcp_allowed_hosts: list[str] = [
+        "127.0.0.1",
+        "127.0.0.1:*",
+        "localhost",
+        "localhost:*",
+        "[::1]",
+        "[::1]:*",
+    ]
+    mcp_allowed_origins: list[str] = [
+        "http://127.0.0.1",
+        "http://127.0.0.1:*",
+        "http://localhost",
+        "http://localhost:*",
+        "http://[::1]",
+        "http://[::1]:*",
+    ]
 
     @field_validator("journal_timezone")
     @classmethod

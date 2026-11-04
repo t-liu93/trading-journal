@@ -13,6 +13,7 @@ dependencies = [
     "alembic>=1.18.4",
     "fastapi-users[sqlalchemy]>=15.0.5",
     "fastapi[standard]>=0.136.1",
+    "mcp==2.3.0",
     "pydantic-settings>=2.14.1",
     "sqlalchemy[asyncio]>=2.0.49",
     "tzdata>=2025.2",

@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, cast
 
+from fastapi import HTTPException
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,8 +23,13 @@ MAX_PAGE_SIZE = 200
 
 
 def _page(limit: int, offset: int) -> None:
-    if not 1 <= limit <= MAX_PAGE_SIZE or offset < 0:
-        raise ValueError("limit must be between 1 and 200 and offset must be nonnegative")
+    fields = []
+    if not 1 <= limit <= MAX_PAGE_SIZE:
+        fields.append({"path": "limit", "message": "must be between 1 and 200"})
+    if offset < 0:
+        fields.append({"path": "offset", "message": "must be nonnegative"})
+    if fields:
+        raise HTTPException(status_code=422, detail={"code": "invalid_fields", "fields": fields})
 
 
 async def _fetch_page[T](
