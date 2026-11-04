@@ -233,12 +233,12 @@ Execution order: **T7 phase A → T1 → T2 → T3 → T4 → T5 → T6 → T7 p
 
 **Acceptance:**
 
-- [ ] New-position and addition requests prepare single-/multi-leg drafts.
-- [ ] Missing values, action-kind mismatch, fractional option quantity, invalid time and foreign/closed target do not create a valid draft.
-- [ ] Preview includes defaults, pending instruments and all time representations.
-- [ ] Preparation changes no real instrument/Position/Trade counts.
-- [ ] Identical retries return one draft; changed content under the same request ID conflicts.
-- [ ] Drafts contain no token plaintext and cannot be taken over by another credential.
+- [x] New-position and addition requests prepare single-/multi-leg drafts.
+- [x] Missing values, action-kind mismatch, fractional option quantity, invalid time and foreign/closed target do not create a valid draft.
+- [x] Preview includes defaults, pending instruments and all time representations.
+- [x] Preparation changes no real instrument/Position/Trade counts.
+- [x] Identical retries return one draft; changed content under the same request ID conflicts.
+- [x] Drafts contain no token plaintext and cannot be taken over by another credential.
 
 **Checks:** Ruff/strict mypy; preparation and migration tests.
 
@@ -390,7 +390,7 @@ Surface material domain/scope changes before implementation; routine implementat
 | T1 time/context | Implemented | Passed (card checks and isolated timezone integration) | Passed (T1-C00) | Pending |
 | T2 credentials | Implemented | Passed (full backend/frontend/migration/codegen; real HTTP isolation) | Passed (T2-C01; one repair) | Pending |
 | T3 shared services | Implemented | Passed (447 backend tests; cross-process and precision HTTP integration) | Passed (T3-C02; two repairs) | Pending |
-| T4 preparation | Not started | Not run | Not requested | Pending |
+| T4 preparation | Implemented | Passed (455 backend tests; immutable/precision/currency boundary integration) | Passed (T4-C05; five repairs) | Pending |
 | T5 commit | Not started | Not run | Not requested | Pending |
 | T6 HTTP MCP | Not started | Not run | Not requested | Pending |
 | T7 phase A documentation | Implemented | Passed (targeted documentation checks) | Not requested | Pending |

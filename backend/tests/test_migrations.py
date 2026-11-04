@@ -20,6 +20,7 @@ EXPECTED_DOMAIN_TABLES = {
     "access_tokens",
     "app_config",
     "mcp_tokens",
+    "journal_entry_drafts",
     "accounts",
     "instruments",
     "option_contracts",

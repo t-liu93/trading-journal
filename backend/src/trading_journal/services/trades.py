@@ -1,5 +1,7 @@
 """Trade service layer — cash-flow formula and action-kind guards (P9)."""
 
+import uuid
+from collections.abc import Sequence
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,22 @@ from trading_journal.services.datetimes import to_utc_naive
 _SELL_SIDE_ACTIONS = {TradeAction.SELL, TradeAction.STO, TradeAction.STC}
 _OPTION_ACTIONS = {TradeAction.BTO, TradeAction.STO, TradeAction.BTC, TradeAction.STC}
 _NONOPTION_ACTIONS = {TradeAction.BUY, TradeAction.SELL}
+
+
+def normalize_order_group_ids(
+    order_group_ids: Sequence[uuid.UUID | None], *, generate_for_multiple: bool
+) -> list[uuid.UUID | None]:
+    """Apply the shared REST/entry semantics for a batch of Trade legs."""
+    supplied = {group_id for group_id in order_group_ids if group_id is not None}
+    if len(supplied) > 1:
+        raise ValueError("rows in a multi-leg POST must share order_group_id")
+    if supplied:
+        group_id = next(iter(supplied))
+    elif generate_for_multiple and len(order_group_ids) > 1:
+        group_id = uuid.uuid4()
+    else:
+        group_id = None
+    return [group_id] * len(order_group_ids)
 
 
 def compute_cash_flow(

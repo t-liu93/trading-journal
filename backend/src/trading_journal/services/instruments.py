@@ -47,24 +47,21 @@ def instrument_query(
             OptionContract.expiry >= current_utc_date()
         )
         stmt = stmt.where(
-            (Instrument.kind != InstrumentKind.OPTION)
-            | Instrument.id.in_(active_option_ids)
+            (Instrument.kind != InstrumentKind.OPTION) | Instrument.id.in_(active_option_ids)
         )
     if option_underlying_id is not None:
         option_ids = select(OptionContract.instrument_id).where(
             OptionContract.underlying_id == option_underlying_id
         )
         stmt = stmt.where(
-            (Instrument.kind != InstrumentKind.OPTION)
-            | Instrument.id.in_(option_ids)
+            (Instrument.kind != InstrumentKind.OPTION) | Instrument.id.in_(option_ids)
         )
     if related_underlying_id is not None:
         related_options = select(OptionContract.instrument_id).where(
             OptionContract.underlying_id == related_underlying_id
         )
         stmt = stmt.where(
-            (Instrument.id == related_underlying_id)
-            | Instrument.id.in_(related_options)
+            (Instrument.id == related_underlying_id) | Instrument.id.in_(related_options)
         )
     return stmt
 
@@ -169,9 +166,7 @@ async def resolve_instrument_spec(
     return await _resolve_forex_spec(session, payload)
 
 
-async def _resolve_forex_spec(
-    session: AsyncSession, payload: ForexCreate
-) -> Instrument | None:
+async def _resolve_forex_spec(session: AsyncSession, payload: ForexCreate) -> Instrument | None:
     stmt = select(Instrument).where(
         Instrument.kind == InstrumentKind.FOREX,
         Instrument.symbol == payload.symbol.strip().upper(),
@@ -183,9 +178,7 @@ async def _resolve_forex_spec(
     if pair is None or (
         pair.base_currency != payload.base_currency
         or pair.quote_currency != payload.quote_currency
-        or _database_numeric_value(
-            session, ForexPair.__table__.c.pip_size.type, payload.pip_size
-        )
+        or _database_numeric_value(session, ForexPair.__table__.c.pip_size.type, payload.pip_size)
         != pair.pip_size
         or _optional_database_numeric_value(
             session,
@@ -204,13 +197,22 @@ def _database_numeric_value(
     """Apply this database dialect's Numeric bind/read conversion to a value."""
     dialect = session.get_bind().dialect
     numeric_type = column_type.dialect_impl(dialect)
-    bind = numeric_type.bind_processor(dialect)
     result = numeric_type.result_processor(dialect, None)
-    bound_value = bind(value) if bind is not None else value
+    bound_value = _database_numeric_bind_value(session, column_type, value)
     converted = result(bound_value) if result is not None else bound_value
     if not isinstance(converted, Decimal):
         raise TypeError("Numeric dialect conversion did not return Decimal")
     return converted
+
+
+def _database_numeric_bind_value(
+    session: AsyncSession, column_type: TypeEngine[Any], value: Decimal
+) -> Any:
+    """Apply only the dialect's Numeric bind conversion, as an SQL equality key does."""
+    dialect = session.get_bind().dialect
+    numeric_type = column_type.dialect_impl(dialect)
+    bind = numeric_type.bind_processor(dialect)
+    return bind(value) if bind is not None else value
 
 
 def _optional_database_numeric_value(
@@ -218,11 +220,7 @@ def _optional_database_numeric_value(
     column_type: TypeEngine[Any],
     value: Decimal | None,
 ) -> Decimal | None:
-    return (
-        None
-        if value is None
-        else _database_numeric_value(session, column_type, value)
-    )
+    return None if value is None else _database_numeric_value(session, column_type, value)
 
 
 async def get_or_create_instrument(

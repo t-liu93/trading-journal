@@ -27,7 +27,7 @@ from trading_journal.models.user import User
 from trading_journal.schemas.trade import TradeCreate, TradeRead, TradeUpdate
 from trading_journal.services.ownership import resolve_owned_position, resolve_owned_trade
 from trading_journal.services.positions import maintain_opened_at_from_active_trades
-from trading_journal.services.trades import create_trades_atomic
+from trading_journal.services.trades import create_trades_atomic, normalize_order_group_ids
 
 router = APIRouter(prefix="/trades", tags=["trades"])
 
@@ -78,20 +78,13 @@ async def create_trades(
             detail="all rows in a multi-leg POST must share the same position_id",
         )
 
-    # order_group_id: if any row supplies it, all must agree.
-    supplied_ogids = {row.order_group_id for row in rows if row.order_group_id}
-    if len(supplied_ogids) > 1:
-        raise HTTPException(
-            status_code=422,
-            detail="rows in a multi-leg POST must share order_group_id",
+    try:
+        normalized_group_ids = normalize_order_group_ids(
+            [row.order_group_id for row in rows], generate_for_multiple=was_array
         )
-    if supplied_ogids:
-        group_id = supplied_ogids.pop()
-    elif was_array and len(rows) > 1:
-        group_id = uuid.uuid4()
-    else:
-        group_id = None
-    for row in rows:
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    for row, group_id in zip(rows, normalized_group_ids, strict=True):
         row.order_group_id = group_id
 
     position = await _resolve_position(session, user, rows[0].position_id)

@@ -17,6 +17,7 @@ from trading_journal.models import (
     User,
     WheelCycleMeta,
 )
+from trading_journal.models.journal_entry_draft import JournalEntryDraft
 
 EXPECTED_TABLES = {
     "users",
@@ -33,6 +34,7 @@ EXPECTED_TABLES = {
     "strategy_configs",
     "wheel_cycle_metas",
     "pmcc_cycle_metas",
+    "journal_entry_drafts",
 }
 
 
@@ -53,6 +55,7 @@ def test_models_can_be_imported() -> None:
         StrategyConfig,
         WheelCycleMeta,
         PmccCycleMeta,
+        JournalEntryDraft,
     )
     for cls in classes:
         assert hasattr(cls, "__tablename__"), f"{cls.__name__} not mapped"
